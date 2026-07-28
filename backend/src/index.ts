@@ -3,6 +3,7 @@ import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { errorHandler } from "./lib/errors";
 import healthRoute from "./routes/health";
+import authRoute from "./routes/auth";
 
 const app = new Hono();
 
@@ -16,6 +17,7 @@ app.onError(errorHandler);
 // Base API Route Group
 const api = new Hono();
 api.route("/health", healthRoute);
+api.route("/auth", authRoute);
 
 // Mount under /api prefix
 app.route("/api", api);
