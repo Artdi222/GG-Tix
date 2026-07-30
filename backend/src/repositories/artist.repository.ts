@@ -1,6 +1,3 @@
-import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { artists } from "../db/schema";
 import { eq, ilike, desc, count } from "drizzle-orm";
 import { db } from "../db";
 import { artists, events } from "../db/schema";
@@ -50,7 +47,6 @@ export async function updateArtist(
   }
 ) {
   const updateData: Record<string, any> = {};
-
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.bio !== undefined) updateData.bio = data.bio ? data.bio.trim() : null;
   if (data.photoUrl !== undefined)
