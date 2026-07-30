@@ -5,6 +5,7 @@ import { errorHandler } from "./lib/errors";
 import healthRoute from "./routes/health";
 import authRoute from "./routes/auth";
 import eventRoute from "./routes/event";
+import artistsRoute from "./routes/artists";
 
 const app = new Hono();
 
@@ -20,6 +21,7 @@ const api = new Hono();
 api.route("/health", healthRoute);
 api.route("/auth", authRoute);
 api.route("/events", eventRoute);
+api.route("/artists", artistsRoute);
 
 // Mount under /api prefix
 app.route("/api", api);
@@ -27,6 +29,8 @@ app.route("/api", api);
 app.get("/", (c) => {
   return c.text("GG Tix API Server - Running");
 });
+
+export { app };
 
 export default {
   port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
