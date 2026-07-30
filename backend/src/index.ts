@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { errorHandler } from "./lib/errors";
 import healthRoute from "./routes/health";
 import authRoute from "./routes/auth";
+import eventRoute from "./routes/event";
 import artistsRoute from "./routes/artists";
 
 const app = new Hono();
@@ -19,6 +20,7 @@ app.onError(errorHandler);
 const api = new Hono();
 api.route("/health", healthRoute);
 api.route("/auth", authRoute);
+api.route("/events", eventRoute);
 api.route("/artists", artistsRoute);
 
 // Mount under /api prefix

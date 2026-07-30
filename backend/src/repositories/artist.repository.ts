@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { artists } from "../db/schema";
 import { eq, ilike, desc, count } from "drizzle-orm";
 import { db } from "../db";
 import { artists, events } from "../db/schema";
