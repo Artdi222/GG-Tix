@@ -1,19 +1,27 @@
 {
-  "name": "fe",
-  "type": "module",
+  "name": "t",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
-    "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@iconify-json/lucide": "^1.2.121",
+    "@iconify-json/simple-icons": "^1.2.92",
     "@nuxt/ui": "^4.10.0",
     "nuxt": "^4.5.1",
-    "tailwindcss": "^4.3.3",
-    "vue": "^3.5.40",
-    "vue-router": "^5.2.0"
-  }
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.16.0",
+    "eslint": "^10.8.0",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.9"
+  },
+  "packageManager": "pnpm@11.18.0"
 }
