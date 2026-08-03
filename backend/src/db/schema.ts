@@ -1,6 +1,5 @@
 // src/db/schema.ts
 // Drizzle ORM schema — PostgreSQL
-// Maps to PRD Section 8.3. WAJIB tables first; BONUS tables at the bottom.
 
 import {
   pgTable,
@@ -26,11 +25,6 @@ export const orderStatusEnum = pgEnum("order_status", [
   "rejected",
 ]);
 
-// =========================================================
-// WAJIB — required by the task sheet
-// =========================================================
-
-// W-1: Admin login
 export const admins = pgTable("admins", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
@@ -40,7 +34,6 @@ export const admins = pgTable("admins", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// M-1: Customer register/login
 export const customers = pgTable("customers", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
@@ -49,7 +42,6 @@ export const customers = pgTable("customers", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// W-4: CRUD Artis
 export const artists = pgTable("artists", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 150 }).notNull(),
@@ -58,7 +50,6 @@ export const artists = pgTable("artists", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// W-2: CRUD Event/Konser
 export const events = pgTable(
   "events",
   {
@@ -93,7 +84,6 @@ export const ticketCategories = pgTable("ticket_categories", {
   quotaRemaining: integer("quota_remaining").notNull(),
 });
 
-// M-5: place an order, W-5/W-6: admin views + verifies
 export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
   customerId: uuid("customer_id")
@@ -112,10 +102,6 @@ export const orders = pgTable("orders", {
   verifiedBy: uuid("verified_by").references(() => admins.id),
   verifiedAt: timestamp("verified_at"),
 });
-
-// =========================================================
-// BONUS — reserved for future feature branches
-// =========================================================
 
 export const paymentProofs = pgTable("payment_proofs", {
   id: uuid("id").defaultRandom().primaryKey(),
