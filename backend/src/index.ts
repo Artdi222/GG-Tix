@@ -6,6 +6,7 @@ import healthRoute from "./routes/health";
 import authRoute from "./routes/auth";
 import eventRoute from "./routes/event";
 import artistsRoute from "./routes/artists";
+import categoryRoute from "./routes/categories";
 
 const app = new Hono();
 
@@ -22,6 +23,7 @@ api.route("/health", healthRoute);
 api.route("/auth", authRoute);
 api.route("/events", eventRoute);
 api.route("/artists", artistsRoute);
+api.route("/", categoryRoute);
 
 // Mount under /api prefix
 app.route("/api", api);
