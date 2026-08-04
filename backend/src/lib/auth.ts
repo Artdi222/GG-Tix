@@ -8,10 +8,14 @@ const JWT_SECRET = new TextEncoder().encode(
 export interface TokenPayload {
   sub: string;
   role: "admin" | "customer";
+  adminRole?: "super_admin" | "staff";
 }
 
 export async function signToken(payload: TokenPayload): Promise<string> {
-  return await new SignJWT({ role: payload.role })
+  return await new SignJWT({
+    role: payload.role,
+    ...(payload.adminRole ? { adminRole: payload.adminRole } : {}),
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -28,6 +32,7 @@ export async function verifyToken(token: string): Promise<TokenPayload> {
     return {
       sub: payload.sub as string,
       role: payload.role as "admin" | "customer",
+      ...(payload.adminRole ? { adminRole: payload.adminRole as "super_admin" | "staff" } : {}),
     };
   } catch (error) {
     if (error instanceof AppError) throw error;

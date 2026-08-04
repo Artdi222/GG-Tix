@@ -14,7 +14,7 @@ export async function adminLogin(email: string, password: string) {
     throw new AppError("Invalid email or password", 401);
   }
 
-  const token = await signToken({ sub: admin.id, role: "admin" });
+  const token = await signToken({ sub: admin.id, role: "admin", adminRole: admin.role });
 
   return {
     token,
