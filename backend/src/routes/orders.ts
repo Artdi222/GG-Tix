@@ -40,7 +40,7 @@ const adminQuerySchema = z.object({
     ),
 });
 
-// POST /api/orders — M-5 (customer places order)
+// POST /api/orders — (customer places order)
 orderRoute.post(
   "/",
   authMiddleware,
@@ -60,14 +60,14 @@ orderRoute.post(
   }
 );
 
-// GET /api/orders/me — M-6 (customer's own order history)
+// GET /api/orders/me — (customer's own order history)
 orderRoute.get("/me", authMiddleware, customerOnly, async (c) => {
   const user = c.get("user");
   const data = await orderService.getCustomerOrders(user.sub);
   return c.json({ data });
 });
 
-// GET /api/orders — W-5 (admin sees all orders)
+// GET /api/orders — (admin sees all orders)
 orderRoute.get(
   "/",
   authMiddleware,
@@ -83,7 +83,7 @@ orderRoute.get(
   }
 );
 
-// PATCH /api/orders/:id/verify — W-6 (admin verify/reject payment)
+// PATCH /api/orders/:id/verify — (admin verify/reject payment)
 orderRoute.patch(
   "/:id/verify",
   authMiddleware,

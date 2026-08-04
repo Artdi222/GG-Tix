@@ -29,6 +29,14 @@ export async function adminOnly(c: Context, next: Next) {
   await next();
 }
 
+export async function superAdminOnly(c: Context, next: Next) {
+  const user = c.get("user");
+  if (!user || user.role !== "admin" || user.adminRole !== "super_admin") {
+    throw new AppError("Access denied: Super admin role required", 403);
+  }
+  await next();
+}
+
 export async function customerOnly(c: Context, next: Next) {
   const user = c.get("user");
   if (!user || user.role !== "customer") {

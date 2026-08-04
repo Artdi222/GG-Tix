@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as artistService from "../services/artist.service";
-import { authMiddleware, adminOnly } from "../lib/middleware";
+import { authMiddleware, adminOnly, superAdminOnly } from "../lib/middleware";
 
 const artistsRoute = new Hono();
 
@@ -55,7 +55,7 @@ artistsRoute.get("/:id", async (c) => {
 artistsRoute.post(
   "/",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("json", createArtistSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -74,7 +74,7 @@ artistsRoute.post(
 artistsRoute.put(
   "/:id",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("json", updateArtistSchema),
   async (c) => {
     const id = c.req.param("id")!;
@@ -88,7 +88,7 @@ artistsRoute.put(
 );
 
 // DELETE /api/artists/:id - Admin only delete
-artistsRoute.delete("/:id", authMiddleware, adminOnly, async (c) => {
+artistsRoute.delete("/:id", authMiddleware, superAdminOnly, async (c) => {
   const id = c.req.param("id")!;
   const data = await artistService.deleteArtist(id);
   return c.json({
