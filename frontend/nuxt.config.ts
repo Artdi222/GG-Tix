@@ -1,6 +1,19 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devServer: { port: 3001 },
+  colorMode: {
+    preference: 'light',
+    fallback: 'light'
+  },
+
+  app:{
+    head: {
+      meta: [
+        {name: 'color-scheme', content: 'light'}
+      ]
+    }
+  },
+
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
