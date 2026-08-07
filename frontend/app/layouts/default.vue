@@ -5,6 +5,7 @@ const isMobileMenuOpen = ref(false)
 const navItems = [
   { label: 'Dashboard', to: '/', icon: 'i-lucide-layout-dashboard' },
   { label: 'Concerts', to: '/concerts', icon: 'i-lucide-calendar' },
+  { label: 'Venues', to: '/venues', icon: 'i-lucide-map-pin' },
   { label: 'Artists', to: '/artists', icon: 'i-lucide-users' },
   { label: 'Orders', to: '/orders', icon: 'i-lucide-shopping-cart' },
   { label: 'Settings', to: '/settings', icon: 'i-lucide-settings' }
