@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { errorHandler } from "./lib/errors";
+import { bodySizeLimit } from "./lib/middleware";
 import healthRoute from "./routes/health";
 import authRoute from "./routes/auth";
 import eventRoute from "./routes/event";
@@ -12,9 +13,19 @@ import dashboardRoute from "./routes/dashboard";
 
 const app = new Hono();
 
+// CORS origin whitelist
+const corsOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+if (process.env.NODE_ENV !== "production") {
+  corsOrigins.push("http://localhost:5173", "http://localhost:3001", "http://localhost:3000");
+}
+
 // Global Middlewares
 app.use("*", logger());
-app.use("*", cors());
+app.use("*", cors({ origin: corsOrigins, credentials: true }));
+app.use("*", bodySizeLimit());
 
 // Global Error Handler
 app.onError(errorHandler);

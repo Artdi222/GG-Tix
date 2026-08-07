@@ -1,4 +1,4 @@
-import { eq, and, desc, count, SQL } from "drizzle-orm";
+import { eq, and, desc, count, SQL, sql } from "drizzle-orm";
 import { db } from "../db";
 import { orders, ticketCategories, events, customers } from "../db/schema";
 
@@ -40,7 +40,7 @@ export async function createOrder(data: CreateOrderInput) {
       return { error: "EVENT_CLOSED" as const };
     }
 
-    // 2. Check category exists and belongs to this event
+    // 2. Check category exists and belongs to this event (with row-level lock)
     const [category] = await tx
       .select()
       .from(ticketCategories)
@@ -50,6 +50,7 @@ export async function createOrder(data: CreateOrderInput) {
           eq(ticketCategories.eventId, data.eventId)
         )
       )
+      .for("update")
       .limit(1);
 
     if (!category) {
@@ -64,10 +65,12 @@ export async function createOrder(data: CreateOrderInput) {
       };
     }
 
-    // 4. Deduct quota
+    // 4. Deduct quota atomically (decrement in single SQL statement)
     await tx
       .update(ticketCategories)
-      .set({ quotaRemaining: category.quotaRemaining - data.quantity })
+      .set({
+        quotaRemaining: sql`${ticketCategories.quotaRemaining} - ${data.quantity}`,
+      })
       .where(eq(ticketCategories.id, data.categoryId));
 
     // 5. Compute total price and insert order
@@ -104,16 +107,39 @@ export async function findOrderById(id: string) {
   return order || null;
 }
 
-/** Customer's own order history */
-export async function findOrdersByCustomerId(customerId: string) {
-  return await db.query.orders.findMany({
+/** Customer's own order history (with pagination) */
+export async function findOrdersByCustomerId(
+  customerId: string,
+  page: number = 1,
+  limit: number = 10
+) {
+  const offset = (page - 1) * limit;
+
+  const items = await db.query.orders.findMany({
     where: eq(orders.customerId, customerId),
     orderBy: [desc(orders.createdAt)],
+    limit,
+    offset,
     with: {
       event: { columns: { title: true, dateTime: true } },
       category: { columns: { name: true } },
     },
   });
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(orders)
+    .where(eq(orders.customerId, customerId));
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      totalCount: Number(total),
+      totalPages: Math.ceil(Number(total) / limit),
+    },
+  };
 }
 
 /** Admin: list all orders with filters + pagination */

@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as orderService from "../services/order.service";
-import { authMiddleware, adminOnly, customerOnly } from "../lib/middleware";
+import {
+  authMiddleware,
+  adminOnly,
+  customerOnly,
+  orderRateLimiter,
+} from "../lib/middleware";
 
 const orderRoute = new Hono();
 
@@ -40,11 +45,25 @@ const adminQuerySchema = z.object({
     ),
 });
 
+const customerQuerySchema = z.object({
+  page: z
+    .string()
+    .optional()
+    .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
+  limit: z
+    .string()
+    .optional()
+    .transform((val) =>
+      val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10
+    ),
+});
+
 // POST /api/orders — (customer places order)
 orderRoute.post(
   "/",
   authMiddleware,
   customerOnly,
+  orderRateLimiter,
   zValidator("json", placeOrderSchema),
   async (c) => {
     const user = c.get("user");
@@ -61,11 +80,18 @@ orderRoute.post(
 );
 
 // GET /api/orders/me — (customer's own order history)
-orderRoute.get("/me", authMiddleware, customerOnly, async (c) => {
-  const user = c.get("user");
-  const data = await orderService.getCustomerOrders(user.sub);
-  return c.json({ data });
-});
+orderRoute.get(
+  "/me",
+  authMiddleware,
+  customerOnly,
+  zValidator("query", customerQuerySchema),
+  async (c) => {
+    const user = c.get("user");
+    const query = c.req.valid("query");
+    const result = await orderService.getCustomerOrders(user.sub, query.page, query.limit);
+    return c.json({ data: result.items, pagination: result.pagination });
+  }
+);
 
 // GET /api/orders — (admin sees all orders)
 orderRoute.get(

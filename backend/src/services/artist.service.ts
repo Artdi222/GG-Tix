@@ -13,8 +13,8 @@ export interface UpdateArtistDTO {
   photoUrl?: string;
 }
 
-export async function getAllArtists(search?: string) {
-  return await artistRepo.findAllArtists(search);
+export async function getAllArtists(search?: string, page?: number, limit?: number) {
+  return await artistRepo.findAllArtists({ search, page: page ?? 1, limit: limit ?? 10 });
 }
 
 export async function getArtistById(id: string) {

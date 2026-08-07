@@ -137,7 +137,7 @@ export async function updateEvent(id: string, data: UpdateEventInput) {
     .where(eq(events.id, id))
     .returning();
 
-  return updated ? await findEventById(id) : null;
+  return updated ?? null;
 }
 
 export async function updateEventStatus(id: string, status: "open" | "closed") {
@@ -146,7 +146,7 @@ export async function updateEventStatus(id: string, status: "open" | "closed") {
     .set({ status })
     .where(eq(events.id, id))
     .returning();
-  return updated ? await findEventById(id) : null;
+  return updated ?? null;
 }
 
 export async function deleteEvent(id: string) {

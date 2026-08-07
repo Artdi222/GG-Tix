@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-// ---------- enums ----------
+// enums
 
 export const adminRoleEnum = pgEnum("admin_role", ["super_admin", "staff"]);
 export const eventStatusEnum = pgEnum("event_status", ["open", "closed"]);
@@ -70,6 +70,9 @@ export const events = pgTable(
   },
   (table) => ({
     publisherIdx: index("events_publisher_idx").on(table.publisherName),
+    cityIdx: index("events_city_idx").on(table.city),
+    statusIdx: index("events_status_idx").on(table.status),
+    artistIdx: index("events_artist_id_idx").on(table.artistId),
   })
 );
 
@@ -84,24 +87,32 @@ export const ticketCategories = pgTable("ticket_categories", {
   quotaRemaining: integer("quota_remaining").notNull(),
 });
 
-export const orders = pgTable("orders", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  customerId: uuid("customer_id")
-    .notNull()
-    .references(() => customers.id),
-  eventId: uuid("event_id")
-    .notNull()
-    .references(() => events.id),
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => ticketCategories.id),
-  quantity: integer("quantity").notNull(),
-  totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
-  status: orderStatusEnum("status").notNull().default("pending"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  verifiedBy: uuid("verified_by").references(() => admins.id),
-  verifiedAt: timestamp("verified_at"),
-});
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => ticketCategories.id),
+    quantity: integer("quantity").notNull(),
+    totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
+    status: orderStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    verifiedBy: uuid("verified_by").references(() => admins.id),
+    verifiedAt: timestamp("verified_at"),
+  },
+  (table) => ({
+    statusIdx: index("orders_status_idx").on(table.status),
+    eventIdx: index("orders_event_id_idx").on(table.eventId),
+    customerIdx: index("orders_customer_id_idx").on(table.customerId),
+  })
+);
 
 export const paymentProofs = pgTable("payment_proofs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -121,7 +132,7 @@ export const tickets = pgTable("tickets", {
   checkedIn: boolean("checked_in").notNull().default(false),
 });
 
-// ---------- relations ----------
+// relations
 
 export const artistsRelations = relations(artists, ({ many }) => ({
   events: many(events),

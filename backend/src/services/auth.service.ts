@@ -1,5 +1,5 @@
 import { AppError } from "../lib/errors";
-import { signToken } from "../lib/auth";
+import { signToken, signRefreshToken, verifyRefreshToken } from "../lib/auth";
 import * as adminRepo from "../repositories/admin.repository";
 import * as customerRepo from "../repositories/customer.repository";
 
@@ -15,9 +15,11 @@ export async function adminLogin(email: string, password: string) {
   }
 
   const token = await signToken({ sub: admin.id, role: "admin", adminRole: admin.role });
+  const refreshToken = await signRefreshToken({ sub: admin.id, role: "admin", adminRole: admin.role });
 
   return {
     token,
+    refreshToken,
     user: {
       id: admin.id,
       name: admin.name,
@@ -41,9 +43,11 @@ export async function customerRegister(name: string, email: string, password: st
   });
 
   const token = await signToken({ sub: customer.id, role: "customer" });
+  const refreshToken = await signRefreshToken({ sub: customer.id, role: "customer" });
 
   return {
     token,
+    refreshToken,
     user: {
       id: customer.id,
       name: customer.name,
@@ -65,9 +69,11 @@ export async function customerLogin(email: string, password: string) {
   }
 
   const token = await signToken({ sub: customer.id, role: "customer" });
+  const refreshToken = await signRefreshToken({ sub: customer.id, role: "customer" });
 
   return {
     token,
+    refreshToken,
     user: {
       id: customer.id,
       name: customer.name,
@@ -97,4 +103,16 @@ export async function getMe(userId: string, role: "admin" | "customer") {
       role: "customer" as const,
     };
   }
+}
+
+export async function refreshAccessToken(refreshToken: string) {
+  const payload = await verifyRefreshToken(refreshToken);
+
+  const newToken = await signToken({
+    sub: payload.sub,
+    role: payload.role,
+    ...(payload.adminRole ? { adminRole: payload.adminRole } : {}),
+  });
+
+  return { token: newToken };
 }

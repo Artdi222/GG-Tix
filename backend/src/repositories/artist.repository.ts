@@ -1,16 +1,42 @@
-import { eq, ilike, desc, count } from "drizzle-orm";
+import { eq, ilike, desc, count, and } from "drizzle-orm";
 import { db } from "../db";
 import { artists, events } from "../db/schema";
 
-export async function findAllArtists(search?: string) {
-  if (search && search.trim() !== "") {
-    return await db
-      .select()
-      .from(artists)
-      .where(ilike(artists.name, `%${search.trim()}%`))
-      .orderBy(desc(artists.createdAt));
-  }
-  return await db.select().from(artists).orderBy(desc(artists.createdAt));
+export interface ArtistQuery {
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function findAllArtists(filters: ArtistQuery = {}) {
+  const { search, page = 1, limit = 10 } = filters;
+  const offset = (page - 1) * limit;
+
+  const conditions = search && search.trim() !== "" ? [ilike(artists.name, `%${search.trim()}%`)] : [];
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const items = await db
+    .select()
+    .from(artists)
+    .where(whereClause)
+    .orderBy(desc(artists.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(artists)
+    .where(whereClause);
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      totalCount: Number(total),
+      totalPages: Math.ceil(Number(total) / limit),
+    },
+  };
 }
 
 export async function findArtistById(id: string) {

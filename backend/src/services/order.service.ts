@@ -34,8 +34,12 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
   return result;
 }
 
-export async function getCustomerOrders(customerId: string) {
-  return await orderRepo.findOrdersByCustomerId(customerId);
+export async function getCustomerOrders(
+  customerId: string,
+  page?: number,
+  limit?: number
+) {
+  return await orderRepo.findOrdersByCustomerId(customerId, page ?? 1, limit ?? 10);
 }
 
 export async function listOrders(filters: orderRepo.OrderQueryFilters) {

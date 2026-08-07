@@ -6,6 +6,19 @@ import { authMiddleware, adminOnly, superAdminOnly } from "../lib/middleware";
 
 const artistsRoute = new Hono();
 
+const listQuerySchema = z.object({
+  q: z.string().optional(),
+  search: z.string().optional(),
+  page: z
+    .string()
+    .optional()
+    .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
+  limit: z
+    .string()
+    .optional()
+    .transform((val) => (val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10)),
+});
+
 const createArtistSchema = z.object({
   name: z
     .string()
@@ -33,12 +46,14 @@ const updateArtistSchema = z.object({
     .or(z.literal("")),
 });
 
-// GET /api/artists - Public list with optional search query (?q= or ?search=)
-artistsRoute.get("/", async (c) => {
-  const search = c.req.query("q") || c.req.query("search");
-  const data = await artistService.getAllArtists(search);
+// GET /api/artists - Public list with optional search (?q= or ?search=) + pagination
+artistsRoute.get("/", zValidator("query", listQuerySchema), async (c) => {
+  const query = c.req.valid("query");
+  const search = query.q || query.search;
+  const result = await artistService.getAllArtists(search, query.page, query.limit);
   return c.json({
-    data,
+    data: result.items,
+    pagination: result.pagination,
   });
 });
 
