@@ -132,7 +132,7 @@ export const orderRateLimiter = rateLimit({
 // Body Size Limit
 
 const BODY_SIZE_LIMIT = parseInt(
-  process.env.BODY_SIZE_LIMIT || "1048576",
+  process.env.BODY_SIZE_LIMIT || "10485760",
   10
 );
 
@@ -142,7 +142,7 @@ export function bodySizeLimit(bytes: number = BODY_SIZE_LIMIT) {
     if (contentLength > bytes) {
       return c.json(
         {
-          error: "Request body terlalu besar. Maksimal 1 MB.",
+          error: "Request body terlalu besar. Batas ukuran terlampaui.",
         },
         413 as any
       );
