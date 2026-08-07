@@ -15,8 +15,8 @@ interface UpcomingShow {
   capacity: number
 }
 
-const { data: stats } = await useFetch<DashboardStats>('/api/dashboard/stats')
-const { data: upcomingShows } = await useFetch<UpcomingShow[]>('/api/dashboard/upcoming')
+const { data: stats } = await useFetch<DashboardStats>('/api/dummy/dashboard/stats')
+const { data: upcomingShows } = await useFetch<UpcomingShow[]>('/api/dummy/dashboard/upcoming')
 
 const statCards = computed(() => [
   { label: 'Total Events', value: stats.value?.totalEvents ?? 0, icon: 'i-lucide-calendar' },
