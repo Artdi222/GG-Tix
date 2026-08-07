@@ -4,9 +4,11 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 definePageMeta({ layout: false })
 
+const { login } = useAuth()
+
 const schema = v.object({
-  email: v.pipe(v.string(), v.email('Invalid email format')),
-  password: v.pipe(v.string(), v.minLength(8, 'Password must be at least 8 characters'))
+  email: v.pipe(v.string(), v.email('Format email tidak valid')),
+  password: v.pipe(v.string(), v.minLength(6, 'Password minimal 6 karakter'))
 })
 type Schema = v.InferOutput<typeof schema>
 
@@ -24,12 +26,10 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   isLoading.value = true
   loginError.value = ''
   try {
-    // TODO: replace this simulation with a call to /api/auth/login once the backend is ready
-    // const { data } = await $fetch('/api/auth/login', { method: 'POST', body: event.data })
-    await new Promise((resolve) => setTimeout(resolve, 900))
+    await login(event.data.email, event.data.password)
     await navigateTo('/')
-  } catch {
-    loginError.value = 'Incorrect email or password'
+  } catch (err: any) {
+    loginError.value = err.data?.error || err.message || 'Email atau password salah'
   } finally {
     isLoading.value = false
   }
