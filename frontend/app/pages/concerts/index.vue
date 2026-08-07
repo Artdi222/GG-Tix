@@ -9,9 +9,11 @@ interface Concert {
   status: 'on-sale' | 'almost-sold-out' | 'sold-out' | 'draft'
 }
 
-const { data: concerts } = await useFetch<Concert[]>('/api/dummy/concert/concerts')
+const { data: concerts } = await useFetch<Concert[]>('/api/concerts')
 
 const search = ref('')
+const isFormOpen = ref(false)
+const editingConcert = ref<Concert | null>(null)
 
 const filteredConcerts = computed(() => {
   if (!search.value.trim()) return concerts.value ?? []
@@ -32,6 +34,26 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function openCreate() {
+  editingConcert.value = null
+  isFormOpen.value = true
+}
+
+function openEdit(concert: Concert) {
+  editingConcert.value = concert
+  isFormOpen.value = true
+}
+
+function onSaved(concert: Concert) {
+  const list = concerts.value ?? []
+  const index = list.findIndex((c) => c.id === concert.id)
+  if (index === -1) {
+    concerts.value = [concert, ...list]
+  } else {
+    concerts.value = list.map((c) => (c.id === concert.id ? concert : c))
+  }
+}
+
 async function onDelete(concert: Concert) {
   // TODO: call DELETE /api/concerts/:id once the backend is ready
   concerts.value = (concerts.value ?? []).filter((c) => c.id !== concert.id)
@@ -48,9 +70,9 @@ async function onDelete(concert: Concert) {
         class="w-full sm:w-72"
       />
       <UButton
-        to="/concerts/create"
         icon="i-lucide-plus"
         class="bg-[#1B1330] hover:bg-[#2A1F49] text-white shrink-0"
+        @click="openCreate"
       >
         Create Concert
       </UButton>
@@ -82,12 +104,12 @@ async function onDelete(concert: Concert) {
             <td class="px-5 py-3.5">
               <div class="flex items-center justify-end gap-1">
                 <UButton
-                  :to="`/concerts/${concert.id}/edit`"
                   icon="i-lucide-pencil"
                   color="neutral"
                   variant="ghost"
                   size="sm"
                   aria-label="Edit concert"
+                  @click="openEdit(concert)"
                 />
                 <UButton
                   icon="i-lucide-trash-2"
@@ -109,5 +131,11 @@ async function onDelete(concert: Concert) {
         </tbody>
       </table>
     </div>
+
+    <ConcertFormModal
+      v-model:open="isFormOpen"
+      :concert="editingConcert"
+      @saved="onSaved"
+    />
   </div>
 </template>
