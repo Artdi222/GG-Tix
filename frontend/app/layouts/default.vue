@@ -92,17 +92,11 @@ watch(() => route.path, () => {
         isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       ]"
     >
-      <!-- Ambient Glow -->
-      <div class="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-        <div class="absolute -top-24 -left-24 w-60 h-60 bg-[#F2A93B]/15 rounded-full blur-3xl" />
-        <div class="absolute top-1/2 -right-24 w-60 h-60 bg-purple-600/10 rounded-full blur-3xl" />
-      </div>
-
       <div class="relative z-10 flex flex-col h-full overflow-hidden">
         <!-- Sidebar Brand Header -->
         <div class="p-6 flex items-center justify-between border-b border-white/10">
           <NuxtLink to="/" class="flex items-center gap-3 group">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#F2A93B] to-amber-300 flex items-center justify-center text-[#1B1330] font-black text-xl shadow-md group-hover:scale-105 transition-transform">
+            <div class="w-10 h-10 rounded-xl bg-[#F2A93B] flex items-center justify-center text-[#1B1330] font-black text-xl shadow-md group-hover:scale-105 transition-transform">
               <UIcon name="i-lucide-ticket" class="w-6 h-6" />
             </div>
             <div>
@@ -142,7 +136,7 @@ watch(() => route.path, () => {
                 :class="[
                   'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative',
                   isPathActive(item.to)
-                    ? 'bg-gradient-to-r from-[#F2A93B] to-amber-500 text-[#1B1330] font-bold shadow-lg shadow-[#F2A93B]/20'
+                    ? 'bg-[#F2A93B] text-[#1B1330] font-bold shadow-md shadow-[#F2A93B]/20'
                     : 'text-white/75 hover:text-white hover:bg-white/10'
                 ]"
               >
@@ -172,7 +166,7 @@ watch(() => route.path, () => {
         </div>
 
         <!-- Admin Profile Footer Widget -->
-        <div class="p-4 m-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center justify-between">
+        <div class="p-4 m-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
           <div class="flex items-center gap-3 overflow-hidden">
             <UAvatar
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
@@ -204,7 +198,7 @@ watch(() => route.path, () => {
     <!-- MAIN WRAPPER -->
     <div class="flex-1 flex flex-col min-w-0 min-h-screen">
       <!-- TOP NAVBAR -->
-      <header class="sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 sm:px-6 flex items-center justify-between gap-4">
+      <header class="sticky top-0 z-30 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 sm:px-6 flex items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <UButton
             color="neutral"
@@ -226,16 +220,6 @@ watch(() => route.path, () => {
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3">
-          <UButton
-            to="/events"
-            color="primary"
-            variant="solid"
-            icon="i-lucide-plus-circle"
-            size="md"
-            class="hidden sm:inline-flex font-semibold shadow-sm"
-          >
-            Tambah Event
-          </UButton>
 
           <UDropdownMenu :items="[notifications.map(n => ({ label: n.title, description: n.desc, icon: 'i-lucide-bell' }))]">
             <UButton
