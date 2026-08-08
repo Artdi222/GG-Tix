@@ -40,10 +40,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   <div class="min-h-screen flex bg-white">
     <!-- Left panel: brand identity -->
     <div class="hidden lg:flex lg:w-[42%] relative overflow-hidden bg-[#1B1330] text-white flex-col justify-between px-12 py-14">
-      <div
-        class="absolute inset-0 pointer-events-none"
-        style="background: radial-gradient(circle at 28% 18%, rgba(242,169,59,0.35), transparent 55%)"
-      />
 
       <div class="relative z-10">
         <span class="text-xl font-bold tracking-[0.3em]">GGTIX</span>
