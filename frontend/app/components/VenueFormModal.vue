@@ -1,11 +1,11 @@
 <script setup lang="ts">
-interface Venue {
-  id: number
+export interface Venue {
+  id?: string
   name: string
   address: string
-  latitude: number
-  longitude: number
-  imageUrl: string
+  latitude: number | null
+  longitude: number | null
+  imageUrl: string | null
 }
 
 const props = defineProps<{
@@ -18,7 +18,9 @@ const emit = defineEmits<{
   saved: [venue: Venue]
 }>()
 
-const isEdit = computed(() => !!props.venue)
+const { request } = useApi()
+
+const isEdit = computed(() => !!props.venue?.id)
 
 const state = reactive({
   name: '',
@@ -29,18 +31,21 @@ const state = reactive({
 })
 
 const isSaving = ref(false)
+const isUploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const uploadError = ref('')
 
 watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return
+    uploadError.value = ''
     if (props.venue) {
       state.name = props.venue.name
       state.address = props.venue.address
       state.latitude = props.venue.latitude
       state.longitude = props.venue.longitude
-      state.imageUrl = props.venue.imageUrl
+      state.imageUrl = props.venue.imageUrl || ''
     } else {
       state.name = ''
       state.address = ''
@@ -51,29 +56,77 @@ watch(
   }
 )
 
-function onImageSelected(event: Event) {
+async function onImageSelected(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
-  // NOTE: this only creates a temporary local preview URL.
-  // Once the backend is ready, upload the file there and store the returned permanent URL instead.
-  state.imageUrl = URL.createObjectURL(file)
+
+  uploadError.value = ''
+  isUploading.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('kind', 'venue') // UPL-03: venue ratio 9:16
+
+    const res = await request<{ data: { url: string; thumbUrl: string; key: string } }>('/uploads', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (res?.data?.url) {
+      state.imageUrl = res.data.url
+    }
+  } catch (err: any) {
+    uploadError.value = err?.data?.error || 'Gagal mengunggah gambar denah venue.'
+  } finally {
+    isUploading.value = false
+  }
 }
 
 async function onSubmit() {
   if (!state.name.trim() || !state.address.trim()) return
   isSaving.value = true
+  uploadError.value = ''
+
   try {
-    // TODO: replace with POST /api/venues (multipart, including the image file) once the backend is ready
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    emit('saved', {
-      id: props.venue?.id ?? Date.now(),
-      name: state.name,
-      address: state.address,
-      latitude: state.latitude ?? 0,
-      longitude: state.longitude ?? 0,
-      imageUrl: state.imageUrl
-    })
+    const payload = {
+      name: state.name.trim(),
+      address: state.address.trim(),
+      latitude: state.latitude !== null ? String(state.latitude) : '',
+      longitude: state.longitude !== null ? String(state.longitude) : '',
+      imageUrl: state.imageUrl || ''
+    }
+
+    if (props.venue?.id) {
+      const res = await request<{ data: Venue }>(`/venues/${props.venue.id}`, {
+        method: 'PUT',
+        body: payload
+      })
+      emit('saved', res?.data || {
+        id: props.venue.id,
+        name: state.name,
+        address: state.address,
+        latitude: state.latitude,
+        longitude: state.longitude,
+        imageUrl: state.imageUrl
+      })
+    } else {
+      const res = await request<{ data: Venue }>('/venues', {
+        method: 'POST',
+        body: payload
+      })
+      emit('saved', res?.data || {
+        id: `venue-${Date.now()}`,
+        name: state.name,
+        address: state.address,
+        latitude: state.latitude,
+        longitude: state.longitude,
+        imageUrl: state.imageUrl
+      })
+    }
     emit('update:open', false)
+  } catch (err: any) {
+    uploadError.value = err?.data?.error || 'Gagal menyimpan data venue.'
   } finally {
     isSaving.value = false
   }
@@ -83,65 +136,74 @@ async function onSubmit() {
 <template>
   <UModal
     :open="open"
-    :title="isEdit ? 'Edit venue' : 'Create venue'"
-    :description="isEdit ? 'Update the details for this venue.' : 'Add a venue that concerts can be held at.'"
+    :title="isEdit ? 'Edit Venue Konser' : 'Tambah Venue Konser Baru'"
+    :description="isEdit ? 'Perbarui informasi venue & denah lokasi.' : 'Tambahkan data master venue & denah area konser.'"
     @update:open="emit('update:open', $event)"
   >
     <template #body>
       <form class="space-y-4" @submit.prevent="onSubmit">
-        <UFormField label="Venue name">
-          <UInput v-model="state.name" placeholder="Istora Senayan" class="w-full" />
+        <UAlert
+          v-if="uploadError"
+          color="error"
+          variant="soft"
+          icon="i-lucide-circle-alert"
+          :description="uploadError"
+        />
+
+        <UFormField label="Nama Venue" required>
+          <UInput v-model="state.name" placeholder="Contoh: Gelora Bung Karno" class="w-full" />
         </UFormField>
 
-        <UFormField label="Address">
+        <UFormField label="Alamat Lengkap" required>
           <UInput v-model="state.address" placeholder="Jl. Pintu Satu Senayan, Jakarta" class="w-full" />
         </UFormField>
 
         <div class="grid grid-cols-2 gap-4">
-          <UFormField label="Latitude">
-            <UInput v-model.number="state.latitude" type="number" step="any" placeholder="-6.2192" class="w-full" />
+          <UFormField label="Latitude (-90 s/d 90)">
+            <UInput v-model.number="state.latitude" type="number" step="any" placeholder="-6.2187300" class="w-full" />
           </UFormField>
-          <UFormField label="Longitude">
-            <UInput v-model.number="state.longitude" type="number" step="any" placeholder="106.8021" class="w-full" />
+          <UFormField label="Longitude (-180 s/d 180)">
+            <UInput v-model.number="state.longitude" type="number" step="any" placeholder="106.8026815" class="w-full" />
           </UFormField>
         </div>
 
-        <UFormField label="Venue area image">
-          <p class="text-xs text-gray-400 mb-2">Layout or seating/zone map, so customers can see where each ticket area is.</p>
+        <UFormField label="Gambar / Denah Area Venue (Rasio 9:16)">
+          <p class="text-xs text-gray-400 mb-2">Denah layout tempat duduk & zona tiket untuk memudahkan customer.</p>
           <div class="flex items-start gap-4">
-            <div class="w-32 h-24 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
-              <img v-if="state.imageUrl" :src="state.imageUrl" alt="Venue area preview" class="w-full h-full object-cover">
-              <UIcon v-else name="i-lucide-image" class="w-6 h-6 text-gray-300" />
+            <div class="w-28 h-40 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
+              <img v-if="state.imageUrl" :src="state.imageUrl" alt="Preview Denah Venue" class="w-full h-full object-cover">
+              <UIcon v-else name="i-lucide-image" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
             </div>
-            <div>
+            <div class="space-y-2">
               <UButton
                 type="button"
                 color="neutral"
                 variant="outline"
                 size="sm"
                 icon="i-lucide-upload"
+                :loading="isUploading"
                 @click="fileInput?.click()"
               >
-                {{ state.imageUrl ? 'Replace image' : 'Upload image' }}
+                {{ state.imageUrl ? 'Ganti Denah' : 'Upload Denah' }}
               </UButton>
               <input
                 ref="fileInput"
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/webp"
                 class="hidden"
                 @change="onImageSelected"
               >
-              <p class="text-xs text-gray-400 mt-1.5">PNG or JPG, ideally the seating/zone map.</p>
+              <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop otomatis ke rasio 9:16.</p>
             </div>
           </div>
         </UFormField>
 
-        <div class="flex justify-end gap-2 pt-2">
+        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
           <UButton color="neutral" variant="outline" @click="emit('update:open', false)">
-            Cancel
+            Batal
           </UButton>
           <UButton type="submit" :loading="isSaving" class="bg-[#1B1330] hover:bg-[#2A1F49] text-white">
-            {{ isEdit ? 'Save changes' : 'Create venue' }}
+            {{ isEdit ? 'Simpan Perubahan' : 'Buat Venue' }}
           </UButton>
         </div>
       </form>
