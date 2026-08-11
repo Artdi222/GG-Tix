@@ -11,7 +11,7 @@ const navigationGroups = [
     title: 'Utama',
     items: [
       { label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/' },
-      { label: 'Event Konser', icon: 'i-lucide-calendar-range', to: '/events', badge: 'Live' },
+      { label: 'Event Konser', icon: 'i-lucide-calendar-range', to: '/events'},
       { label: 'Transaksi & Orders', icon: 'i-lucide-receipt', to: '/orders' },
       { label: 'Scan QR Check-In', icon: 'i-lucide-qr-code', to: '/scanner' }
     ]
@@ -150,16 +150,6 @@ watch(() => route.path, () => {
                   />
                   <span>{{ item.label }}</span>
                 </div>
-
-                <UBadge
-                  v-if="item.badge"
-                  :color="isPathActive(item.to) ? 'neutral' : 'warning'"
-                  variant="solid"
-                  size="xs"
-                  class="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                >
-                  {{ item.badge }}
-                </UBadge>
               </NuxtLink>
             </div>
           </div>

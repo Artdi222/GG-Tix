@@ -13,6 +13,15 @@ const isModalOpen = ref(false)
 const editingEvent = ref<EventItem | null>(null)
 const isLoading = ref(false)
 
+// Category manager modal state
+const isCategoryModalOpen = ref(false)
+const selectedEventForCategories = ref<EventItem | null>(null)
+
+function openCategoryManager(event: EventItem) {
+  selectedEventForCategories.value = event
+  isCategoryModalOpen.value = true
+}
+
 // Artists list for select dropdown
 const artists = ref<{ id: string; name: string }[]>([
   { id: 'art-001', name: 'Rover Ensemble' },
@@ -20,6 +29,21 @@ const artists = ref<{ id: string; name: string }[]>([
   { id: 'art-003', name: 'NIKI' },
   { id: 'art-004', name: 'Sheila on 7' }
 ])
+
+function getArtistName(id: string) {
+  return artists.value.find(a => a.id === id)?.name || id
+}
+
+async function fetchArtists() {
+  try {
+    const res = await request<{ data: { id: string; name: string }[] }>('/artists')
+    if (res?.data) {
+      artists.value = res.data
+    }
+  } catch {
+    // Keep mock data if BE is offline
+  }
+}
 
 // Events list matching BE contract
 const events = ref<EventItem[]>([
@@ -72,6 +96,7 @@ async function fetchEvents() {
 
 onMounted(() => {
   fetchEvents()
+  fetchArtists()
 })
 
 const cityOptions = [
@@ -214,79 +239,117 @@ function formatDate(iso: string) {
       </div>
     </div>
 
-    <!-- Events Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div
-        v-for="event in filteredEvents"
-        :key="event.id"
-        class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
-      >
-        <div class="p-6 space-y-4">
-          <!-- Card Header & Status Badge -->
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <span class="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-                {{ event.publisherName }}
-              </span>
-              <h3 class="text-lg font-bold text-gray-900 dark:text-white mt-0.5 leading-snug">
-                {{ event.title }}
-              </h3>
-            </div>
-
-            <UBadge
-              :color="event.status === 'open' ? 'success' : 'neutral'"
-              variant="soft"
-              size="xs"
-              class="font-bold px-2 py-0.5 shrink-0"
-            >
-              {{ event.status === 'open' ? 'OPEN' : 'CLOSED' }}
-            </UBadge>
-          </div>
-
-          <!-- Event Info Details -->
-          <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-calendar" class="w-4 h-4 text-gray-400 shrink-0" />
-              <span>{{ formatDate(event.dateTime) }}</span>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-400 shrink-0" />
-              <span class="truncate">{{ event.venue }}, {{ event.city }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card Footer Actions -->
-        <div class="p-4 bg-gray-50/50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-          <UButton
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            :icon="event.status === 'open' ? 'i-lucide-pause-circle' : 'i-lucide-play-circle'"
-            @click="toggleStatus(event)"
+    <!-- Events Table -->
+    <div class="overflow-x-auto rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-sm">
+        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-xs">
+          <tr>
+            <th scope="col" class="px-6 py-4">Event & Promoter</th>
+            <th scope="col" class="px-6 py-4">Artis / Performer</th>
+            <th scope="col" class="px-6 py-4">Waktu</th>
+            <th scope="col" class="px-6 py-4">Lokasi & Venue</th>
+            <th scope="col" class="px-6 py-4 text-center">Status</th>
+            <th scope="col" class="px-6 py-4 text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
+          <tr v-if="filteredEvents.length === 0">
+            <td colspan="6" class="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
+              Tidak ada event yang ditemukan.
+            </td>
+          </tr>
+          <tr 
+            v-for="event in filteredEvents" 
+            :key="event.id"
+            class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
           >
-            {{ event.status === 'open' ? 'Tutup Sale' : 'Buka Sale' }}
-          </UButton>
-
-          <div class="flex items-center gap-1">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-edit-2"
-              size="xs"
-              @click="openEditModal(event)"
-            />
-            <UButton
-              color="error"
-              variant="ghost"
-              icon="i-lucide-trash-2"
-              size="xs"
-              @click="deleteEvent(event.id!)"
-            />
-          </div>
-        </div>
-      </div>
+            <!-- Event & Promoter -->
+            <td class="px-6 py-4">
+              <div class="font-bold text-gray-900 dark:text-white">{{ event.title }}</div>
+              <div class="text-xs text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wider mt-0.5">
+                {{ event.publisherName }}
+              </div>
+            </td>
+            
+            <!-- Artist -->
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2.5 py-1 rounded-full text-xs font-medium">
+                <UIcon name="i-lucide-music" class="w-3.5 h-3.5 text-gray-400" />
+                {{ getArtistName(event.artistId) }}
+              </span>
+            </td>
+            
+            <!-- Date/Time -->
+            <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-calendar" class="w-4 h-4 text-gray-400" />
+                <span>{{ formatDate(event.dateTime) }}</span>
+              </div>
+            </td>
+            
+            <!-- Venue / City -->
+            <td class="px-6 py-4">
+              <div class="text-gray-900 dark:text-white truncate max-w-xs">{{ event.venue }}</div>
+              <div class="text-xs text-gray-400 mt-0.5">{{ event.city }}</div>
+            </td>
+            
+            <!-- Status Badge -->
+            <td class="px-6 py-4 text-center whitespace-nowrap">
+              <UBadge
+                :color="event.status === 'open' ? 'success' : 'neutral'"
+                variant="soft"
+                size="xs"
+                class="font-bold px-2 py-0.5"
+              >
+                {{ event.status === 'open' ? 'OPEN' : 'CLOSED' }}
+              </UBadge>
+            </td>
+            
+            <!-- Actions -->
+            <td class="px-6 py-4 whitespace-nowrap text-right">
+              <div class="flex items-center justify-end gap-2">
+                <!-- Manage categories button -->
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-ticket"
+                  size="xs"
+                  class="font-medium"
+                  @click="openCategoryManager(event)"
+                >
+                  Kategori Tiket
+                </UButton>
+                
+                <!-- Toggle status sale button -->
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  :icon="event.status === 'open' ? 'i-lucide-pause-circle' : 'i-lucide-play-circle'"
+                  :title="event.status === 'open' ? 'Tutup Penjualan' : 'Buka Penjualan'"
+                  @click="toggleStatus(event)"
+                />
+                
+                <!-- Edit & Delete -->
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-edit-2"
+                  size="xs"
+                  @click="openEditModal(event)"
+                />
+                <UButton
+                  color="error"
+                  variant="ghost"
+                  icon="i-lucide-trash-2"
+                  size="xs"
+                  @click="deleteEvent(event.id!)"
+                />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Event Form Modal Component -->
@@ -295,6 +358,13 @@ function formatDate(iso: string) {
       :event-data="editingEvent"
       :artists="artists"
       @saved="handleSaveEvent"
+    />
+
+    <!-- Category Manager Modal Component -->
+    <CategoryManagerModal
+      v-model:open="isCategoryModalOpen"
+      :event-id="selectedEventForCategories?.id ?? ''"
+      :event-title="selectedEventForCategories?.title"
     />
   </div>
 </template>
