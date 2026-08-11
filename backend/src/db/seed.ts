@@ -13,6 +13,7 @@ import {
   admins,
   customers,
   artists,
+  venues,
   events,
   ticketCategories,
   orders,
@@ -55,6 +56,29 @@ async function seed() {
     .returning();
 
   console.log("  3 admins created (password: admin123)");
+
+  // 1b. Venues (GGT-03)
+  const insertedVenues = await db
+    .insert(venues)
+    .values([
+      {
+        name: "Gelora Bung Karno",
+        address: "Jl. Pintu Satu Senayan, Gelora, Tanah Abang, Jakarta Pusat, DKI Jakarta 10270",
+        latitude: "-6.2187300",
+        longitude: "106.8026815",
+        imageUrl: null,
+      },
+      {
+        name: "Istora Senayan",
+        address: "Gelora Bung Karno Complex, Jl. Pintu Satu Senayan, Tanah Abang, Jakarta Pusat, DKI Jakarta 10270",
+        latitude: "-6.2207900",
+        longitude: "106.8047900",
+        imageUrl: null,
+      },
+    ])
+    .returning();
+
+  console.log("  2 venues created");
 
   // 2. Customers
   const customerPassword = await Bun.password.hash("customer123");

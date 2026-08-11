@@ -3,6 +3,7 @@ import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { errorHandler } from "./lib/errors";
 import { bodySizeLimit } from "./lib/middleware";
+import { assertB2Configured } from "./lib/storage";
 import healthRoute from "./routes/health";
 import authRoute from "./routes/auth";
 import eventRoute from "./routes/event";
@@ -10,6 +11,10 @@ import artistsRoute from "./routes/artists";
 import categoryRoute from "./routes/categories";
 import orderRoute from "./routes/orders";
 import dashboardRoute from "./routes/dashboard";
+import uploadRoute from "./routes/uploads";
+import venueRoute from "./routes/venues";
+
+assertB2Configured();
 
 const app = new Hono();
 
@@ -39,6 +44,8 @@ api.route("/artists", artistsRoute);
 api.route("/", categoryRoute);
 api.route("/orders", orderRoute);
 api.route("/dashboard", dashboardRoute);
+api.route("/uploads", uploadRoute);
+api.route("/venues", venueRoute);
 
 // Mount under /api prefix
 app.route("/api", api);

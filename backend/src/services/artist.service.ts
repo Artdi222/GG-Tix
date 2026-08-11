@@ -1,5 +1,6 @@
 import * as artistRepo from "../repositories/artist.repository";
 import { AppError } from "../lib/errors";
+import { deleteAssetsByUrl } from "../lib/storage";
 
 export interface CreateArtistDTO {
   name: string;
@@ -34,7 +35,15 @@ export async function updateArtist(id: string, data: UpdateArtistDTO) {
   if (!existing) {
     throw new AppError("Artist not found", 404);
   }
-  return await artistRepo.updateArtist(id, data);
+
+  const updated = await artistRepo.updateArtist(id, data);
+
+  // UPL-09: foto lama diganti → hapus aset B2 lama (best-effort)
+  if (data.photoUrl !== undefined && existing.photoUrl && data.photoUrl !== existing.photoUrl) {
+    await deleteAssetsByUrl(existing.photoUrl);
+  }
+
+  return updated;
 }
 
 export async function deleteArtist(id: string) {
@@ -48,5 +57,12 @@ export async function deleteArtist(id: string) {
     throw new AppError("Cannot delete artist with associated events", 400);
   }
 
-  return await artistRepo.deleteArtist(id);
+  const deleted = await artistRepo.deleteArtist(id);
+
+  // UPL-09: hapus artis → hapus foto B2 (best-effort)
+  if (existing.photoUrl) {
+    await deleteAssetsByUrl(existing.photoUrl);
+  }
+
+  return deleted;
 }

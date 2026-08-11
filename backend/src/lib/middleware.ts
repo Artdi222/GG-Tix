@@ -138,6 +138,12 @@ const BODY_SIZE_LIMIT = parseInt(
 
 export function bodySizeLimit(bytes: number = BODY_SIZE_LIMIT) {
   return async function bodySizeLimitMiddleware(c: Context, next: Next) {
+    // UPL-07: multipart upload endpoint bypasses the general JSON limit;
+    // its own cap is enforced in the upload service (IMAGE_MAX_BYTES).
+    if (c.req.path.startsWith("/api/uploads")) {
+      await next();
+      return;
+    }
     const contentLength = Number(c.req.header("content-length") || 0);
     if (contentLength > bytes) {
       return c.json(

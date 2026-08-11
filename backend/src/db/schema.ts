@@ -50,6 +50,22 @@ export const artists = pgTable("artists", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const venues = pgTable(
+  "venues",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    address: text("address").notNull(),
+    latitude: numeric("latitude", { precision: 10, scale: 7 }),
+    longitude: numeric("longitude", { precision: 10, scale: 7 }),
+    imageUrl: text("image_url"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    nameIdx: index("venues_name_idx").on(table.name),
+  })
+);
+
 export const events = pgTable(
   "events",
   {
@@ -62,6 +78,7 @@ export const events = pgTable(
     venue: varchar("venue", { length: 200 }).notNull(),
     city: varchar("city", { length: 100 }).notNull(),
     dateTime: timestamp("date_time").notNull(),
+    imageUrl: text("image_url"),
     status: eventStatusEnum("status").notNull().default("open"),
     createdBy: uuid("created_by")
       .notNull()

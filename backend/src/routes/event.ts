@@ -18,6 +18,7 @@ const createEventSchema = z.object({
   city: z.string().min(1, "City is required").max(100),
   dateTime: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid ISO date string"),
   status: z.enum(["open", "closed"]).optional(),
+  imageUrl: z.string().url("Invalid image URL format").optional().or(z.literal("")),
 });
 
 const updateEventSchema = createEventSchema.partial();

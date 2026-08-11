@@ -1,6 +1,7 @@
 import * as eventRepository from "../repositories/event.repository";
 import * as artistRepository from "../repositories/artist.repository";
 import { AppError } from "../lib/errors";
+import { deleteAssetsByUrl } from "../lib/storage";
 
 export interface CreateEventParams {
   title: string;
@@ -11,6 +12,7 @@ export interface CreateEventParams {
   dateTime: string | Date;
   createdBy: string;
   status?: "open" | "closed";
+  imageUrl?: string | null;
 }
 
 export interface UpdateEventParams {
@@ -21,6 +23,7 @@ export interface UpdateEventParams {
   city?: string;
   dateTime?: string | Date;
   status?: "open" | "closed";
+  imageUrl?: string | null;
 }
 
 export async function createEvent(params: CreateEventParams) {
@@ -74,10 +77,21 @@ export async function updateEvent(id: string, params: UpdateEventParams) {
     }
   }
 
-  return await eventRepository.updateEvent(id, {
+  const updated = await eventRepository.updateEvent(id, {
     ...params,
     dateTime: parsedDate,
   });
+
+  // UPL-09: gambar lama diganti → hapus aset B2 lama (best-effort)
+  if (
+    params.imageUrl !== undefined &&
+    existingEvent.imageUrl &&
+    params.imageUrl !== existingEvent.imageUrl
+  ) {
+    await deleteAssetsByUrl(existingEvent.imageUrl);
+  }
+
+  return updated;
 }
 
 export async function setEventStatus(id: string, status: "open" | "closed") {
@@ -95,5 +109,10 @@ export async function deleteEvent(id: string) {
     throw new AppError("Event not found", 404);
   }
 
-  return await eventRepository.deleteEvent(id);
+  await eventRepository.deleteEvent(id);
+
+  // UPL-09: hapus event → hapus banner B2 (best-effort)
+  if (existingEvent.imageUrl) {
+    await deleteAssetsByUrl(existingEvent.imageUrl);
+  }
 }
