@@ -12,13 +12,18 @@ const uploadLimiter = rateLimit({
 
 // POST /api/uploads — multipart: file + form `kind` (profile|banner|venue)
 uploadRoute.post("/", authMiddleware, superAdminOnly, uploadLimiter, async (c) => {
-  // Early guard so we don't buffer an oversized body into memory.
-  const contentLength = Number(c.req.header("content-length") || 0);
-  if (contentLength > IMAGE_MAX_BYTES + 1024) {
-    return c.json({ error: "Ukuran gambar maksimal 10 MB." }, 413 as any);
+  const contentType = c.req.header("content-type") || "";
+  if (!contentType.includes("multipart/form-data")) {
+    return c.json({ error: "File gambar wajib dikirim dengan format multipart/form-data." }, 400);
   }
 
-  const form = await c.req.formData();
+  let form: FormData;
+  try {
+    form = await c.req.formData();
+  } catch {
+    return c.json({ error: "Gagal memproses body upload. Pastikan file dikirim sebagai multipart/form-data." }, 400);
+  }
+
   const file = form.get("file");
   const kind = form.get("kind");
 

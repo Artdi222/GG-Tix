@@ -35,8 +35,8 @@ function buildRangeCondition(range?: DashboardRange): SQL | undefined {
     if (from && to) {
       const nextDayAfterTo = new Date(to.getTime() + 86400000);
       return and(
-        sql`${orders.createdAt} >= ${from}`,
-        sql`${orders.createdAt} < ${nextDayAfterTo}`
+        sql`${orders.createdAt} >= ${from.toISOString()}`,
+        sql`${orders.createdAt} < ${nextDayAfterTo.toISOString()}`
       );
     }
   }
@@ -45,7 +45,7 @@ function buildRangeCondition(range?: DashboardRange): SQL | undefined {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - (days - 1));
-  return sql`${orders.createdAt} >= ${start}`;
+  return sql`${orders.createdAt} >= ${start.toISOString()}`;
 }
 
 export async function getDashboardSummary(range: DashboardRange = {}) {

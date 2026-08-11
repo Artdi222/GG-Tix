@@ -113,17 +113,30 @@ async function onImageSelected(event: Event) {
   }
 }
 
-async function onSubmit(event: FormSubmitEvent<Schema>) {
+async function onSave() {
+  if (!state.title.trim() || !state.artistId || !state.publisherName.trim() || !state.venue.trim() || !state.city.trim() || !state.dateTime) {
+    uploadError.value = 'Harap lengkapi semua field yang wajib diisi.'
+    return
+  }
+
   isSaving.value = true
+  uploadError.value = ''
   try {
     const payload: EventItem = {
       id: props.eventData?.id,
-      ...event.data,
-      dateTime: new Date(event.data.dateTime).toISOString(),
+      title: state.title.trim(),
+      artistId: state.artistId,
+      publisherName: state.publisherName.trim(),
+      venue: state.venue.trim(),
+      city: state.city.trim(),
+      dateTime: state.dateTime ? new Date(state.dateTime).toISOString() : new Date().toISOString(),
+      status: state.status,
       imageUrl: state.imageUrl || null
     }
     emit('saved', payload)
     open.value = false
+  } catch (err: any) {
+    uploadError.value = err?.message || 'Gagal menyimpan event.'
   } finally {
     isSaving.value = false
   }
@@ -131,103 +144,102 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <UForm :schema="schema" :state="state" @submit="onSubmit">
-    <UModal v-model:open="open" :title="isEditMode ? 'Edit Event Konser' : 'Buat Event Konser Baru'">
-      <template #body>
-        <div class="space-y-4">
-          <UAlert
-            v-if="uploadError"
-            color="error"
-            variant="soft"
-            icon="i-lucide-circle-alert"
-            :description="uploadError"
-          />
+  <UModal v-model:open="open" :title="isEditMode ? 'Edit Event Konser' : 'Buat Event Konser Baru'">
+    <template #body>
+      <div class="space-y-4">
+        <UAlert
+          v-if="uploadError"
+          color="error"
+          variant="soft"
+          icon="i-lucide-circle-alert"
+          :description="uploadError"
+        />
 
-          <UFormField label="Judul Event" name="title">
-            <UInput v-model="state.title" placeholder="Contoh: Wuthering Waves Live 2026" class="w-full" />
+        <UFormField label="Judul Event" name="title">
+          <UInput v-model="state.title" placeholder="Contoh: Wuthering Waves Live 2026" class="w-full" />
+        </UFormField>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <UFormField label="Artis / Performer" name="artistId">
+            <USelect
+              v-model="state.artistId"
+              :items="(props.artists || []).map(a => ({ label: a.name, value: a.id }))"
+              placeholder="Pilih Artis"
+              class="w-full"
+            />
           </UFormField>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <UFormField label="Artis / Performer" name="artistId">
-              <USelect
-                v-model="state.artistId"
-                :items="(props.artists || []).map(a => ({ label: a.name, value: a.id }))"
-                placeholder="Pilih Artis"
-                class="w-full"
-              />
-            </UFormField>
+          <UFormField label="Promoter / Publisher" name="publisherName">
+            <UInput v-model="state.publisherName" placeholder="Contoh: Kuro Games / Live Nation" class="w-full" />
+          </UFormField>
+        </div>
 
-            <UFormField label="Promoter / Publisher" name="publisherName">
-              <UInput v-model="state.publisherName" placeholder="Contoh: Kuro Games / Live Nation" class="w-full" />
-            </UFormField>
-          </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <UFormField label="Nama Venue" name="venue">
+            <UInput v-model="state.venue" placeholder="Contoh: Gelora Bung Karno" class="w-full" />
+          </UFormField>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <UFormField label="Nama Venue" name="venue">
-              <UInput v-model="state.venue" placeholder="Contoh: Gelora Bung Karno" class="w-full" />
-            </UFormField>
+          <UFormField label="Kota" name="city">
+            <UInput v-model="state.city" placeholder="Contoh: Jakarta" class="w-full" />
+          </UFormField>
+        </div>
 
-            <UFormField label="Kota" name="city">
-              <UInput v-model="state.city" placeholder="Contoh: Jakarta" class="w-full" />
-            </UFormField>
-          </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <UFormField label="Tanggal & Waktu Konser" name="dateTime">
+            <UInput v-model="state.dateTime" type="datetime-local" class="w-full" />
+          </UFormField>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <UFormField label="Tanggal & Waktu Konser" name="dateTime">
-              <UInput v-model="state.dateTime" type="datetime-local" class="w-full" />
-            </UFormField>
+          <UFormField label="Status Event" name="status">
+            <USelect v-model="state.status" :items="statusOptions" class="w-full" />
+          </UFormField>
+        </div>
 
-            <UFormField label="Status Event" name="status">
-              <USelect v-model="state.status" :items="statusOptions" class="w-full" />
-            </UFormField>
-          </div>
-
-          <UFormField label="Banner Gambar Event (Rasio 16:9)">
-            <div class="flex items-start gap-4">
-              <div class="w-36 h-20 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
-                <img v-if="state.imageUrl" :src="state.imageUrl" alt="Preview Banner" class="w-full h-full object-cover">
-                <UIcon v-else name="i-lucide-image" class="w-6 h-6 text-gray-300 dark:text-gray-600" />
-              </div>
-              <div class="space-y-1.5">
-                <UButton
-                  type="button"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  icon="i-lucide-upload"
-                  :loading="isUploading"
-                  @click="fileInput?.click()"
-                >
-                  {{ state.imageUrl ? 'Ganti Banner' : 'Upload Banner' }}
-                </UButton>
-                <input
-                  ref="fileInput"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  class="hidden"
-                  @change="onImageSelected"
-                >
-                <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop otomatis ke rasio 16:9.</p>
-              </div>
+        <UFormField label="Banner Gambar Event (Rasio 16:9)">
+          <div class="flex items-start gap-4">
+            <div class="w-36 h-20 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
+              <img v-if="state.imageUrl" :src="state.imageUrl" alt="Preview Banner" class="w-full h-full object-cover">
+              <UIcon v-else name="i-lucide-image" class="w-6 h-6 text-gray-300 dark:text-gray-600" />
             </div>
-          </UFormField>
-        </div>
-      </template>
+            <div class="space-y-1.5">
+              <UButton
+                type="button"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                icon="i-lucide-upload"
+                :loading="isUploading"
+                @click="fileInput?.click()"
+              >
+                {{ state.imageUrl ? 'Ganti Banner' : 'Upload Banner' }}
+              </UButton>
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                class="hidden"
+                @change="onImageSelected"
+              >
+              <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop otomatis ke rasio 16:9.</p>
+            </div>
+          </div>
+        </UFormField>
+      </div>
+    </template>
 
-      <template #footer>
-        <div class="flex items-center justify-end gap-2 w-full">
-          <UButton color="neutral" variant="outline" @click="open = false">
-            Batal
-          </UButton>
-          <UButton
-            type="submit"
-            :loading="isSaving"
-            class="bg-[#1B1330] hover:bg-[#2A1F49] text-white"
-          >
-            {{ isEditMode ? 'Simpan Perubahan' : 'Buat Event' }}
-          </UButton>
-        </div>
-      </template>
-    </UModal>
-  </UForm>
+    <template #footer>
+      <div class="flex items-center justify-end gap-2 w-full">
+        <UButton color="neutral" variant="outline" @click="open = false">
+          Batal
+        </UButton>
+        <UButton
+          type="button"
+          :loading="isSaving"
+          class="bg-[#1B1330] hover:bg-[#2A1F49] text-white"
+          @click="onSave"
+        >
+          {{ isEditMode ? 'Simpan Perubahan' : 'Buat Event' }}
+        </UButton>
+      </div>
+    </template>
+  </UModal>
 </template>

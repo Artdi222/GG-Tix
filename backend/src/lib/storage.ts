@@ -17,6 +17,7 @@ interface AuthData {
   authToken: string;
   downloadUrl: string;
   bucketId: string;
+  downloadAuthToken?: string;
 }
 
 let auth: AuthData | null = null;
@@ -34,9 +35,9 @@ async function ensureAuth(): Promise<AuthData> {
   const res = await fetch(
     `https://api.backblazeb2.com/b2api/v3/b2_authorize_account`,
     {
-      method: "POST",
+      method: "GET",
       headers: {
-        Authorization: "Basic " + btoa(`${B2_KEY_ID}:${B2_APPLICATION_KEY}`),
+        Authorization: "Basic " + Buffer.from(`${B2_KEY_ID}:${B2_APPLICATION_KEY}`).toString("base64"),
       },
     }
   );
@@ -44,29 +45,78 @@ async function ensureAuth(): Promise<AuthData> {
   if (!res.ok) {
     throw new AppError(`B2 authorize failed: ${body.message || "unknown"}`, 500);
   }
-  auth = {
-    apiUrl: body.apiUrl,
-    authToken: body.authorizationToken,
-    downloadUrl: body.downloadUrl,
-    bucketId: body.allowed?.bucketId || "",
-  };
-  if (!auth.bucketId) {
-    throw new AppError("B2: no bucket allowed for this key", 500);
+
+  const storageApi = body.apiInfo?.storageApi;
+  const apiUrl = storageApi?.apiUrl || body.apiUrl;
+  const downloadUrl = storageApi?.downloadUrl || body.downloadUrl;
+  let bucketId = storageApi?.bucketId || body.allowed?.bucketId || "";
+
+  // If using a Master Application Key, resolve bucketId via list_buckets
+  if (!bucketId) {
+    const listRes = await fetch(
+      `${apiUrl}/b2api/v3/b2_list_buckets?accountId=${body.accountId}&bucketName=${encodeURIComponent(B2_BUCKET)}`,
+      {
+        headers: { Authorization: body.authorizationToken },
+      }
+    );
+    const listBody: any = await listRes.json();
+    if (listRes.ok && listBody.buckets?.length > 0) {
+      bucketId = listBody.buckets[0].bucketId;
+    }
   }
+
+  if (!bucketId) {
+    throw new AppError(`B2: bucket '${B2_BUCKET}' not found or not allowed for this key`, 500);
+  }
+
+  let downloadAuthToken: string | undefined = undefined;
+  try {
+    const dlRes = await fetch(`${apiUrl}/b2api/v3/b2_get_download_authorization`, {
+      method: "POST",
+      headers: {
+        Authorization: body.authorizationToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bucketId,
+        fileNamePrefix: "",
+        validDurationInSeconds: 604800, // 7 days
+      }),
+    });
+    if (dlRes.ok) {
+      const dlBody: any = await dlRes.json();
+      downloadAuthToken = dlBody.authorizationToken;
+    }
+  } catch {
+    // Fall back to unauthenticated URL if token generation is restricted
+  }
+
+  auth = {
+    apiUrl,
+    authToken: body.authorizationToken,
+    downloadUrl,
+    bucketId,
+    downloadAuthToken,
+  };
   return auth;
 }
 
 function publicUrl(key: string): string {
-  return `${auth!.downloadUrl}/file/${B2_BUCKET}/${key}`;
+  const base = `${auth!.downloadUrl}/file/${B2_BUCKET}/${key}`;
+  if (auth?.downloadAuthToken) {
+    return `${base}?Authorization=${encodeURIComponent(auth.downloadAuthToken)}`;
+  }
+  return base;
 }
 
 // Extract the object key from a stored public URL (ours only, else null)
 export function keyFromUrl(url: string | null | undefined): string | null {
   if (!url) return null;
+  const cleanUrl = url.split("?")[0];
   const marker = `/file/${B2_BUCKET}/`;
-  const idx = url.indexOf(marker);
+  const idx = cleanUrl.indexOf(marker);
   if (idx === -1) return null;
-  return url.slice(idx + marker.length);
+  return cleanUrl.slice(idx + marker.length);
 }
 
 export async function uploadObject(

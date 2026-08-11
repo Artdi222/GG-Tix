@@ -16,9 +16,14 @@ export function useApi() {
   async function request<T = any>(endpoint: string, options: ApiOptions = {}): Promise<T> {
     const url = endpoint.startsWith('http') ? endpoint : `${apiBase}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
 
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers || {})
+    }
+
+    if (!isFormData && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json'
     }
 
     if (token.value) {
