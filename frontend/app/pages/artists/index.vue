@@ -33,6 +33,9 @@ const artists = ref<Artist[]>([
 
 const isLoading = ref(false)
 const isModalOpen = ref(false)
+const isUploading = ref(false)
+const uploadError = ref('')
+const fileInput = ref<HTMLInputElement | null>(null)
 const editingArtist = ref<Artist | null>(null)
 
 const formState = reactive({
@@ -69,6 +72,7 @@ function openCreateModal() {
   formState.name = ''
   formState.bio = ''
   formState.photoUrl = ''
+  uploadError.value = ''
   isModalOpen.value = true
 }
 
@@ -77,7 +81,35 @@ function openEditModal(artist: Artist) {
   formState.name = artist.name
   formState.bio = artist.bio || ''
   formState.photoUrl = artist.photoUrl || ''
+  uploadError.value = ''
   isModalOpen.value = true
+}
+
+async function onImageSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  uploadError.value = ''
+  isUploading.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('kind', 'profile') // UPL-03: profile 1:1 ratio
+
+    const res = await request<{ data: { url: string; thumbUrl: string; key: string } }>('/uploads', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (res?.data?.url) {
+      formState.photoUrl = res.data.url
+    }
+  } catch (err: any) {
+    uploadError.value = err?.data?.error || 'Gagal mengunggah foto profil artis.'
+  } finally {
+    isUploading.value = false
+  }
 }
 
 async function handleSaveArtist() {
@@ -198,12 +230,48 @@ async function deleteArtist(id: string) {
     <UModal v-model:open="isModalOpen" :title="editingArtist ? 'Edit Artis' : 'Tambah Artis Baru'">
       <template #body>
         <div class="space-y-4">
-          <UFormField label="Nama Artis / Band">
+          <UAlert
+            v-if="uploadError"
+            color="error"
+            variant="soft"
+            icon="i-lucide-circle-alert"
+            :description="uploadError"
+          />
+
+          <UFormField label="Nama Artis / Band" required>
             <UInput v-model="formState.name" placeholder="Contoh: Coldplay" class="w-full" />
           </UFormField>
 
-          <UFormField label="URL Foto Profil">
-            <UInput v-model="formState.photoUrl" placeholder="https://..." class="w-full" />
+          <UFormField label="Foto Profil Artis (Rasio 1:1)">
+            <div class="flex items-center gap-4 mb-2">
+              <UAvatar
+                :src="formState.photoUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'"
+                size="lg"
+                class="shrink-0 ring-2 ring-amber-500/20"
+              />
+              <div class="space-y-1">
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  icon="i-lucide-upload"
+                  :loading="isUploading"
+                  @click="fileInput?.click()"
+                >
+                  {{ formState.photoUrl ? 'Ganti Foto' : 'Upload Foto' }}
+                </UButton>
+                <input
+                  ref="fileInput"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="hidden"
+                  @change="onImageSelected"
+                >
+                <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop 1:1.</p>
+              </div>
+            </div>
+            <UInput v-model="formState.photoUrl" placeholder="Atau masukkan URL foto manual (https://...)" class="w-full text-xs" />
           </UFormField>
 
           <UFormField label="Deskripsi Bio">

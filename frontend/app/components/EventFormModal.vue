@@ -11,6 +11,7 @@ export interface EventItem {
   city: string
   dateTime: string
   status: 'open' | 'closed'
+  imageUrl?: string | null
 }
 
 interface ArtistOption {
@@ -26,6 +27,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   saved: [eventData: EventItem]
 }>()
+
+const { request } = useApi()
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -50,12 +53,16 @@ function defaultState() {
     venue: '',
     city: '',
     dateTime: new Date().toISOString().slice(0, 16),
-    status: 'open' as Schema['status']
+    status: 'open' as Schema['status'],
+    imageUrl: ''
   }
 }
 
 const state = reactive(defaultState())
 const isSaving = ref(false)
+const isUploading = ref(false)
+const uploadError = ref('')
+const fileInput = ref<HTMLInputElement | null>(null)
 
 const statusOptions = [
   { label: 'Open (Aktif)', value: 'open' },
@@ -64,6 +71,7 @@ const statusOptions = [
 
 watch(open, (isOpen) => {
   if (!isOpen) return
+  uploadError.value = ''
   if (props.eventData) {
     state.title = props.eventData.title
     state.artistId = props.eventData.artistId
@@ -72,10 +80,38 @@ watch(open, (isOpen) => {
     state.city = props.eventData.city
     state.dateTime = props.eventData.dateTime ? new Date(props.eventData.dateTime).toISOString().slice(0, 16) : ''
     state.status = props.eventData.status
+    state.imageUrl = props.eventData.imageUrl || ''
   } else {
     Object.assign(state, defaultState())
   }
 })
+
+async function onImageSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  uploadError.value = ''
+  isUploading.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('kind', 'banner') // UPL-03: banner ratio 16:9
+
+    const res = await request<{ data: { url: string; thumbUrl: string; key: string } }>('/uploads', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (res?.data?.url) {
+      state.imageUrl = res.data.url
+    }
+  } catch (err: any) {
+    uploadError.value = err?.data?.error || 'Gagal mengunggah banner event.'
+  } finally {
+    isUploading.value = false
+  }
+}
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   isSaving.value = true
@@ -83,7 +119,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     const payload: EventItem = {
       id: props.eventData?.id,
       ...event.data,
-      dateTime: new Date(event.data.dateTime).toISOString()
+      dateTime: new Date(event.data.dateTime).toISOString(),
+      imageUrl: state.imageUrl || null
     }
     emit('saved', payload)
     open.value = false
@@ -98,6 +135,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     <UModal v-model:open="open" :title="isEditMode ? 'Edit Event Konser' : 'Buat Event Konser Baru'">
       <template #body>
         <div class="space-y-4">
+          <UAlert
+            v-if="uploadError"
+            color="error"
+            variant="soft"
+            icon="i-lucide-circle-alert"
+            :description="uploadError"
+          />
+
           <UFormField label="Judul Event" name="title">
             <UInput v-model="state.title" placeholder="Contoh: Wuthering Waves Live 2026" class="w-full" />
           </UFormField>
@@ -136,6 +181,36 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
               <USelect v-model="state.status" :items="statusOptions" class="w-full" />
             </UFormField>
           </div>
+
+          <UFormField label="Banner Gambar Event (Rasio 16:9)">
+            <div class="flex items-start gap-4">
+              <div class="w-36 h-20 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
+                <img v-if="state.imageUrl" :src="state.imageUrl" alt="Preview Banner" class="w-full h-full object-cover">
+                <UIcon v-else name="i-lucide-image" class="w-6 h-6 text-gray-300 dark:text-gray-600" />
+              </div>
+              <div class="space-y-1.5">
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  icon="i-lucide-upload"
+                  :loading="isUploading"
+                  @click="fileInput?.click()"
+                >
+                  {{ state.imageUrl ? 'Ganti Banner' : 'Upload Banner' }}
+                </UButton>
+                <input
+                  ref="fileInput"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="hidden"
+                  @change="onImageSelected"
+                >
+                <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop otomatis ke rasio 16:9.</p>
+              </div>
+            </div>
+          </UFormField>
         </div>
       </template>
 
