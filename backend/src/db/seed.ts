@@ -24,7 +24,7 @@ async function seed() {
 
   // Truncate in correct order (respecting FK constraints)
   await db.execute(
-    sql`TRUNCATE orders, ticket_categories, events, artists, customers, admins CASCADE`
+    sql`TRUNCATE orders, ticket_categories, events, venues, artists, customers, admins CASCADE`
   );
   console.log("  Truncated existing data");
 

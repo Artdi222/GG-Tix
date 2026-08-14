@@ -62,8 +62,8 @@ async function deleteVenue(id?: string) {
   try {
     await request(`/venues/${id}`, { method: 'DELETE' })
     venuesList.value = venuesList.value.filter((v) => v.id !== id)
-  } catch {
-    venuesList.value = venuesList.value.filter((v) => v.id !== id)
+  } catch (err: any) {
+    alert(err?.data?.error || err?.data?.message || err?.message || 'Gagal menghapus venue.')
   }
 }
 </script>

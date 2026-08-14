@@ -1,6 +1,9 @@
 import * as venueRepo from "../repositories/venue.repository";
 import { AppError } from "../lib/errors";
 import { deleteAssetsByUrl } from "../lib/storage";
+import { db } from "../db";
+import { events } from "../db/schema";
+import { eq, count } from "drizzle-orm";
 
 export interface CreateVenueDTO {
   name: string;
@@ -58,6 +61,19 @@ export async function deleteVenue(id: string) {
   const existing = await venueRepo.findVenueById(id);
   if (!existing) {
     throw new AppError("Venue not found", 404);
+  }
+
+  // Check if any event is linked to this venue
+  const [eventCount] = await db
+    .select({ total: count() })
+    .from(events)
+    .where(eq(events.venueId, id));
+
+  if (Number(eventCount?.total || 0) > 0) {
+    throw new AppError(
+      "Venue tidak dapat dihapus karena masih digunakan oleh event konser.",
+      400
+    );
   }
 
   const deleted = await venueRepo.deleteVenue(id);

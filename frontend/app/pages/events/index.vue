@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EventItem } from '~/components/EventFormModal.vue'
+import type { EventItem, ArtistOption, VenueOption } from '~/components/EventFormModal.vue'
 
 const { request } = useApi()
 
@@ -23,7 +23,7 @@ function openCategoryManager(event: EventItem) {
 }
 
 // Artists list for select dropdown
-const artists = ref<{ id: string; name: string }[]>([
+const artists = ref<ArtistOption[]>([
   { id: 'art-001', name: 'Rover Ensemble' },
   { id: 'art-002', name: 'Coldplay' },
   { id: 'art-003', name: 'NIKI' },
@@ -32,6 +32,32 @@ const artists = ref<{ id: string; name: string }[]>([
 
 function getArtistName(id: string) {
   return artists.value.find(a => a.id === id)?.name || id
+}
+
+function getVenueName(event: EventItem) {
+  if (event.venue && typeof event.venue === 'object' && event.venue.name) {
+    return event.venue.name
+  }
+  const vId = event.venueId || (typeof event.venue === 'string' ? event.venue : null)
+  if (vId) {
+    const found = venues.value.find(v => v.id === vId)
+    if (found) return found.name
+    return vId
+  }
+  return '-'
+}
+
+function getVenueCity(event: EventItem) {
+  if (event.venue && typeof event.venue === 'object' && event.venue.city) {
+    return event.venue.city
+  }
+  if (event.city) return event.city
+  const vId = event.venueId || (typeof event.venue === 'string' ? event.venue : null)
+  if (vId) {
+    const found = venues.value.find(v => v.id === vId)
+    if (found) return found.city
+  }
+  return '-'
 }
 
 async function fetchArtists() {
@@ -52,7 +78,8 @@ const events = ref<EventItem[]>([
     title: 'Wuthering Waves Live 2026',
     artistId: 'art-001',
     publisherName: 'Kuro Games',
-    venue: 'Gelora Bung Karno',
+    venueId: '',
+    venue: { id: 'v-1', name: 'Gelora Bung Karno', city: 'Jakarta' },
     city: 'Jakarta',
     dateTime: '2026-10-12T19:00:00.000Z',
     status: 'open'
@@ -62,7 +89,8 @@ const events = ref<EventItem[]>([
     title: 'Coldplay Music of the Spheres',
     artistId: 'art-002',
     publisherName: 'PK Entertainment',
-    venue: 'Stadion Utama GBK',
+    venueId: '',
+    venue: { id: 'v-2', name: 'Stadion Utama GBK', city: 'Jakarta' },
     city: 'Jakarta',
     dateTime: '2026-11-15T20:00:00.000Z',
     status: 'open'
@@ -72,7 +100,8 @@ const events = ref<EventItem[]>([
     title: 'NIKI Nicole World Tour',
     artistId: 'art-003',
     publisherName: '88rising',
-    venue: 'Beach City International Stadium',
+    venueId: '',
+    venue: { id: 'v-3', name: 'Beach City International Stadium', city: 'Jakarta' },
     city: 'Jakarta',
     dateTime: '2026-12-20T19:30:00.000Z',
     status: 'closed'
@@ -94,11 +123,11 @@ async function fetchEvents() {
   }
 }
 
-const venues = ref<{ id: string; name: string; city: string }[]>([])
+const venues = ref<VenueOption[]>([])
 
 async function fetchVenues() {
   try {
-    const res = await request<{ data: { id: string; name: string; city: string }[] }>('/venues')
+    const res = await request<{ data: VenueOption[] }>('/venues')
     if (res?.data) {
       venues.value = res.data
     }
@@ -113,13 +142,20 @@ onMounted(() => {
   fetchVenues()
 })
 
-const cityOptions = [
-  { label: 'Semua Kota', value: 'ALL' },
-  { label: 'Jakarta', value: 'Jakarta' },
-  { label: 'Bandung', value: 'Bandung' },
-  { label: 'Surabaya', value: 'Surabaya' },
-  { label: 'Bali', value: 'Bali' }
-]
+const cityOptions = computed(() => {
+  const cities = new Set<string>()
+  venues.value.forEach(v => {
+    if (v.city) cities.add(v.city)
+  })
+  events.value.forEach(e => {
+    const c = getVenueCity(e)
+    if (c && c !== '-') cities.add(c)
+  })
+  return [
+    { label: 'Semua Kota', value: 'ALL' },
+    ...Array.from(cities).map(c => ({ label: c, value: c }))
+  ]
+})
 
 const statusOptions = [
   { label: 'Semua Status', value: 'ALL' },
@@ -129,8 +165,14 @@ const statusOptions = [
 
 const filteredEvents = computed(() => {
   return events.value.filter((e) => {
-    const matchesSearch = !search.value || e.title.toLowerCase().includes(search.value.toLowerCase()) || e.venue.toLowerCase().includes(search.value.toLowerCase())
-    const matchesCity = selectedCity.value === 'ALL' || e.city === selectedCity.value
+    const venueName = getVenueName(e)
+    const venueCity = getVenueCity(e)
+    const matchesSearch = !search.value ||
+      e.title.toLowerCase().includes(search.value.toLowerCase()) ||
+      venueName.toLowerCase().includes(search.value.toLowerCase()) ||
+      venueCity.toLowerCase().includes(search.value.toLowerCase()) ||
+      (e.publisherName && e.publisherName.toLowerCase().includes(search.value.toLowerCase()))
+    const matchesCity = selectedCity.value === 'ALL' || venueCity === selectedCity.value
     const matchesStatus = selectedStatus.value === 'ALL' || e.status === selectedStatus.value
     return matchesSearch && matchesCity && matchesStatus
   })
@@ -142,7 +184,12 @@ function openCreateModal() {
 }
 
 function openEditModal(event: EventItem) {
-  editingEvent.value = event
+  const venueIdVal = event.venueId || (typeof event.venue === 'object' ? event.venue?.id : event.venue) || ''
+  const preparedEvent: EventItem = {
+    ...event,
+    venueId: venueIdVal
+  }
+  editingEvent.value = preparedEvent
   isModalOpen.value = true
 }
 
@@ -303,8 +350,8 @@ function formatDate(iso: string) {
             
             <!-- Venue / City -->
             <td class="px-6 py-4">
-              <div class="text-gray-900 dark:text-white truncate max-w-xs">{{ event.venue }}</div>
-              <div class="text-xs text-gray-400 mt-0.5">{{ event.city }}</div>
+              <div class="text-gray-900 dark:text-white font-medium truncate max-w-xs">{{ getVenueName(event) }}</div>
+              <div class="text-xs text-gray-400 mt-0.5">{{ getVenueCity(event) }}</div>
             </td>
             
             <!-- Status Badge -->

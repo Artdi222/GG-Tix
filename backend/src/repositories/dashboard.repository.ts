@@ -358,8 +358,8 @@ export async function getDashboardEvents(eventId?: string) {
     return {
       id: ev.id,
       title: ev.title,
-      city: ev.city,
-      venue: ev.venue,
+      city: ev.city || "-",
+      venue: ev.venue || "-",
       dateTime: ev.dateTime,
       status: ev.status,
       capacity: cap.capacity,

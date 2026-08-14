@@ -2,6 +2,18 @@
 import * as v from 'valibot'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
+export interface ArtistOption {
+  id: string
+  name: string
+}
+
+export interface VenueOption {
+  id: string
+  name: string
+  city: string
+  imageUrl?: string | null
+}
+
 export interface EventItem {
   id?: string
   title: string
@@ -17,13 +29,9 @@ export interface EventItem {
   sortOrder?: number
   status: 'open' | 'closed'
   imageUrl?: string | null
-}
-
-interface VenueOption {
-  id: string
-  name: string
-  city: string
-  imageUrl?: string | null
+  artist?: { id: string; name: string; bio?: string; photoUrl?: string }
+  venue?: { id: string; name: string; city: string; address?: string; imageUrl?: string | null } | string
+  city?: string
 }
 
 const props = defineProps<{
@@ -88,10 +96,10 @@ watch(open, (isOpen) => {
   if (!isOpen) return
   uploadError.value = ''
   if (props.eventData) {
-    state.title = props.eventData.title
-    state.artistId = props.eventData.artistId
-    state.publisherName = props.eventData.publisherName
-    state.venueId = props.eventData.venueId
+    state.title = props.eventData.title || ''
+    state.artistId = props.eventData.artistId || ((props.eventData as any).artist?.id) || ''
+    state.publisherName = props.eventData.publisherName || ''
+    state.venueId = props.eventData.venueId || ((props.eventData as any).venue?.id) || ((props.eventData as any).venue) || ''
     state.dateTime = props.eventData.dateTime ? new Date(props.eventData.dateTime).toISOString().slice(0, 16) : ''
     state.endDateTime = props.eventData.endDateTime ? new Date(props.eventData.endDateTime).toISOString().slice(0, 16) : ''
     state.description = props.eventData.description || ''
@@ -99,7 +107,7 @@ watch(open, (isOpen) => {
     state.tags = props.eventData.tags ? [...props.eventData.tags] : []
     state.seatmapUrl = props.eventData.seatmapUrl || ''
     state.sortOrder = props.eventData.sortOrder || 0
-    state.status = props.eventData.status
+    state.status = props.eventData.status || 'open'
     state.imageUrl = props.eventData.imageUrl || ''
   } else {
     Object.assign(state, defaultState())
