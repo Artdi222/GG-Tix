@@ -21,7 +21,7 @@ const navigationGroups = [
     items: [
       { label: 'Master Venue', icon: 'i-lucide-map-pin', to: '/venues' },
       { label: 'Data Artis / Performer', icon: 'i-lucide-mic', to: '/artists' },
-      { label: 'Data Pelanggan', icon: 'i-lucide-users', to: '/users' }
+      { label: 'Data Pengguna', icon: 'i-lucide-users', to: '/users' }
     ]
   },
   {
