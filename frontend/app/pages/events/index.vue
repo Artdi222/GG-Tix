@@ -94,9 +94,23 @@ async function fetchEvents() {
   }
 }
 
+const venues = ref<{ id: string; name: string; city: string }[]>([])
+
+async function fetchVenues() {
+  try {
+    const res = await request<{ data: { id: string; name: string; city: string }[] }>('/venues')
+    if (res?.data) {
+      venues.value = res.data
+    }
+  } catch {
+    // Keep empty if offline
+  }
+}
+
 onMounted(() => {
   fetchEvents()
   fetchArtists()
+  fetchVenues()
 })
 
 const cityOptions = [
@@ -357,6 +371,7 @@ function formatDate(iso: string) {
       v-model:open="isModalOpen"
       :event-data="editingEvent"
       :artists="artists"
+      :venues="venues"
       @saved="handleSaveEvent"
     />
 

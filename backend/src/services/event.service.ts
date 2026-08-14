@@ -7,9 +7,14 @@ export interface CreateEventParams {
   title: string;
   artistId: string;
   publisherName: string;
-  venue: string;
-  city: string;
+  venueId: string;
   dateTime: string | Date;
+  endDateTime?: string | Date | null;
+  description?: string | null;
+  maxTicketsPerOrder?: number;
+  tags?: string[];
+  seatmapUrl?: string | null;
+  sortOrder?: number;
   createdBy: string;
   status?: "open" | "closed";
   imageUrl?: string | null;
@@ -19,15 +24,19 @@ export interface UpdateEventParams {
   title?: string;
   artistId?: string;
   publisherName?: string;
-  venue?: string;
-  city?: string;
+  venueId?: string;
   dateTime?: string | Date;
+  endDateTime?: string | Date | null;
+  description?: string | null;
+  maxTicketsPerOrder?: number;
+  tags?: string[];
+  seatmapUrl?: string | null;
+  sortOrder?: number;
   status?: "open" | "closed";
   imageUrl?: string | null;
 }
 
 export async function createEvent(params: CreateEventParams) {
-  // Validate artist existence
   const artist = await artistRepository.findArtistById(params.artistId);
   if (!artist) {
     throw new AppError("Artist not found", 404);
@@ -38,9 +47,18 @@ export async function createEvent(params: CreateEventParams) {
     throw new AppError("Invalid event date/time format", 400);
   }
 
+  let parsedEndDate: Date | undefined;
+  if (params.endDateTime) {
+    parsedEndDate = new Date(params.endDateTime);
+    if (isNaN(parsedEndDate.getTime())) {
+      throw new AppError("Invalid event end date/time format", 400);
+    }
+  }
+
   return await eventRepository.createEvent({
     ...params,
     dateTime: parsedDate,
+    endDateTime: parsedEndDate || null,
   });
 }
 
@@ -77,9 +95,22 @@ export async function updateEvent(id: string, params: UpdateEventParams) {
     }
   }
 
+  let parsedEndDate: Date | null | undefined;
+  if (params.endDateTime !== undefined) {
+    if (params.endDateTime === null) {
+      parsedEndDate = null;
+    } else {
+      parsedEndDate = new Date(params.endDateTime);
+      if (isNaN(parsedEndDate.getTime())) {
+        throw new AppError("Invalid event end date/time format", 400);
+      }
+    }
+  }
+
   const updated = await eventRepository.updateEvent(id, {
     ...params,
     dateTime: parsedDate,
+    endDateTime: parsedEndDate,
   });
 
   // UPL-09: gambar lama diganti → hapus aset B2 lama (best-effort)

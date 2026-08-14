@@ -6,9 +6,14 @@ export interface CreateEventInput {
   title: string;
   artistId: string;
   publisherName: string;
-  venue: string;
-  city: string;
+  venueId: string;
   dateTime: Date;
+  endDateTime?: Date | null;
+  description?: string | null;
+  maxTicketsPerOrder?: number;
+  tags?: string[];
+  seatmapUrl?: string | null;
+  sortOrder?: number;
   createdBy: string;
   status?: "open" | "closed";
   imageUrl?: string | null;
@@ -18,9 +23,14 @@ export interface UpdateEventInput {
   title?: string;
   artistId?: string;
   publisherName?: string;
-  venue?: string;
-  city?: string;
+  venueId?: string;
   dateTime?: Date;
+  endDateTime?: Date | null;
+  description?: string | null;
+  maxTicketsPerOrder?: number;
+  tags?: string[];
+  seatmapUrl?: string | null;
+  sortOrder?: number;
   status?: "open" | "closed";
   imageUrl?: string | null;
 }
@@ -28,7 +38,7 @@ export interface UpdateEventInput {
 export interface EventQueryFilters {
   search?: string;
   artistId?: string;
-  city?: string;
+  venueId?: string;
   status?: "open" | "closed";
   page?: number;
   limit?: number;
@@ -41,9 +51,14 @@ export async function createEvent(data: CreateEventInput) {
       title: data.title.trim(),
       artistId: data.artistId,
       publisherName: data.publisherName.trim(),
-      venue: data.venue.trim(),
-      city: data.city.trim(),
+      venueId: data.venueId,
       dateTime: data.dateTime,
+      endDateTime: data.endDateTime || null,
+      description: data.description ? data.description.trim() : null,
+      maxTicketsPerOrder: data.maxTicketsPerOrder ?? 4,
+      tags: data.tags || [],
+      seatmapUrl: data.seatmapUrl ? data.seatmapUrl.trim() : null,
+      sortOrder: data.sortOrder ?? 0,
       createdBy: data.createdBy,
       status: data.status || "open",
       imageUrl: data.imageUrl ? data.imageUrl.trim() : null,
@@ -57,6 +72,7 @@ export async function findEventById(id: string) {
     where: eq(events.id, id),
     with: {
       artist: true,
+      venue: true,
       ticketCategories: true,
     },
   });
@@ -64,7 +80,7 @@ export async function findEventById(id: string) {
 }
 
 export async function findEvents(filters: EventQueryFilters = {}) {
-  const { search, artistId, city, status, page = 1, limit = 10 } = filters;
+  const { search, artistId, venueId, status, page = 1, limit = 10 } = filters;
   const offset = (page - 1) * limit;
 
   const conditions: SQL[] = [];
@@ -74,7 +90,6 @@ export async function findEvents(filters: EventQueryFilters = {}) {
     conditions.push(
       or(
         ilike(events.title, term),
-        ilike(events.venue, term),
         ilike(events.publisherName, term)
       )!
     );
@@ -84,8 +99,8 @@ export async function findEvents(filters: EventQueryFilters = {}) {
     conditions.push(eq(events.artistId, artistId));
   }
 
-  if (city) {
-    conditions.push(ilike(events.city, city.trim()));
+  if (venueId) {
+    conditions.push(eq(events.venueId, venueId));
   }
 
   if (status) {
@@ -96,11 +111,12 @@ export async function findEvents(filters: EventQueryFilters = {}) {
 
   const items = await db.query.events.findMany({
     where: whereClause,
-    orderBy: [desc(events.createdAt)],
+    orderBy: [events.sortOrder, desc(events.createdAt)],
     limit,
     offset,
     with: {
       artist: true,
+      venue: true,
     },
   });
 
@@ -125,9 +141,14 @@ export async function updateEvent(id: string, data: UpdateEventInput) {
   if (data.title !== undefined) updateData.title = data.title.trim();
   if (data.artistId !== undefined) updateData.artistId = data.artistId;
   if (data.publisherName !== undefined) updateData.publisherName = data.publisherName.trim();
-  if (data.venue !== undefined) updateData.venue = data.venue.trim();
-  if (data.city !== undefined) updateData.city = data.city.trim();
+  if (data.venueId !== undefined) updateData.venueId = data.venueId;
   if (data.dateTime !== undefined) updateData.dateTime = data.dateTime;
+  if (data.endDateTime !== undefined) updateData.endDateTime = data.endDateTime;
+  if (data.description !== undefined) updateData.description = data.description ? data.description.trim() : null;
+  if (data.maxTicketsPerOrder !== undefined) updateData.maxTicketsPerOrder = data.maxTicketsPerOrder;
+  if (data.tags !== undefined) updateData.tags = data.tags;
+  if (data.seatmapUrl !== undefined) updateData.seatmapUrl = data.seatmapUrl ? data.seatmapUrl.trim() : null;
+  if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
   if (data.status !== undefined) updateData.status = data.status;
   if (data.imageUrl !== undefined)
     updateData.imageUrl = data.imageUrl ? data.imageUrl.trim() : null;

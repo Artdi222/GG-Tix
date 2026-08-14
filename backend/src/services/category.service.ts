@@ -6,12 +6,16 @@ export interface CreateCategoryDTO {
   name: string;
   price: string;
   quotaTotal: number;
+  benefits?: string[];
+  sortOrder?: number;
 }
 
 export interface UpdateCategoryDTO {
   name?: string;
   price?: string;
   quotaTotal?: number;
+  benefits?: string[];
+  sortOrder?: number;
 }
 
 export async function createCategory(eventId: string, data: CreateCategoryDTO) {

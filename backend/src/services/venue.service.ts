@@ -5,21 +5,21 @@ import { deleteAssetsByUrl } from "../lib/storage";
 export interface CreateVenueDTO {
   name: string;
   address: string;
-  latitude?: string | null;
-  longitude?: string | null;
+  city: string;
   imageUrl?: string | null;
+  sortOrder?: number;
 }
 
 export interface UpdateVenueDTO {
   name?: string;
   address?: string;
-  latitude?: string | null;
-  longitude?: string | null;
+  city?: string;
   imageUrl?: string | null;
+  sortOrder?: number;
 }
 
 export async function getAllVenues(q?: string, page?: number, limit?: number) {
-  return await venueRepo.findAllVenues({ q, page: page ?? 1, limit: limit ?? 10 });
+  return await venueRepo.findAllVenues({ q, page, limit });
 }
 
 export async function getVenueById(id: string) {

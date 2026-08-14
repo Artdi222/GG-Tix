@@ -3,9 +3,9 @@ export interface Venue {
   id?: string
   name: string
   address: string
-  latitude: number | null
-  longitude: number | null
+  city: string
   imageUrl: string | null
+  sortOrder?: number
 }
 
 const props = defineProps<{
@@ -25,8 +25,8 @@ const isEdit = computed(() => !!props.venue?.id)
 const state = reactive({
   name: '',
   address: '',
-  latitude: null as number | null,
-  longitude: null as number | null,
+  city: '',
+  sortOrder: 0,
   imageUrl: ''
 })
 
@@ -43,14 +43,14 @@ watch(
     if (props.venue) {
       state.name = props.venue.name
       state.address = props.venue.address
-      state.latitude = props.venue.latitude
-      state.longitude = props.venue.longitude
+      state.city = props.venue.city || ''
+      state.sortOrder = props.venue.sortOrder || 0
       state.imageUrl = props.venue.imageUrl || ''
     } else {
       state.name = ''
       state.address = ''
-      state.latitude = null
-      state.longitude = null
+      state.city = ''
+      state.sortOrder = 0
       state.imageUrl = ''
     }
   }
@@ -84,7 +84,7 @@ async function onImageSelected(event: Event) {
 }
 
 async function onSubmit() {
-  if (!state.name.trim() || !state.address.trim()) return
+  if (!state.name.trim() || !state.address.trim() || !state.city.trim()) return
   isSaving.value = true
   uploadError.value = ''
 
@@ -92,8 +92,8 @@ async function onSubmit() {
     const payload = {
       name: state.name.trim(),
       address: state.address.trim(),
-      latitude: state.latitude !== null ? String(state.latitude) : '',
-      longitude: state.longitude !== null ? String(state.longitude) : '',
+      city: state.city.trim(),
+      sortOrder: Number(state.sortOrder) || 0,
       imageUrl: state.imageUrl || ''
     }
 
@@ -104,11 +104,7 @@ async function onSubmit() {
       })
       emit('saved', res?.data || {
         id: props.venue.id,
-        name: state.name,
-        address: state.address,
-        latitude: state.latitude,
-        longitude: state.longitude,
-        imageUrl: state.imageUrl
+        ...payload
       })
     } else {
       const res = await request<{ data: Venue }>('/venues', {
@@ -117,11 +113,7 @@ async function onSubmit() {
       })
       emit('saved', res?.data || {
         id: `venue-${Date.now()}`,
-        name: state.name,
-        address: state.address,
-        latitude: state.latitude,
-        longitude: state.longitude,
-        imageUrl: state.imageUrl
+        ...payload
       })
     }
     emit('update:open', false)
@@ -159,11 +151,11 @@ async function onSubmit() {
         </UFormField>
 
         <div class="grid grid-cols-2 gap-4">
-          <UFormField label="Latitude (-90 s/d 90)">
-            <UInput v-model.number="state.latitude" type="number" step="any" placeholder="-6.2187300" class="w-full" />
+          <UFormField label="Kota" required>
+            <UInput v-model="state.city" placeholder="Contoh: Jakarta" class="w-full" />
           </UFormField>
-          <UFormField label="Longitude (-180 s/d 180)">
-            <UInput v-model.number="state.longitude" type="number" step="any" placeholder="106.8026815" class="w-full" />
+          <UFormField label="Urutan Tampil (Sort Order)">
+            <UInput v-model.number="state.sortOrder" type="number" placeholder="0" class="w-full" />
           </UFormField>
         </div>
 

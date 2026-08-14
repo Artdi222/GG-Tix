@@ -19,7 +19,7 @@ export async function findAllVenues(filters: VenueQuery = {}) {
     .select()
     .from(venues)
     .where(whereClause)
-    .orderBy(desc(venues.createdAt))
+    .orderBy(venues.sortOrder, desc(venues.createdAt))
     .limit(limit)
     .offset(offset);
 
@@ -51,18 +51,18 @@ export async function findVenueById(id: string) {
 export async function createVenue(data: {
   name: string;
   address: string;
-  latitude?: string | null;
-  longitude?: string | null;
+  city: string;
   imageUrl?: string | null;
+  sortOrder?: number;
 }) {
   const [venue] = await db
     .insert(venues)
     .values({
       name: data.name.trim(),
       address: data.address.trim(),
-      latitude: data.latitude || null,
-      longitude: data.longitude || null,
+      city: data.city.trim(),
       imageUrl: data.imageUrl ? data.imageUrl.trim() : null,
+      sortOrder: data.sortOrder ?? 0,
     })
     .returning();
   return venue;
@@ -73,18 +73,18 @@ export async function updateVenue(
   data: {
     name?: string;
     address?: string;
-    latitude?: string | null;
-    longitude?: string | null;
+    city?: string;
     imageUrl?: string | null;
+    sortOrder?: number;
   }
 ) {
   const updateData: Record<string, any> = {};
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.address !== undefined) updateData.address = data.address.trim();
-  if (data.latitude !== undefined) updateData.latitude = data.latitude || null;
-  if (data.longitude !== undefined) updateData.longitude = data.longitude || null;
+  if (data.city !== undefined) updateData.city = data.city.trim();
   if (data.imageUrl !== undefined)
     updateData.imageUrl = data.imageUrl ? data.imageUrl.trim() : null;
+  if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
   const [venue] = await db
     .update(venues)

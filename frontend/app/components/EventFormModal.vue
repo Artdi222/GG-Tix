@@ -7,21 +7,29 @@ export interface EventItem {
   title: string
   artistId: string
   publisherName: string
-  venue: string
-  city: string
+  venueId: string
   dateTime: string
+  endDateTime?: string | null
+  description?: string | null
+  maxTicketsPerOrder?: number
+  tags?: string[]
+  seatmapUrl?: string | null
+  sortOrder?: number
   status: 'open' | 'closed'
   imageUrl?: string | null
 }
 
-interface ArtistOption {
+interface VenueOption {
   id: string
   name: string
+  city: string
+  imageUrl?: string | null
 }
 
 const props = defineProps<{
   eventData?: EventItem | null
   artists?: ArtistOption[]
+  venues?: VenueOption[]
 }>()
 
 const emit = defineEmits<{
@@ -38,8 +46,7 @@ const schema = v.object({
   title: v.pipe(v.string(), v.minLength(3, 'Judul event minimal 3 karakter')),
   artistId: v.pipe(v.string(), v.minLength(1, 'Pilih artis')),
   publisherName: v.pipe(v.string(), v.minLength(2, 'Nama publisher/promoter wajib diisi')),
-  venue: v.pipe(v.string(), v.minLength(2, 'Nama venue wajib diisi')),
-  city: v.pipe(v.string(), v.minLength(2, 'Kota wajib diisi')),
+  venueId: v.pipe(v.string(), v.minLength(1, 'Pilih venue')),
   dateTime: v.pipe(v.string(), v.minLength(1, 'Tanggal & waktu wajib diisi')),
   status: v.picklist(['open', 'closed'])
 })
@@ -50,9 +57,15 @@ function defaultState() {
     title: '',
     artistId: '',
     publisherName: '',
-    venue: '',
-    city: '',
+    venueId: '',
     dateTime: new Date().toISOString().slice(0, 16),
+    endDateTime: '',
+    description: '',
+    maxTicketsPerOrder: 4,
+    tagInput: '',
+    tags: [] as string[],
+    seatmapUrl: '',
+    sortOrder: 0,
     status: 'open' as Schema['status'],
     imageUrl: ''
   }
@@ -61,8 +74,10 @@ function defaultState() {
 const state = reactive(defaultState())
 const isSaving = ref(false)
 const isUploading = ref(false)
+const isUploadingSeatmap = ref(false)
 const uploadError = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const seatmapFileInput = ref<HTMLInputElement | null>(null)
 
 const statusOptions = [
   { label: 'Open (Aktif)', value: 'open' },
@@ -76,15 +91,59 @@ watch(open, (isOpen) => {
     state.title = props.eventData.title
     state.artistId = props.eventData.artistId
     state.publisherName = props.eventData.publisherName
-    state.venue = props.eventData.venue
-    state.city = props.eventData.city
+    state.venueId = props.eventData.venueId
     state.dateTime = props.eventData.dateTime ? new Date(props.eventData.dateTime).toISOString().slice(0, 16) : ''
+    state.endDateTime = props.eventData.endDateTime ? new Date(props.eventData.endDateTime).toISOString().slice(0, 16) : ''
+    state.description = props.eventData.description || ''
+    state.maxTicketsPerOrder = props.eventData.maxTicketsPerOrder || 4
+    state.tags = props.eventData.tags ? [...props.eventData.tags] : []
+    state.seatmapUrl = props.eventData.seatmapUrl || ''
+    state.sortOrder = props.eventData.sortOrder || 0
     state.status = props.eventData.status
     state.imageUrl = props.eventData.imageUrl || ''
   } else {
     Object.assign(state, defaultState())
   }
 })
+
+function addTag() {
+  const t = state.tagInput.trim()
+  if (t && !state.tags.includes(t)) {
+    state.tags.push(t)
+    state.tagInput = ''
+  }
+}
+
+function removeTag(index: number) {
+  state.tags.splice(index, 1)
+}
+
+async function onSeatmapSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  uploadError.value = ''
+  isUploadingSeatmap.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('kind', 'venue')
+
+    const res = await request<{ data: { url: string } }>('/uploads', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (res?.data?.url) {
+      state.seatmapUrl = res.data.url
+    }
+  } catch (err: any) {
+    uploadError.value = err?.data?.error || 'Gagal mengunggah seatmap event.'
+  } finally {
+    isUploadingSeatmap.value = false
+  }
+}
 
 async function onImageSelected(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
@@ -114,8 +173,13 @@ async function onImageSelected(event: Event) {
 }
 
 async function onSave() {
-  if (!state.title.trim() || !state.artistId || !state.publisherName.trim() || !state.venue.trim() || !state.city.trim() || !state.dateTime) {
+  if (!state.title.trim() || !state.artistId || !state.publisherName.trim() || !state.venueId || !state.dateTime) {
     uploadError.value = 'Harap lengkapi semua field yang wajib diisi.'
+    return
+  }
+
+  if (state.endDateTime && new Date(state.endDateTime) < new Date(state.dateTime)) {
+    uploadError.value = 'Waktu selesai tidak boleh sebelum waktu mulai.'
     return
   }
 
@@ -127,9 +191,14 @@ async function onSave() {
       title: state.title.trim(),
       artistId: state.artistId,
       publisherName: state.publisherName.trim(),
-      venue: state.venue.trim(),
-      city: state.city.trim(),
+      venueId: state.venueId,
       dateTime: state.dateTime ? new Date(state.dateTime).toISOString() : new Date().toISOString(),
+      endDateTime: state.endDateTime ? new Date(state.endDateTime).toISOString() : null,
+      description: state.description.trim() || null,
+      maxTicketsPerOrder: Number(state.maxTicketsPerOrder) || 4,
+      tags: state.tags,
+      seatmapUrl: state.seatmapUrl || null,
+      sortOrder: Number(state.sortOrder) || 0,
       status: state.status,
       imageUrl: state.imageUrl || null
     }
@@ -175,22 +244,51 @@ async function onSave() {
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Nama Venue" name="venue">
-            <UInput v-model="state.venue" placeholder="Contoh: Gelora Bung Karno" class="w-full" />
+          <UFormField label="Venue Master" name="venueId">
+            <USelect
+              v-model="state.venueId"
+              :items="(props.venues || []).map(v => ({ label: `${v.name} (${v.city})`, value: v.id }))"
+              placeholder="Pilih Venue"
+              class="w-full"
+            />
           </UFormField>
 
-          <UFormField label="Kota" name="city">
-            <UInput v-model="state.city" placeholder="Contoh: Jakarta" class="w-full" />
+          <UFormField label="Batas Pembelian per Order" name="maxTicketsPerOrder">
+            <UInput v-model.number="state.maxTicketsPerOrder" type="number" min="1" max="10" class="w-full" />
           </UFormField>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Tanggal & Waktu Konser" name="dateTime">
+          <UFormField label="Tanggal & Waktu Mulai" name="dateTime">
             <UInput v-model="state.dateTime" type="datetime-local" class="w-full" />
           </UFormField>
 
+          <UFormField label="Tanggal & Waktu Selesai (Opsional)" name="endDateTime">
+            <UInput v-model="state.endDateTime" type="datetime-local" class="w-full" />
+          </UFormField>
+        </div>
+
+        <UFormField label="Deskripsi Event" name="description">
+          <UTextarea v-model="state.description" placeholder="Deskripsi lengkap event untuk mobile app..." class="w-full" />
+        </UFormField>
+
+        <UFormField label="Tags / Kategori (Tekan Enter untuk tambah)">
+          <div class="flex flex-wrap gap-2 mb-2" v-if="state.tags.length">
+            <span v-for="(tag, idx) in state.tags" :key="idx" class="bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full text-xs flex items-center gap-1">
+              {{ tag }}
+              <button type="button" @click="removeTag(idx)" class="text-gray-400 hover:text-red-500">×</button>
+            </span>
+          </div>
+          <UInput v-model="state.tagInput" placeholder="Contoh: Genshin, Anime, J-Pop (Tekan Enter)" @keydown.enter.prevent="addTag" class="w-full" />
+        </UFormField>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <UFormField label="Status Event" name="status">
             <USelect v-model="state.status" :items="statusOptions" class="w-full" />
+          </UFormField>
+
+          <UFormField label="Urutan Tampil (Sort Order)">
+            <UInput v-model.number="state.sortOrder" type="number" class="w-full" />
           </UFormField>
         </div>
 
@@ -219,7 +317,38 @@ async function onSave() {
                 class="hidden"
                 @change="onImageSelected"
               >
-              <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop otomatis ke rasio 16:9.</p>
+              <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB).</p>
+            </div>
+          </div>
+        </UFormField>
+
+        <UFormField label="Seatmap Custom per Event (Opsional)">
+          <p class="text-xs text-gray-400 mb-2">Jika kosong, akan otomatis fallback ke gambar default venue.</p>
+          <div class="flex items-start gap-4">
+            <div class="w-28 h-40 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
+              <img v-if="state.seatmapUrl" :src="state.seatmapUrl" alt="Preview Seatmap" class="w-full h-full object-cover">
+              <UIcon v-else name="i-lucide-image" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
+            </div>
+            <div class="space-y-2">
+              <UButton
+                type="button"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                icon="i-lucide-upload"
+                :loading="isUploadingSeatmap"
+                @click="seatmapFileInput?.click()"
+              >
+                {{ state.seatmapUrl ? 'Ganti Seatmap' : 'Upload Seatmap' }}
+              </UButton>
+              <input
+                ref="seatmapFileInput"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                class="hidden"
+                @change="onSeatmapSelected"
+              >
+              <p class="text-xs text-gray-400">Rasio 9:16 recommended.</p>
             </div>
           </div>
         </UFormField>

@@ -8,7 +8,6 @@ const artistsRoute = new Hono();
 
 const listQuerySchema = z.object({
   q: z.string().optional(),
-  search: z.string().optional(),
   page: z
     .string()
     .optional()
@@ -46,11 +45,10 @@ const updateArtistSchema = z.object({
     .or(z.literal("")),
 });
 
-// GET /api/artists - Public list with optional search (?q= or ?search=) + pagination
+// GET /api/artists - Public list with optional search (?q=) + pagination
 artistsRoute.get("/", zValidator("query", listQuerySchema), async (c) => {
   const query = c.req.valid("query");
-  const search = query.q || query.search;
-  const result = await artistService.getAllArtists(search, query.page, query.limit);
+  const result = await artistService.getAllArtists(query.q, query.page, query.limit);
   return c.json({
     data: result.items,
     pagination: result.pagination,

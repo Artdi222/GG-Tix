@@ -18,6 +18,8 @@ const createCategorySchema = z.object({
     .number()
     .int("Quota must be a whole number")
     .min(1, "Quota must be at least 1"),
+  benefits: z.array(z.string()).optional(),
+  sortOrder: z.number().int().optional(),
 });
 
 const updateCategorySchema = z.object({
@@ -35,6 +37,8 @@ const updateCategorySchema = z.object({
     .int("Quota must be a whole number")
     .min(1, "Quota must be at least 1")
     .optional(),
+  benefits: z.array(z.string()).optional(),
+  sortOrder: z.number().int().optional(),
 });
 
 const eventIdParamSchema = z.object({

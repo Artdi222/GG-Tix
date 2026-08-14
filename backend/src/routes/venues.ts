@@ -22,35 +22,15 @@ const listQuerySchema = z.object({
     .transform((val) => (val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10)),
 });
 
-const latSchema = z
-  .string()
-  .refine((v) => {
-    if (!v || v.trim() === "") return true;
-    const n = Number(v);
-    return Number.isFinite(n) && n >= -90 && n <= 90;
-  }, "Latitude harus antara -90 dan 90")
-  .optional()
-  .or(z.literal(""));
-
-const lngSchema = z
-  .string()
-  .refine((v) => {
-    if (!v || v.trim() === "") return true;
-    const n = Number(v);
-    return Number.isFinite(n) && n >= -180 && n <= 180;
-  }, "Longitude harus antara -180 dan 180")
-  .optional()
-  .or(z.literal(""));
-
 const createVenueSchema = z.object({
   name: z
     .string()
     .min(1, "Nama venue wajib diisi")
     .max(200, "Nama venue maksimum 200 karakter"),
   address: z.string().min(1, "Alamat wajib diisi"),
-  latitude: latSchema,
-  longitude: lngSchema,
+  city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter"),
   imageUrl: z.string().url("Invalid image URL format").optional().or(z.literal("")),
+  sortOrder: z.number().int().optional(),
 });
 
 const updateVenueSchema = z.object({
@@ -60,9 +40,9 @@ const updateVenueSchema = z.object({
     .max(200, "Nama venue maksimum 200 karakter")
     .optional(),
   address: z.string().min(1, "Alamat wajib diisi").optional(),
-  latitude: latSchema,
-  longitude: lngSchema,
+  city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter").optional(),
   imageUrl: z.string().url("Invalid image URL format").optional().or(z.literal("")),
+  sortOrder: z.number().int().optional(),
 });
 
 // GET /api/venues — admin list (admin + staff read)

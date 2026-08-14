@@ -56,9 +56,9 @@ export const venues = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     name: varchar("name", { length: 200 }).notNull(),
     address: text("address").notNull(),
-    latitude: numeric("latitude", { precision: 10, scale: 7 }),
-    longitude: numeric("longitude", { precision: 10, scale: 7 }),
+    city: varchar("city", { length: 100 }).notNull().default("Jakarta"),
     imageUrl: text("image_url"),
+    sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
@@ -75,9 +75,15 @@ export const events = pgTable(
       .notNull()
       .references(() => artists.id, { onDelete: "restrict" }),
     publisherName: varchar("publisher_name", { length: 100 }).notNull(),
-    venue: varchar("venue", { length: 200 }).notNull(),
-    city: varchar("city", { length: 100 }).notNull(),
+    venueId: uuid("venue_id")
+      .references(() => venues.id, { onDelete: "restrict" }),
     dateTime: timestamp("date_time").notNull(),
+    endDateTime: timestamp("end_date_time"),
+    description: text("description"),
+    maxTicketsPerOrder: integer("max_tickets_per_order").notNull().default(4),
+    tags: text("tags").array().notNull().default([]),
+    seatmapUrl: text("seatmap_url"),
+    sortOrder: integer("sort_order").notNull().default(0),
     imageUrl: text("image_url"),
     status: eventStatusEnum("status").notNull().default("open"),
     createdBy: uuid("created_by")
@@ -87,9 +93,9 @@ export const events = pgTable(
   },
   (table) => ({
     publisherIdx: index("events_publisher_idx").on(table.publisherName),
-    cityIdx: index("events_city_idx").on(table.city),
     statusIdx: index("events_status_idx").on(table.status),
     artistIdx: index("events_artist_id_idx").on(table.artistId),
+    venueIdx: index("events_venue_id_idx").on(table.venueId),
   })
 );
 
@@ -102,6 +108,8 @@ export const ticketCategories = pgTable("ticket_categories", {
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
   quotaTotal: integer("quota_total").notNull(),
   quotaRemaining: integer("quota_remaining").notNull(),
+  benefits: text("benefits").array().notNull().default([]),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 export const orders = pgTable(
@@ -157,9 +165,14 @@ export const artistsRelations = relations(artists, ({ many }) => ({
 
 export const eventsRelations = relations(events, ({ one, many }) => ({
   artist: one(artists, { fields: [events.artistId], references: [artists.id] }),
+  venue: one(venues, { fields: [events.venueId], references: [venues.id] }),
   createdByAdmin: one(admins, { fields: [events.createdBy], references: [admins.id] }),
   ticketCategories: many(ticketCategories),
   orders: many(orders),
+}));
+
+export const venuesRelations = relations(venues, ({ many }) => ({
+  events: many(events),
 }));
 
 export const ticketCategoriesRelations = relations(ticketCategories, ({ one, many }) => ({

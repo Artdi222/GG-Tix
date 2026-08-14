@@ -13,6 +13,7 @@ import orderRoute from "./routes/orders";
 import dashboardRoute from "./routes/dashboard";
 import uploadRoute from "./routes/uploads";
 import venueRoute from "./routes/venues";
+import usersRoute from "./routes/users";
 
 assertB2Configured();
 
@@ -46,6 +47,7 @@ api.route("/orders", orderRoute);
 api.route("/dashboard", dashboardRoute);
 api.route("/uploads", uploadRoute);
 api.route("/venues", venueRoute);
+api.route("/users", usersRoute);
 
 // Mount under /api prefix
 app.route("/api", api);

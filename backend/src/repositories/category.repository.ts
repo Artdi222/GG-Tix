@@ -7,19 +7,24 @@ export interface CreateCategoryInput {
   name: string;
   price: string;
   quotaTotal: number;
+  benefits?: string[];
+  sortOrder?: number;
 }
 
 export interface UpdateCategoryInput {
   name?: string;
   price?: string;
   quotaTotal?: number;
+  benefits?: string[];
+  sortOrder?: number;
 }
 
 export async function findCategoriesByEventId(eventId: string) {
   return await db
     .select()
     .from(ticketCategories)
-    .where(eq(ticketCategories.eventId, eventId));
+    .where(eq(ticketCategories.eventId, eventId))
+    .orderBy(ticketCategories.sortOrder);
 }
 
 export async function findCategoryById(id: string) {
@@ -40,6 +45,8 @@ export async function createCategory(data: CreateCategoryInput) {
       price: data.price,
       quotaTotal: data.quotaTotal,
       quotaRemaining: data.quotaTotal,
+      benefits: data.benefits || [],
+      sortOrder: data.sortOrder ?? 0,
     })
     .returning();
   return newCategory;
@@ -53,6 +60,8 @@ export async function updateCategory(id: string, data: UpdateCategoryInput) {
   const updateData: Record<string, any> = {};
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.price !== undefined) updateData.price = data.price;
+  if (data.benefits !== undefined) updateData.benefits = data.benefits;
+  if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
   // When quotaTotal changes, adjust quotaRemaining by the same delta
   // so already-sold tickets are preserved.

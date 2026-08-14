@@ -1,6 +1,6 @@
 import { eq, and, sum, count, sql, SQL, desc, asc } from "drizzle-orm";
 import { db } from "../db";
-import { orders, events, ticketCategories, tickets } from "../db/schema";
+import { orders, events, ticketCategories, tickets, venues } from "../db/schema";
 
 export interface DashboardRange {
   days?: number;
@@ -81,11 +81,12 @@ export async function getDashboardSummary(range: DashboardRange = {}) {
       .select({
         id: events.id,
         title: events.title,
-        city: events.city,
-        venue: events.venue,
+        city: venues.city,
+        venue: venues.name,
         dateTime: events.dateTime,
       })
       .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
       .where(eq(events.status, "open"))
       .orderBy(asc(events.dateTime))
       .limit(5),
@@ -93,11 +94,12 @@ export async function getDashboardSummary(range: DashboardRange = {}) {
       .select({
         id: events.id,
         title: events.title,
-        city: events.city,
-        venue: events.venue,
+        city: venues.city,
+        venue: venues.name,
         dateTime: events.dateTime,
       })
       .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
       .where(eq(events.status, "closed"))
       .orderBy(desc(events.dateTime))
       .limit(5),
@@ -303,12 +305,13 @@ export async function getDashboardEvents(eventId?: string) {
       .select({
         id: events.id,
         title: events.title,
-        city: events.city,
-        venue: events.venue,
+        city: venues.city,
+        venue: venues.name,
         dateTime: events.dateTime,
         status: events.status,
       })
       .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
       .where(eventWhere)
       .orderBy(desc(events.dateTime)),
     db

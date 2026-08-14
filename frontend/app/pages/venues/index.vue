@@ -4,24 +4,7 @@ import type { Venue } from '~/components/VenueFormModal.vue'
 const { request } = useApi()
 
 const search = ref('')
-const venuesList = ref<Venue[]>([
-  {
-    id: 'ven-001',
-    name: 'Gelora Bung Karno',
-    address: 'Jl. Pintu Satu Senayan, Gelora, Tanah Abang, Jakarta Pusat, DKI Jakarta 10270',
-    latitude: -6.2187300,
-    longitude: 106.8026815,
-    imageUrl: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=500'
-  },
-  {
-    id: 'ven-002',
-    name: 'Istora Senayan',
-    address: 'Gelora Bung Karno Complex, Jl. Pintu Satu Senayan, Tanah Abang, Jakarta Pusat, DKI Jakarta 10270',
-    latitude: -6.2207900,
-    longitude: 106.8047900,
-    imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500'
-  }
-])
+const venuesList = ref<Venue[]>([])
 
 const isLoading = ref(false)
 const isModalOpen = ref(false)
@@ -35,7 +18,7 @@ async function fetchVenues() {
       venuesList.value = res.data
     }
   } catch {
-    // Keep mock data if BE offline
+    // Keep empty if BE offline
   } finally {
     isLoading.value = false
   }
@@ -128,7 +111,7 @@ async function deleteVenue(id?: string) {
             <th scope="col" class="px-6 py-4">Denah / Visual</th>
             <th scope="col" class="px-6 py-4">Nama Venue</th>
             <th scope="col" class="px-6 py-4">Alamat Lengkap</th>
-            <th scope="col" class="px-6 py-4">Koordinat GPS</th>
+            <th scope="col" class="px-6 py-4">Kota</th>
             <th scope="col" class="px-6 py-4 text-right">Aksi</th>
           </tr>
         </thead>
@@ -161,13 +144,11 @@ async function deleteVenue(id?: string) {
               <div class="text-gray-600 dark:text-gray-300 max-w-sm line-clamp-2">{{ v.address }}</div>
             </td>
 
-            <!-- Koordinat -->
+            <!-- Kota -->
             <td class="px-6 py-4 whitespace-nowrap">
-              <div v-if="v.latitude && v.longitude" class="text-xs font-mono text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                <UIcon name="i-lucide-navigation" class="w-3.5 h-3.5 text-amber-500" />
-                {{ v.latitude }}, {{ v.longitude }}
-              </div>
-              <span v-else class="text-xs text-gray-400 italic">Belum diset</span>
+              <span class="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2.5 py-1 rounded-full text-xs font-medium">
+                {{ v.city }}
+              </span>
             </td>
 
             <!-- Aksi -->
