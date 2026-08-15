@@ -12,6 +12,7 @@ import {
   boolean,
   pgEnum,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -23,6 +24,7 @@ export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "verified",
   "rejected",
+  "expired",
 ]);
 
 export const admins = pgTable("admins", {
@@ -144,7 +146,12 @@ export const paymentProofs = pgTable("payment_proofs", {
   orderId: uuid("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
-  imageUrl: text("image_url").notNull(),
+  imageUrl: text("image_url"),
+  midtransTransactionId: varchar("midtrans_transaction_id", { length: 100 }),
+  paymentType: varchar("payment_type", { length: 50 }),
+  transactionStatus: varchar("transaction_status", { length: 30 }),
+  midtransResponse: jsonb("midtrans_response"),
+  paidAt: timestamp("paid_at"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
 

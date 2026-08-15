@@ -180,9 +180,11 @@ async function saveAdmin() {
     errorMsg.value = err?.data?.message || 'Gagal menyimpan data admin.'
     // Local fallback update if offline
     if (editingAdmin.value) {
-      const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      if (idx !== -1) {
-        admins.value[idx] = { ...admins.value[idx], name: adminForm.name, email: adminForm.email, role: adminForm.role }
+      const target = admins.value.find((a) => a.id === editingAdmin.value!.id)
+      if (target) {
+        target.name = adminForm.name
+        target.email = adminForm.email
+        target.role = adminForm.role
       }
     } else {
       admins.value.unshift({

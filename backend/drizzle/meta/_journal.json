@@ -6,21 +6,28 @@
       "idx": 0,
       "version": "7",
       "when": 1785234644479,
-      "tag": "0000_huge_red_skull",
+      "tag": "0000_initial_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
       "when": 1786087893212,
-      "tag": "0001_colossal_the_watchers",
+      "tag": "0001_add_indexes",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
       "when": 1786356628997,
-      "tag": "0002_ambiguous_black_bird",
+      "tag": "0002_add_venues_and_event_image",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786800000000,
+      "tag": "0003_midtrans_payments",
       "breakpoints": true
     }
   ]
