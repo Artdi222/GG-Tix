@@ -197,6 +197,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   tickets: many(tickets),
 }));
 
+export const paymentProofsRelations = relations(paymentProofs, ({ one }) => ({
+  order: one(orders, { fields: [paymentProofs.orderId], references: [orders.id] }),
+}));
+
 export const ticketsRelations = relations(tickets, ({ one }) => ({
   order: one(orders, { fields: [tickets.orderId], references: [orders.id] }),
 }));
@@ -204,3 +208,4 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
 export const customersRelations = relations(customers, ({ many }) => ({
   orders: many(orders),
 }));
+
