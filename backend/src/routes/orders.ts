@@ -31,7 +31,7 @@ const orderIdParamSchema = z.object({
 });
 
 const adminQuerySchema = z.object({
-  status: z.enum(["pending", "verified", "rejected"]).optional(),
+  status: z.enum(["pending", "verified", "rejected", "expired"]).optional(),
   eventId: z.string().uuid().optional(),
   page: z
     .string()
@@ -68,11 +68,12 @@ orderRoute.post(
   async (c) => {
     const user = c.get("user");
     const body = c.req.valid("json");
-    const data = await orderService.placeOrder(user.sub, body);
+    const { order, payment } = await orderService.placeOrder(user.sub, body);
     return c.json(
       {
         message: "Order placed successfully",
-        data,
+        data: order,
+        ...(payment ? { payment } : {}),
       },
       201
     );

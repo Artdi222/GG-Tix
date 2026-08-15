@@ -2,7 +2,7 @@
 
 > **Platform Penjualan Tiket Konser Gaming & Pop Culture Indonesia**
 >
-> Versi: `1.0` · Terakhir diperbarui: `2026-08-08` · Status: **Living Document**
+> Versi: `1.1` · Terakhir diperbarui: `2026-08-15` · Status: **Living Document**
 
 ---
 
@@ -82,15 +82,15 @@ Pain Point: Server crash saat war tiket, batas beli terlalu ketat
 ```
 Nama: Budi — Super Admin GG Tix
 Role: Super Admin
-Kebutuhan: Kelola seluruh event, artis, tiket, verifikasi order, lihat analytics
-Akses: CRUD event, CRUD artis, verifikasi order, dashboard analytics
+Kebutuhan: Kelola seluruh event, venue, artis, tiket, admin/staff, verifikasi order, lihat analytics
+Akses: CRUD event, CRUD venue, CRUD artis, CRUD admin/staff, verifikasi order, dashboard analytics
 ```
 
 ```
 Nama: Siti — Staff GG Tix
 Role: Staff
 Kebutuhan: Verifikasi order masuk, scan QR check-in di venue
-Akses: Read event, verifikasi order, scan QR (tidak bisa create/delete event)
+Akses: Read event/venue/artis, verifikasi order, scan QR (tidak bisa create/edit/delete event, venue, artis, dan admin)
 ```
 
 ### 2.3 Matriks Role & Permission
@@ -98,12 +98,16 @@ Akses: Read event, verifikasi order, scan QR (tidak bisa create/delete event)
 | Aksi | Super Admin | Staff | Customer |
 | --- | --- | --- | --- |
 | CRUD Event | Ya | Tidak | Tidak |
+| CRUD Venue | Ya | Tidak | Tidak |
 | CRUD Artis | Ya | Tidak | Tidak |
 | CRUD Kategori Tiket | Ya | Tidak | Tidak |
+| CRUD Admin / Staff | Ya | Tidak | Tidak |
+| Lihat Daftar Customer | Ya | Ya | Tidak |
 | Verifikasi Order | Ya | Ya | Tidak |
 | Lihat Dashboard Analytics | Ya | Ya | Tidak |
 | Scan QR Check-In | Ya | Ya | Tidak |
-| Browse Event | Ya | Ya | Ya |
+| Upload Gambar (B2 Object Storage) | Ya | Tidak | Tidak |
+| Browse Event & Artis | Ya | Ya | Ya |
 | Buat Order / Beli Tiket | Tidak | Tidak | Ya |
 | Lihat Tiket Sendiri | Tidak | Tidak | Ya |
 | Riwayat Order Sendiri | Tidak | Tidak | Ya |
@@ -132,7 +136,7 @@ graph TB
     subgraph "External Services"
         PG["Midtrans<br/>Payment Gateway"]
         PUSH["Push Notification<br/>Service (FCM)"]
-        STORE["Object Storage<br/>(Payment Proofs)"]
+        STORE["Backblaze B2 Storage<br/>(Assets, Banners, Seatmaps)"]
     end
 
     MA -->|HTTPS /api| API
@@ -140,7 +144,7 @@ graph TB
     API --> DB
     API <-->|Webhook + API| PG
     API -->|Send Push| PUSH
-    API -->|Upload/Download| STORE
+    API -->|Upload / Download WebP| STORE
 ```
 
 ### 3.2 Arsitektur Komunikasi
@@ -149,19 +153,20 @@ graph TB
 | --- | --- | --- | --- |
 | Mobile App | Backend API | HTTPS REST | Semua operasi customer |
 | Web Dashboard | Backend API | HTTPS REST | Semua operasi admin |
-| Backend API | PostgreSQL | TCP (postgres) | Data persistence |
-| Backend API | Midtrans | HTTPS | Create payment, check status |
+| Backend API | PostgreSQL | TCP (postgres) | Data persistence via Drizzle ORM |
+| Backend API | Midtrans | HTTPS | Inisiasi Snap Token & Cek Status |
 | Midtrans | Backend API | HTTPS Webhook | Payment notification callback |
-| Backend API | FCM | HTTPS | Push notification ke mobile |
+| Backend API | Backblaze B2 | HTTPS S3 API | Upload gambar, kompresi WebP, & storage |
+| Backend API | FCM | HTTPS | Push notification ke mobile app |
 
 ### 3.3 Arsitektur Frontend (Admin Web)
 
 ```mermaid
 graph LR
     subgraph "Nuxt 4 App"
-        Pages["Pages<br/>/events, /orders,<br/>/artists, /login"]
-        Components["Components<br/>EventFormModal,<br/>AppLogo, dll"]
-        Composables["Composables<br/>useApi, useAuth"]
+        Pages["Pages<br/>/events, /venues, /artists,<br/>/orders, /users, /scanner, /login"]
+        Components["Components<br/>EventFormModal, CategoryManagerModal,<br/>VenueModal, AdminModal, dll"]
+        Composables["Composables<br/>useApi, useAuth, useUpload"]
         Layouts["Layouts<br/>default (sidebar + topbar)"]
     end
 
@@ -179,27 +184,30 @@ graph LR
 
 | Layer | Teknologi | Versi | Catatan |
 | --- | --- | --- | --- |
-| **Frontend (Admin)** | Nuxt | 4.5.x | SSR framework Vue 3 |
-| **UI Kit** | Nuxt UI | 4.10.x | Komponen UI + icons |
-| **CSS** | TailwindCSS | 4.3.x | Utility-first CSS |
-| **Validasi (FE)** | Valibot | 1.4.x | Schema validation |
-| **Backend** | Hono | 4.12.x | Lightweight web framework |
-| **Runtime** | Bun | Latest | Pengganti Node.js, lebih cepat |
-| **ORM** | Drizzle ORM | 0.40.x | Type-safe SQL |
-| **Database** | PostgreSQL | — | Via Docker Compose |
-| **Auth** | Jose (JWT) | 6.0.x | JSON Web Token |
-| **Validasi (BE)** | Zod | 3.24.x | Schema validation |
-| **Package Manager** | pnpm | 11.18.x | Untuk frontend |
+| **Frontend (Admin)** | Nuxt | 4.5.x | SSR & Client framework Vue 3 |
+| **UI Kit** | Nuxt UI | 4.10.x | Komponen UI, form, modal, & icons |
+| **CSS** | TailwindCSS | 4.3.x | Utility-first styling |
+| **Validasi (FE)** | Valibot | 1.4.x | Schema validation form frontend |
+| **Backend** | Hono | 4.12.x | Lightweight web framework di atas Bun |
+| **Runtime** | Bun | Latest | JavaScript/TypeScript runtime performa tinggi |
+| **ORM** | Drizzle ORM | 0.40.x | Type-safe SQL ORM |
+| **Database** | PostgreSQL | 16 | Relational database via Docker Compose |
+| **Auth** | Jose (JWT) | 6.0.x | JSON Web Token (Access 1h + Refresh 7d) |
+| **Validasi (BE)** | Zod | 3.24.x | Schema validation request payload |
+| **Image Processing** | Sharp | 0.33.x | Kompresi WebP otomatis saat upload |
+| **Object Storage** | Backblaze B2 | S3 API | Storage publik untuk banner, venue, seatmap |
+| **Package Manager** | Bun / pnpm | — | Workspace package management |
 
-### 4.2 Stack Direncanakan
+### 4.2 Stack Direncanakan (Fase Selanjutnya)
 
 | Layer | Teknologi | Status | Catatan |
 | --- | --- | --- | --- |
-| **Mobile App** | React Native | Planned | Customer-facing app (iOS + Android) |
-| **Payment** | Midtrans | Planned | Payment gateway otomatis |
-| **Push Notif** | Firebase Cloud Messaging | Planned | Notifikasi ke mobile |
-| **Object Storage** | Backblaze B2 (S3-compatible) | Implemented (GGT-03) | Upload event banner, foto artis, denah venue (WebP) |
-| **Social Login** | Google/Apple Sign-In | Future | Roadmap masa depan |
+| **Payment Gateway** | Midtrans (Snap) | Active/Next (Phase 3) | Pembayaran otomatis QRIS, VA, E-Wallet |
+| **Digital Tickets & QR** | `qrcode` / SVG | Active/Next (Phase 3) | Generasi tiket ber-QR unik per order verified |
+| **QR Scanner (Web/Mobile)** | HTML5-QRCode | Active/Next (Phase 3) | Scanner check-in tiket pada venue konser |
+| **Mobile App** | React Native | Planned (Phase 4) | Aplikasi customer (iOS & Android) |
+| **Push Notification** | Firebase Cloud Messaging | Planned (Phase 5) | Notifikasi tiket rilis, update status order |
+| **Virtual Queue** | Redis + SSE / WebSocket | Planned (Phase 5) | Ruang tunggu saat war tiket |
 
 ---
 
@@ -234,14 +242,30 @@ erDiagram
         timestamp created_at
     }
 
+    VENUES {
+        uuid id PK
+        varchar name
+        text address
+        varchar city
+        text image_url
+        integer sort_order
+        timestamp created_at
+    }
+
     EVENTS {
         uuid id PK
         varchar title
         uuid artist_id FK
         varchar publisher_name
-        varchar venue
-        varchar city
+        uuid venue_id FK
         timestamp date_time
+        timestamp end_date_time
+        text description
+        integer max_tickets_per_order
+        text[] tags
+        text seatmap_url
+        text image_url
+        integer sort_order
         enum status "open | closed"
         uuid created_by FK
         timestamp created_at
@@ -254,6 +278,8 @@ erDiagram
         numeric price "precision 12 scale 2"
         integer quota_total
         integer quota_remaining
+        text[] benefits
+        integer sort_order
     }
 
     ORDERS {
@@ -285,6 +311,7 @@ erDiagram
 
     ADMINS ||--o{ EVENTS : "creates"
     ARTISTS ||--o{ EVENTS : "performs at"
+    VENUES ||--o{ EVENTS : "hosts"
     EVENTS ||--o{ TICKET_CATEGORIES : "has"
     EVENTS ||--o{ ORDERS : "receives"
     CUSTOMERS ||--o{ ORDERS : "places"
@@ -298,142 +325,116 @@ erDiagram
 
 | Entitas | Deskripsi | Relasi Utama |
 | --- | --- | --- |
-| **Admins** | Tim internal GG Tix (super_admin, staff) | Creates events, verifies orders |
-| **Customers** | Pembeli tiket (end user di mobile app) | Places orders |
-| **Artists** | Artis/performer yang tampil di konser | Has many events |
-| **Events** | Konser/event yang dijual tiketnya | Has categories, receives orders |
-| **Ticket Categories** | Jenis tiket (VVIP, VIP, Reguler) per event | Belongs to event, has price & quota |
-| **Orders** | Transaksi pembelian tiket | Links customer - event - category |
-| **Payment Proofs** | Bukti pembayaran (rencana: otomatis via Midtrans) | Belongs to order |
-| **Tickets** | Tiket digital dengan QR Code unik | Belongs to order, used for check-in |
+| **Admins** | Tim internal GG Tix (`super_admin`, `staff`) | Membuat event, memverifikasi order |
+| **Customers** | Akun pengguna/pembeli tiket (mobile/web) | Membuat order transaksi |
+| **Artists** | Artis, komposer, atau grup musik yang tampil | Relasi ke banyak event |
+| **Venues** | Lokasi gedung/hall konser beserta alamat & kota | Menampung banyak event |
+| **Events** | Konser gaming/pop culture yang diadakan | Terhubung ke artist, venue, admin, categories |
+| **Ticket Categories** | Tier tiket (VVIP, VIP, Reguler) + benefits & harga | Milik event, dipesan di order |
+| **Orders** | Transaksi pembelian tiket konser | Menghubungkan customer, event, dan category |
+| **Payment Proofs** | Bukti bayar manual (arsip/fallback) | Milik order |
+| **Tickets** | Tiket digital individual dengan QR Code unik | Dihasilkan dari order verified, digunakan check-in |
 
 ### 5.3 Aturan Data Penting
 
 | Aturan | Detail |
 | --- | --- |
-| **ID** | Semua menggunakan UUID (string), bukan integer auto-increment |
-| **Harga** | Tipe `numeric(12,2)`, dikirim sebagai **string** di API (`"750000.00"`) |
-| **Status Event** | Hanya 2 nilai: `open` dan `closed` |
-| **Status Order** | 3 nilai: `pending` -> `verified` atau `rejected` |
-| **Quota** | `quota_remaining` berkurang saat order dibuat, bertambah saat order rejected |
-| **Batas Pembelian** | Maksimal **4 tiket per order per event** |
-| **QR Code** | Unique per tiket, digunakan untuk check-in di venue |
+| **ID** | Semua entitas menggunakan UUID v4 (string) |
+| **Harga** | Tipe `numeric(12,2)`, diformat sebagai string di API (`"750000.00"`) |
+| **Status Event** | `open` (tiket dijual) atau `closed` (penjualan ditutup) |
+| **Status Order** | `pending` -> `verified` atau `rejected` |
+| **Quota Management** | `quota_remaining` dikurangi seketika secara atomik (`SELECT FOR UPDATE`), dan direfund otomatis jika order ditolak/gagal |
+| **Batas Pembelian** | Dikonfigurasi per event melalui `max_tickets_per_order` (default 4) |
+| **QR Code Tiket** | Nilai string unik per tiket digital untuk keperluan scanner check-in |
 
 ---
 
 ## 6. Fitur Utama (Core Features)
 
-### 6.1 Fitur Customer (Mobile App — React Native)
-
-#### Autentikasi
-
-| Fitur | Deskripsi | Status |
-| --- | --- | --- |
-| Register | Daftar dengan nama, email, password | Backend ready |
-| Login | Email + password | Backend ready |
-| Auto-refresh token | Access token 1 jam, refresh token 7 hari | Backend ready |
-| Logout | Hapus token di client | Backend ready |
-| Social login (Google/Apple) | OAuth2 social sign-in | Future roadmap |
-
-#### Browse & Discovery
-
-| Fitur | Deskripsi | Status |
-| --- | --- | --- |
-| Daftar event | List semua event terbuka dengan search, filter kota/status | Backend ready |
-| Detail event | Info lengkap + daftar kategori tiket + sisa kuota | Backend ready |
-| Profil artis | Bio, foto, daftar event artis tersebut | Backend ready |
-| Wishlist / Reminder | "Ingatkan saya saat tiket dijual" | Planned |
-
-#### Pembelian Tiket
-
-| Fitur | Deskripsi | Status |
-| --- | --- | --- |
-| Buat order | Pilih event -> kategori -> jumlah (maks 4) -> submit | Backend ready |
-| Pembayaran (Midtrans) | VA, QRIS, e-wallet, kartu kredit | Planned |
-| Riwayat order | List order sendiri (`/orders/me`) dengan pagination | Backend ready |
-| Status order real-time | Lihat status pending/verified/rejected | Backend ready |
-
-#### Tiket Digital
-
-| Fitur | Deskripsi | Status |
-| --- | --- | --- |
-| E-ticket dengan QR Code | QR code unik per tiket untuk check-in | DB schema ready |
-| Download / screenshot tiket | Simpan tiket untuk akses offline | Planned |
-
-#### Notifikasi
-
-| Fitur | Deskripsi | Status |
-| --- | --- | --- |
-| Push notification | Tiket hampir habis, event baru, status order | Planned |
-| In-app notification | Notifikasi dalam aplikasi | Planned |
-
-#### Promo
-
-| Fitur | Deskripsi | Status |
-| --- | --- | --- |
-| Kode promo / voucher | Diskon persentase atau nominal tetap | Planned |
-| Apply promo saat checkout | Input kode -> validasi -> diskon otomatis | Planned |
-
----
-
-### 6.2 Fitur Admin (Web Dashboard — Nuxt)
+### 6.1 Fitur Admin (Web Dashboard — Nuxt 4)
 
 #### Dashboard Analytics
-
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| KPI Cards | Total events, tiket terjual, revenue, upcoming, pending verifikasi | Partial (PRD GGT-02) |
-| Overall Stats | Breakdown per status: verified, pending, rejected | Backend ready |
-| Per-Event Stats | Revenue, tiket terjual, occupancy % per event | Planned (GGT-02) |
-| Per-Category Stats | Revenue share per kategori tiket | Planned (GGT-02) |
-| Trend Chart | Penjualan harian (line chart) | Planned (GGT-02) |
-| Event Activity | Upcoming events, recently closed events | Backend ready |
+| KPI Cards | Total event, total tiket terjual, revenue, upcoming, order pending | Implemented |
+| Tren Penjualan | Line chart tren penjualan harian & revenue | Implemented |
+| Occupancy per Event | Progress bar occupancy (%) dan perbandingan kuota per event | Implemented |
+| Revenue Share Kategori | Donut/Pie chart proporsi penjualan tier tiket (VVIP/VIP/dll) | Implemented |
+| Event Activity | List upcoming events dan recent closed events | Implemented |
 
-#### Manajemen Event
-
+#### Manajemen Event & Venue
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| CRUD Event | Buat, edit, hapus event konser | Implemented |
-| Toggle Status | Buka/tutup penjualan tiket | Implemented |
-| CRUD Kategori Tiket | Kelola jenis tiket (VVIP/VIP/Reguler) + harga + kuota | Backend ready |
-| Filter & Search | Filter kota, status; search nama event/venue | Implemented |
+| CRUD Event | Buat, edit, hapus konser (title, artis, publisher, venue, tanggal, seatmap, banner) | Implemented |
+| Toggle Status Event | Buka/tutup penjualan tiket seketika | Implemented |
+| CRUD Kategori & Benefit | Kelola tier tiket, harga, kuota, urutan, dan daftar benefit tier | Implemented |
+| CRUD Venue | Kelola master gedung/venue, alamat, kota, dan denah/foto | Implemented |
+| Filter & Search | Filter kota, status, publisher; pencarian nama event/venue | Implemented |
 
-#### Manajemen Artis
-
+#### Manajemen Artis & Media
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| CRUD Artis | Buat, edit, hapus artis/performer | Backend ready |
-| Proteksi hapus | Tidak bisa hapus artis yang masih punya event | Backend ready |
+| CRUD Artis | Buat, edit, hapus artis/performer + foto & biografi | Implemented |
+| Proteksi Relasi | Pencegahan penghapusan artis/venue yang masih memiliki event aktif | Implemented |
+| Upload Media B2 | Integrasi Backblaze B2 dengan kompresi WebP otomatis untuk banner & foto | Implemented |
 
-#### Verifikasi Transaksi
-
+#### Manajemen Transaksi & Order
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| List semua order | Filter status, search ID/nama customer | Implemented |
-| Verifikasi / Tolak | Approve atau reject order pending | Implemented |
-| Auto-refund kuota | Kuota kembali saat order di-reject | Backend ready |
+| List Order | Filter status (pending/verified/rejected), pencarian customer/event | Implemented |
+| Verifikasi / Tolak | Approve transaksi atau tolak dengan auto-refund kuota | Implemented |
+| Histori Verifikasi | Pencatatan siapa admin yang memverifikasi dan timestamp verifikasi | Implemented |
+
+#### Manajemen Tim & Pelanggan
+| Fitur | Deskripsi | Status |
+| --- | --- | --- |
+| Data Pelanggan | List customer terdaftar beserta email dan tanggal registrasi | Implemented |
+| Tim Admin/Staff | CRUD staf/admin internal dengan assign role `super_admin` / `staff` | Implemented |
 
 #### QR Scanner (Check-In)
-
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| Scan QR tiket | Scan QR code -> validasi -> mark checked_in | Planned |
-| Check-in stats | Jumlah sudah check-in vs total tiket per event | Planned (GGT-02) |
+| Scan QR Tiket | Kamera scanner QR code tiket di pintu masuk venue | Active / Next (Phase 3) |
+| Manual Input QR | Input kode tiket manual jika kamera bermasalah | Active / Next (Phase 3) |
+| Check-in Stats | Monitoring real-time jumlah pengunjung yang sudah check-in di venue | Active / Next (Phase 3) |
 
 ---
 
-### 6.3 Fitur Antrian Virtual (Waiting Room)
+### 6.2 Fitur Customer (Mobile App / API)
 
-> Fitur krusial untuk mencegah server crash saat tiket baru rilis ("war tiket").
+#### Autentikasi & Akun
+| Fitur | Deskripsi | Status |
+| --- | --- | --- |
+| Register & Login | Pendaftaran dan autentikasi customer berbasis email/password | Backend ready |
+| Session & Token Rotation | Access token 1 jam + refresh token 7 hari (`/api/auth/refresh`) | Backend ready |
+| Social Login | Google / Apple Sign-In | Future Roadmap |
 
-| Aspek | Detail |
-| --- | --- |
-| **Kapan Aktif** | Saat admin mengaktifkan mode "war tiket" pada event tertentu |
-| **Mekanisme** | Customer masuk antrian -> mendapat nomor urut -> dialihkan ke halaman pembelian saat giliran |
-| **Kapasitas** | Batch release (misal: 100 orang per batch setiap 2 menit) |
-| **Fairness** | First-come-first-served berdasarkan waktu masuk antrian |
-| **UI** | Loading screen dengan estimasi waktu tunggu + posisi antrian |
-| **Status** | Planned — memerlukan implementasi WebSocket/SSE |
+#### Browse & Discovery
+| Fitur | Deskripsi | Status |
+| --- | --- | --- |
+| Browse & Search Event | List event konser dengan filter kota, publisher, artis | Backend ready |
+| Detail Event & Seatmap | Info konser lengkap, seatmap venue, daftar kategori & sisa kuota | Backend ready |
+| Detail Artis | Portofolio artis dan daftar konser terkait | Backend ready |
+| Wishlist & Reminder | Fitur pengingat saat tiket konser dibuka | Planned (Phase 5) |
+
+#### Pembelian Tiket & Pembayaran
+| Fitur | Deskripsi | Status |
+| --- | --- | --- |
+| Pemesanan Tiket | Pemilihan kategori & quantity dengan atomic locking anti-oversell | Backend ready |
+| Midtrans Snap Payment | Integrasi pembayaran otomatis (QRIS, VA, GoPay/ShopeePay, Kartu) | Active / Next (Phase 3) |
+| Riwayat Transaksi | List transaksi customer (`/api/orders/me`) | Backend ready |
+
+#### E-Ticket & Digital QR
+| Fitur | Deskripsi | Status |
+| --- | --- | --- |
+| E-Ticket dengan QR Unik | Tiket digital yang diterbitkan setelah pesanan terverifikasi | Active / Next (Phase 3) |
+| Akses Tiket Offline | Simpan tiket digital untuk kemudahan check-in tanpa koneksi | Planned (Phase 4) |
+
+#### Antrian Virtual & Promo
+| Fitur | Deskripsi | Status |
+| --- | --- | --- |
+| Waiting Room | Antrian virtual untuk meratakan lonjakan traffic saat war tiket rilis | Planned (Phase 5) |
+| Promo & Voucher | Input kode promo diskon nominal/persen | Planned (Phase 5) |
 
 ---
 
@@ -450,462 +451,242 @@ flowchart TD
     E --> F["POST /api/auth/customer/register"]
     F --> G{"Berhasil?"}
     G -->|Ya| H["Redirect ke Login"]
-    G -->|Tidak| I["Tampilkan Error<br/>(email sudah terdaftar, dll)"]
+    G -->|Tidak| I["Tampilkan Error (Email sudah terdaftar, dll)"]
     I --> E
     C --> J["POST /api/auth/customer/login"]
     J --> K{"Berhasil?"}
-    K -->|Ya| L["Simpan Access Token<br/>+ Refresh Token"]
-    L --> M["Masuk ke Home"]
-    K -->|Tidak| N{"429 Rate Limited?"}
-    N -->|Ya| O["Tampilkan: Terlalu banyak<br/>percobaan. Coba lagi nanti."]
-    N -->|Tidak| P["Tampilkan: Email/password salah"]
+    K -->|Ya| L["Simpan Access Token + Refresh Token"]
+    L --> M["Masuk ke Home Screen"]
+    K -->|Tidak 429| N["Tampilkan: Terlalu banyak percobaan. Tunggu sebentar."]
+    K -->|Tidak 401| O["Tampilkan: Email atau password salah"]
+    N --> C
     O --> C
-    P --> C
-    H --> C
 ```
 
-### 7.2 Flow Customer: Browse & Beli Tiket
+### 7.2 Flow Customer: Browse, Beli Tiket & Pembayaran (Midtrans)
 
 ```mermaid
 flowchart TD
     A["Home Screen"] --> B["Browse Daftar Event<br/>GET /api/events"]
-    B --> C["Search / Filter<br/>(kota, artis, status)"]
-    C --> D["Tap Event Card"]
-    D --> E["Halaman Detail Event<br/>GET /api/events/:id"]
-    E --> F["Lihat Kategori Tiket<br/>+ Sisa Kuota + Harga"]
-    F --> G["Pilih Kategori Tiket"]
-    G --> H["Pilih Jumlah<br/>(1-4 tiket)"]
-    H --> I["Tap 'Beli Tiket'"]
-    I --> J{"Customer sudah login?"}
-    J -->|Tidak| K["Redirect ke Login"]
-    K --> J
-    J -->|Ya| L["Review Order<br/>(Event, Kategori, Qty, Total)"]
-    L --> M{"Ada Kode Promo?"}
-    M -->|Ya| N["Input Kode Promo<br/>-> Validasi -> Apply Diskon"]
-    M -->|Tidak| O["Lanjut ke Pembayaran"]
-    N --> O
-    O --> P["POST /api/orders<br/>{eventId, categoryId, quantity}"]
-    P --> Q{"Berhasil?"}
-    Q -->|Ya| R["Redirect ke Midtrans<br/>Payment Page"]
-    Q -->|Tidak 409| S["Tiket tidak mencukupi!<br/>Tersisa X tiket."]
-    Q -->|Tidak 403| T["Event sudah ditutup!"]
-    S --> F
-    T --> B
-    R --> U{"Pembayaran Berhasil?"}
-    U -->|Ya (webhook)| V["Order status: verified<br/>Generate QR Ticket"]
-    V --> W["Tampilkan E-Ticket<br/>dengan QR Code"]
-    U -->|Tidak / Expire| X["Order status tetap pending<br/>-> expired setelah timeout"]
+    B --> C["Filter Kota / Publisher / Cari Event"]
+    C --> D["Pilih Event Card"]
+    D --> E["Detail Event & Seatmap<br/>GET /api/events/:id"]
+    E --> F["Pilih Kategori Tiket & Qty (1-4)"]
+    F --> G["Tap 'Beli Tiket'"]
+    G --> H{"Sudah Login?"}
+    H -->|Tidak| I["Arahkan ke Login Customer"]
+    I --> H
+    H -->|Ya| J["POST /api/orders<br/>{eventId, categoryId, quantity}"]
+    J --> K{"Quota Tersedia & Event Open?"}
+    K -->|Tidak| L["Error: Tiket Habis / Event Ditutup"]
+    K -->|Ya| M["Order Created (Status: pending)<br/>Dapatkan Midtrans Snap Token"]
+    M --> N["Tampilkan Halaman Pembayaran Midtrans (QRIS / VA / E-Wallet)"]
+    N --> O{"Customer Membayar?"}
+    O -->|Ya (Settlement Callback)| P["Webhook Midtrans -> Order: verified<br/>Generate QR Tickets"]
+    P --> Q["E-Ticket Terbit di Tab 'Tiket Saya'"]
+    O -->|Expired / Cancelled| R["Webhook Midtrans -> Order: rejected<br/>Quota Dikembalikan Otomatis"]
 ```
 
-### 7.3 Flow Customer: Lihat Tiket & Check-In
+### 7.3 Flow Check-In di Pintu Masuk Konser (QR Scanner)
 
 ```mermaid
 flowchart TD
-    A["Tab Tiket Saya"] --> B["GET /api/orders/me"]
-    B --> C["List Order + Status"]
-    C --> D["Tap Order Verified"]
-    D --> E["Tampilkan E-Ticket<br/>dengan QR Code"]
-    E --> F["Hari H Konser"]
-    F --> G["Tunjukkan QR Code<br/>di Pintu Masuk"]
-    G --> H["Staff Scan QR<br/>dengan Scanner App"]
-    H --> I{"QR Valid?"}
-    I -->|Ya, belum check-in| J["Check-in Berhasil!<br/>checked_in = true"]
-    I -->|Ya, sudah check-in| K["Tiket Sudah Digunakan"]
-    I -->|Tidak valid| L["QR Code Tidak Dikenali"]
-```
-
-### 7.4 Flow Admin: Kelola Event
-
-```mermaid
-flowchart TD
-    A["Login Admin<br/>POST /api/auth/admin/login"] --> B["Dashboard"]
-    B --> C["Sidebar -> Event Konser"]
-    C --> D["Halaman Manajemen Event"]
-    D --> E["Klik 'Tambah Event'"]
-    E --> F["Form: Title, Artis, Publisher,<br/>Venue, Kota, Tanggal/Waktu"]
-    F --> G["POST /api/events"]
-    G --> H["Event Dibuat (status: open)"]
-    H --> I["Tambah Kategori Tiket"]
-    I --> J["POST /api/events/:id/categories<br/>{name, price, quotaTotal}"]
-    J --> K["Ulangi untuk setiap kategori<br/>(VVIP, VIP, Reguler)"]
-    K --> L["Event Siap Dijual"]
-
-    D --> M["Klik Toggle Status"]
-    M --> N["PATCH /api/events/:id/status<br/>{status: closed}"]
-    N --> O["Penjualan Ditutup"]
-
-    D --> P["Klik Edit"]
-    P --> Q["PUT /api/events/:id"]
-
-    D --> R["Klik Hapus"]
-    R --> S["DELETE /api/events/:id"]
-```
-
-### 7.5 Flow Admin: Verifikasi Order
-
-```mermaid
-flowchart TD
-    A["Halaman Orders"] --> B["GET /api/orders<br/>?status=pending"]
-    B --> C["List Order Pending"]
-    C --> D["Review Detail Order<br/>(Customer, Event, Kategori, Qty, Total)"]
-    D --> E{"Keputusan Admin"}
-    E -->|Setujui| F["PATCH /api/orders/:id/verify<br/>{decision: verified}"]
-    F --> G["Status: verified<br/>QR Ticket dibuat"]
-    E -->|Tolak| H["PATCH /api/orders/:id/verify<br/>{decision: rejected}"]
-    H --> I["Status: rejected<br/>Kuota dikembalikan"]
-```
-
-### 7.6 Flow Pembayaran (Midtrans — Planned)
-
-```mermaid
-sequenceDiagram
-    participant C as Customer App
-    participant BE as Backend API
-    participant MT as Midtrans
-    participant DB as Database
-
-    C->>BE: POST /api/orders {eventId, categoryId, qty}
-    BE->>DB: Check quota (SELECT FOR UPDATE)
-    DB-->>BE: Quota available
-    BE->>DB: Create order (status: pending), deduct quota
-    BE->>MT: Create Snap Transaction (orderId, amount)
-    MT-->>BE: Snap Token + Redirect URL
-    BE-->>C: {orderId, paymentUrl, snapToken}
-
-    C->>MT: User completes payment (VA/QRIS/e-wallet)
-    MT->>BE: POST /webhook/midtrans (notification)
-    BE->>DB: Update order status: verified
-    BE->>DB: Generate QR tickets
-    BE-->>C: Push Notification: "Pembayaran berhasil!"
-
-    Note over C,MT: Jika payment timeout/gagal
-    MT->>BE: POST /webhook/midtrans (expired/failure)
-    BE->>DB: Update order status: rejected
-    BE->>DB: Restore quota (quota_remaining += qty)
-```
-
-### 7.7 Flow Token Refresh
-
-```mermaid
-sequenceDiagram
-    participant App as App / Dashboard
-    participant BE as Backend API
-
-    App->>BE: Request dengan Access Token
-    BE-->>App: 401 Unauthorized (token expired)
-
-    App->>BE: POST /api/auth/refresh {refreshToken}
-    alt Refresh token valid
-        BE-->>App: {data: {token: "new_access_token"}}
-        App->>BE: Retry original request dengan token baru
-        BE-->>App: 200 OK (response normal)
-    else Refresh token expired/invalid
-        BE-->>App: 401 Unauthorized
-        App->>App: Clear session -> redirect ke Login
-    end
-```
-
-### 7.8 Flow Antrian Virtual / Waiting Room (Planned)
-
-```mermaid
-flowchart TD
-    A["Customer buka halaman event<br/>(saat mode war tiket aktif)"] --> B["Masuk Waiting Room"]
-    B --> C["Dapat Nomor Antrian<br/>+ Estimasi Waktu Tunggu"]
-    C --> D{"Giliran?"}
-    D -->|Belum| E["Tampilkan Progress Bar<br/>+ Posisi Antrian"]
-    E --> D
-    D -->|Ya| F["Redirect ke Halaman Pembelian<br/>(session 10 menit)"]
-    F --> G{"Selesai beli<br/>dalam 10 menit?"}
-    G -->|Ya| H["Order Dibuat"]
-    G -->|Tidak| I["Session expired<br/>-> kembali ke antrian"]
+    A["Customer Membuka E-Ticket di App"] --> B["Tunjukkan QR Code di Gate Venue"]
+    B --> C["Staff Membuka Halaman Scanner di Dashboard<br/>(/scanner)"]
+    C --> D["Scan QR Code Tiket (Kamera / Input Manual)"]
+    D --> E["POST /api/tickets/:id/check-in<br/>atau POST /api/tickets/check-in"]
+    E --> F{"Validasi Tiket"}
+    F -->|QR Valid & Belum Check-in| G["Check-in BERHASIL!<br/>Set checked_in = true<br/>Bunyikan Suara Sukses"]
+    F -->|QR Valid Tapi Sudah Pernah Check-in| H["PERINGATAN: Tiket Sudah Digunakan!<br/>Tampilkan Waktu Check-In Sebelumnya"]
+    F -->|QR Tidak Dikenali / Event Salah| I["ERROR: Tiket Tidak Valid"]
 ```
 
 ---
 
 ## 8. API Contract Summary
 
-> Detail lengkap: lihat dokumen [Backend API Contract — Panduan Integrasi Frontend.md](file:///home/artdi/Projects/GG%20Tix/prd/Backend%20API%20Contract%20-%20Panduan%20Integrasi%20Frontend.md)
+> Rujukan detail lengkap ada pada dokumen [Backend API Contract — Panduan Integrasi Frontend.md](file:///home/artdi/Projects/GG%20Tix/prd/Backend%20API%20Contract%20-%20Panduan%20Integrasi%20Frontend.md)
 
-### 8.1 Base URL & Format
+### 8.1 Base URL & Standar Response
 
-| Item | Detail |
+| Item | Standar |
 | --- | --- |
 | **Base URL** | `http://localhost:3000/api` (dev) |
-| **Auth Header** | `Authorization: Bearer <accessToken>` |
-| **Response sukses** | `{ data: {...} }` atau `{ data: [...], pagination: {...} }` |
-| **Response error** | `{ error: "message", fields?: {...} }` |
-| **ID format** | UUID string |
-| **Harga format** | String decimal (`"750000.00"`) |
+| **Header Auth** | `Authorization: Bearer <accessToken>` |
+| **Format Sukses** | `{ "data": { ... } }` atau `{ "data": [ ... ], "pagination": { ... } }` |
+| **Format Error** | `{ "error": "Pesan error", "fields": { ... } }` |
+| **Tipe Data ID** | UUID v4 (string) |
+| **Tipe Data Harga** | String desimal (`"750000.00"`) |
 
-### 8.2 Endpoint Summary
+### 8.2 Daftar Endpoint Aktif
 
-| Group | Method | Path | Auth | Deskripsi |
+| Group | Method | Path | Auth / Role | Deskripsi |
 | --- | --- | --- | --- | --- |
-| **Auth** | POST | `/auth/admin/login` | Public | Login admin |
+| **Auth** | POST | `/auth/admin/login` | Public | Login tim admin / staff |
 | | POST | `/auth/customer/login` | Public | Login customer |
-| | POST | `/auth/customer/register` | Public | Register customer |
-| | POST | `/auth/refresh` | Public | Refresh access token |
-| | GET | `/auth/me` | Auth | Get current user info |
-| **Events** | GET | `/events` | Public | List events (paginated, filterable) |
-| | GET | `/events/:id` | Public | Detail event + categories + artist |
-| | POST | `/events` | Super Admin | Create event |
-| | PUT | `/events/:id` | Super Admin | Update event |
-| | PATCH | `/events/:id/status` | Super Admin | Toggle open/closed |
-| | DELETE | `/events/:id` | Super Admin | Delete event |
-| **Categories** | GET | `/events/:eventId/categories` | Public | List ticket categories |
-| | POST | `/events/:eventId/categories` | Super Admin | Create category |
-| | PUT | `/categories/:id` | Super Admin | Update category |
-| | DELETE | `/categories/:id` | Super Admin | Delete category |
-| **Artists** | GET | `/artists` | Public | List artists (paginated) |
-| | GET | `/artists/:id` | Public | Detail artist |
-| | POST | `/artists` | Super Admin | Create artist |
-| | PUT | `/artists/:id` | Super Admin | Update artist |
-| | DELETE | `/artists/:id` | Super Admin | Delete artist |
-| **Uploads** | POST | `/uploads` | Super Admin | Upload gambar (crop WebP ke B2) — GGT-03 |
-| **Venues** | GET | `/venues` | Admin | List venues (paginated) |
+| | POST | `/auth/customer/register` | Public | Registrasi akun customer |
+| | POST | `/auth/refresh` | Public | Refresh token JWT |
+| | GET | `/auth/me` | Logged In | Dapatkan profil user saat ini |
+| **Events** | GET | `/events` | Public | List konser (filter kota, status, publisher, pagination) |
+| | GET | `/events/:id` | Public | Detail konser lengkap (artist, venue, ticket categories) |
+| | POST | `/events` | Super Admin | Buat konser baru |
+| | PUT | `/events/:id` | Super Admin | Update data konser |
+| | PATCH | `/events/:id/status` | Super Admin | Buka / tutup penjualan tiket |
+| | DELETE | `/events/:id` | Super Admin | Hapus konser |
+| **Categories**| GET | `/events/:eventId/categories` | Public | List kategori tiket konser |
+| | POST | `/events/:eventId/categories` | Super Admin | Tambah kategori tiket (+ benefits, quota, sortOrder) |
+| | PUT | `/categories/:id` | Super Admin | Update kategori tiket |
+| | DELETE | `/categories/:id` | Super Admin | Hapus kategori tiket |
+| **Venues** | GET | `/venues` | Admin | List master venue |
 | | GET | `/venues/:id` | Admin | Detail venue |
-| | POST | `/venues` | Super Admin | Create venue |
-| | PUT | `/venues/:id` | Super Admin | Update venue |
-| | DELETE | `/venues/:id` | Super Admin | Delete venue |
-| **Orders** | POST | `/orders` | Customer | Create order |
-| | GET | `/orders/me` | Customer | My orders (paginated) |
-| | GET | `/orders` | Admin | All orders (paginated, filterable) |
-| | PATCH | `/orders/:id/verify` | Admin | Verify/reject order |
-| **Dashboard** | GET | `/dashboard/summary` | Admin | Dashboard summary stats |
-| **Health** | GET | `/health` | Public | Health check |
+| | POST | `/venues` | Super Admin | Buat master venue baru |
+| | PUT | `/venues/:id` | Super Admin | Update data venue |
+| | DELETE | `/venues/:id` | Super Admin | Hapus venue |
+| **Artists** | GET | `/artists` | Public | List artis konser |
+| | GET | `/artists/:id` | Public | Detail artis & event terkait |
+| | POST | `/artists` | Super Admin | Tambah artis baru |
+| | PUT | `/artists/:id` | Super Admin | Update artis |
+| | DELETE | `/artists/:id` | Super Admin | Hapus artis |
+| **Uploads** | POST | `/uploads` | Super Admin | Upload gambar ke Backblaze B2 (auto WebP) |
+| **Orders** | POST | `/orders` | Customer | Buat order tiket (atomic lock quota) |
+| | GET | `/orders/me` | Customer | Riwayat pesanan tiket customer |
+| | GET | `/orders` | Admin | List seluruh order transaksi |
+| | PATCH | `/orders/:id/verify` | Admin | Verifikasi atau tolak order manual |
+| **Users** | GET | `/customers` | Admin | List data pelanggan |
+| | GET | `/admins` | Admin | List tim internal admin/staff |
+| | POST | `/admins` | Super Admin | Buat akun admin/staff baru |
+| | PUT | `/admins/:id` | Super Admin | Update data/role admin |
+| | DELETE | `/admins/:id` | Super Admin | Hapus akun admin/staff |
+| **Dashboard**| GET | `/dashboard/summary` | Admin | Summary metrics, tren, occupancy, category breakdown |
+| **Health** | GET | `/health` | Public | Health check server |
 
-### 8.3 Endpoint yang Direncanakan (Belum Ada)
+### 8.3 Endpoint Target Fase Selanjutnya (Phase 3)
 
-| Method | Path | Deskripsi | PRD |
+| Method | Path | Auth / Role | Deskripsi |
 | --- | --- | --- | --- |
-| GET | `/dashboard/trend` | Trend penjualan per hari | GGT-02 |
-| GET | `/dashboard/events` | Detail analytics per event | GGT-02 |
-| POST | `/payments/midtrans/notification` | Midtrans webhook callback | TBD |
-| POST | `/tickets/:id/check-in` | Scan QR check-in | TBD |
-| GET | `/tickets/order/:orderId` | Get tickets for an order | TBD |
-| POST | `/promo/validate` | Validasi kode promo | TBD |
+| GET | `/tickets/order/:orderId` | Customer / Admin | Mengambil daftar tiket QR per order |
+| POST | `/tickets/check-in` | Admin (Staff) | Validasi & mark check-in tiket di venue |
+| POST | `/payments/midtrans/token` | Customer | Membuat Midtrans Snap Token untuk order |
+| POST | `/payments/midtrans/notification` | Public (Webhook) | Webhook notifikasi pembayaran dari Midtrans |
+| POST | `/promo/validate` | Customer | Validasi kode voucher promo |
 
 ---
 
 ## 9. Keamanan & Performa
 
-> Detail lengkap: lihat dokumen [GGT-01 - Backend Security & Performance Hardening.md](file:///home/artdi/Projects/GG%20Tix/prd/GGT-01%20-%20Backend%20Security%20%26%20Performance%20Hardening.md)
+### 9.1 Keamanan Sistem
 
-### 9.1 Keamanan (Sudah Diimplementasi)
-
-| Aspek | Implementasi | Status |
-| --- | --- | --- |
-| **Rate Limiting** | Auth: 10 req/15 menit/IP, Order: 20 req/15 menit | Terpasang |
-| **CORS** | Origin whitelist via env `CORS_ORIGINS` | Terpasang |
-| **JWT Hardening** | No fallback secret, fail-fast jika `JWT_SECRET` kosong | Terpasang |
-| **Access Token TTL** | 1 jam (dipendekkan dari 7 hari) | Terpasang |
-| **Refresh Token** | 7 hari, endpoint `/auth/refresh` | Terpasang |
-| **Body Size Limit** | Maks 1 MB (konfigurabel, response 413 jika melebihi) | Terpasang |
-| **Atomic Transactions** | `SELECT FOR UPDATE` pada pembelian tiket (anti race condition) | Terpasang |
-| **Password Hashing** | Bun.password.hash (bcrypt) | Terpasang |
-
-### 9.2 Performa (Sudah Diimplementasi)
-
-| Aspek | Implementasi | Status |
-| --- | --- | --- |
-| **Pagination** | Semua list endpoint: default 10, max 100 | Terpasang |
-| **Database Indexes** | events(city, status, artistId), orders(status, eventId, customerId) | Terpasang |
-| **Dashboard Parallelization** | `Promise.all` untuk 5 query dashboard | Terpasang |
-| **Optimized Update** | `.returning()` langsung, tanpa double query | Terpasang |
-
-### 9.3 Kebijakan Anti-Calo
-
-| Mekanisme | Detail |
+| Aspek | Kebijakan & Implementasi |
 | --- | --- |
-| **Batas pembelian** | Maks 4 tiket per order per event |
-| **Rate limiting** | 20 order/15 menit per IP |
-| **Atomic quota** | Row-level lock mencegah overselling |
-| **Waiting room** | (Planned) Antrian virtual saat war tiket |
-| **No resale** | Tidak ada fitur transfer/jual ulang tiket |
+| **Rate Limiting** | Auth: 10 request / 15 menit per IP; Order: 20 request / 15 menit per IP |
+| **CORS Whitelisting** | Whitelist origin ketat melalui variabel environment `CORS_ORIGINS` |
+| **JWT Secrets & Fail-Fast** | Wajib `JWT_SECRET` minimal 32 karakter, no hardcoded fallback, fail-fast saat startup jika kosong |
+| **Token Lifetime** | Access token 1 jam (minimalkan dampak token leak), Refresh token 7 hari |
+| **Atomic Quota Locking** | `SELECT FOR UPDATE` pada baris kategori tiket saat checkout untuk mencegah over-selling saat war tiket |
+| **Password Hashing** | Bcrypt via native `Bun.password.hash` |
+| **Payload Size Protection**| Batas maksimal request body 1 MB untuk endpoint JSON |
 
-### 9.4 Kebijakan Refund
+### 9.2 Optimasi Performa Database
 
-| Kondisi | Kebijakan |
-| --- | --- |
-| **Customer minta refund sendiri** | Tidak bisa — semua penjualan bersifat final |
-| **Event dibatalkan oleh organizer** | Full refund otomatis ke semua pembeli |
-| **Pembayaran gagal/expired** | Otomatis — kuota dikembalikan, order tetap pending/expired |
+- **Pagination Standar**: Semua endpoint list dilengkapi limit dan offset (default 10, max 100).
+- **Index Strategis**: Index pada `events(publisher_name, status, artist_id, venue_id)`, `orders(status, event_id, customer_id)`, `venues(name)`.
+- **Query Parallelization**: Dashboard summary dieksekusi secara asinkron paralel (`Promise.all`).
 
 ---
 
 ## 10. Roadmap & Fase Pengembangan
 
-### 10.1 Overview Timeline
+### 10.1 Status Fase Saat Ini
 
 ```mermaid
 gantt
-    title GG Tix Development Roadmap
+    title GG Tix Project Status & Roadmap
     dateFormat  YYYY-MM-DD
     axisFormat  %b %Y
 
-    section Phase 1 - Foundation
-    Backend Core (Auth, Events, Orders)       :done, p1a, 2026-07-01, 2026-08-07
-    Admin Dashboard (Nuxt UI)                 :done, p1b, 2026-07-15, 2026-08-07
-    Security & Performance (GGT-01)           :done, p1c, 2026-08-01, 2026-08-07
+    section Phase 1 - Foundation (DONE)
+    Core Auth, Events, Orders API             :done, p1a, 2026-07-01, 2026-08-07
+    Admin Dashboard Foundation (Nuxt 4)       :done, p1b, 2026-07-15, 2026-08-07
+    Security Hardening (GGT-01)               :done, p1c, 2026-08-01, 2026-08-07
 
-    section Phase 2 - Analytics & Polish
-    Dashboard Analytics (GGT-02)              :active, p2a, 2026-08-08, 30d
-    Frontend-Backend Integration Sync         :p2b, 2026-08-08, 14d
-    Cleanup Legacy Code (concerts/venues)     :p2c, 2026-08-15, 7d
+    section Phase 2 - Analytics, Media & Polish (DONE)
+    Dashboard Analytics Expansion (GGT-02)    :done, p2a, 2026-08-08, 2026-08-14
+    Backblaze B2 Uploads & WebP (GGT-03)      :done, p2b, 2026-08-10, 2026-08-14
+    Schema Enrichment, Users & Session (GGT-04):done, p2c, 2026-08-12, 2026-08-15
 
-    section Phase 3 - Payment & Tickets
-    Midtrans Payment Integration              :p3a, 2026-09-08, 30d
-    QR Ticket Generation                      :p3b, 2026-09-15, 14d
-    QR Scanner (Admin Check-in)               :p3c, 2026-09-22, 14d
+    section Phase 3 - Tickets & Payments (ACTIVE / NEXT)
+    Digital Ticket QR Generation              :active, p3a, 2026-08-16, 10d
+    Admin QR Scanner Page (/scanner)          :active, p3b, 2026-08-20, 10d
+    Midtrans Payment Gateway Integration      :p3c, 2026-08-25, 14d
 
-    section Phase 4 - Mobile App
-    React Native Setup & Auth                 :p4a, 2026-10-08, 21d
-    Event Browse & Detail                     :p4b, 2026-10-22, 14d
-    Checkout & Payment Flow                   :p4c, 2026-11-01, 21d
-    E-Ticket & QR Display                     :p4d, 2026-11-15, 14d
+    section Phase 4 - Mobile App (PLANNED)
+    React Native Setup & Auth                 :p4a, 2026-09-10, 14d
+    Event Discovery & Ticket Purchase         :p4b, 2026-09-24, 21d
+    Digital Ticket & Offline QR View          :p4c, 2026-10-15, 14d
 
-    section Phase 5 - Growth Features
-    Push Notifications (FCM)                  :p5a, 2026-12-01, 14d
-    Promo Code / Voucher System               :p5b, 2026-12-08, 14d
-    Wishlist & Reminder                       :p5c, 2026-12-15, 14d
-    Virtual Queue / Waiting Room              :p5d, 2027-01-01, 30d
+    section Phase 5 - Growth Features (PLANNED)
+    Push Notification (FCM)                   :p5a, 2026-11-01, 14d
+    Promo / Voucher Engine                    :p5b, 2026-11-15, 14d
+    Virtual Queue / Waiting Room              :p5c, 2026-12-01, 21d
 ```
 
-### 10.2 Detail Per Fase
+### 10.2 Rincian Deliverable Per Fase
 
-#### Phase 1 — Foundation (DONE)
+#### Phase 1 — Foundation ✅ (Selesai)
+- Autentikasi JWT (Admin & Customer), Refresh Token, Role matrix.
+- CRUD Events, Artists, Ticket Categories.
+- Order placement dengan database transaction lock & manual verification.
+- Security hardening (GGT-01).
 
-> Backend core + Admin dashboard dasar
+#### Phase 2 — Analytics, Storage & Schema Enrichment ✅ (Selesai)
+- Dashboard Analytics lengkap (KPI, chart tren, occupancy, revenue share tier) — PRD GGT-02.
+- Upload media Backblaze B2 dengan kompresi WebP otomatis — PRD GGT-03.
+- Master Management Venue (`/venues`) & relasi FK `events.venue_id` — PRD GGT-04.
+- Field enrichment (`benefits`, `seatmap_url`, `tags`, `sort_order`, `description`) — PRD GGT-04.
+- Session persistence fix & User Management (`/users`) — PRD GGT-04.
 
-| Deliverable | Status |
-| --- | --- |
-| Auth system (admin + customer, JWT, refresh token) | Selesai |
-| CRUD Events, Artists, Ticket Categories | Selesai |
-| Order system (create, list, verify/reject) | Selesai |
-| Admin dashboard (Nuxt 4 + Nuxt UI) | Selesai |
-| Security hardening (GGT-01) | Selesai |
-| Database schema + seed data | Selesai |
+#### Phase 3 — Tickets, QR Scanner & Payment Gateway 🚀 (Fokus Aktif Selanjutnya)
+- **Generasi Tiket Digital**: Pembuatan record tabel `tickets` dengan nilai QR unik otomatis saat order berstatus `verified`.
+- **QR Scanner & Check-In**: Endpoint check-in tiket dan implementasi halaman UI `/scanner` untuk operasional staf venue di hari H konser.
+- **Midtrans Payment Integration**: Integrasi Midtrans Snap & webhook auto-verification dan auto-refund saat transaksi gagal/expired.
 
-#### Phase 2 — Analytics & Polish (IN PROGRESS)
+#### Phase 4 — Mobile App (React Native) 📱 (Direncanakan)
+- Frontend mobile untuk customer (iOS & Android).
+- Discovery konser, checkout flow, e-ticket viewer, dan profil customer.
 
-> Dashboard analytics + cleanup integrasi frontend-backend
-
-| Deliverable | PRD | Status |
-| --- | --- | --- |
-| Dashboard summary expansion (KPI cards) | GGT-02 (DASH-02) | Planned |
-| Trend penjualan endpoint | GGT-02 (DASH-01) | Planned |
-| Occupancy per event | GGT-02 (DASH-03, DASH-04) | Planned |
-| Detail event analytics | GGT-02 (DASH-05) | Planned |
-| Filter rentang tanggal | GGT-02 (DASH-06) | Planned |
-| Chart rendering (line, bar, donut) | GGT-02 (DASH-08) | Planned |
-| Hapus dummy data & sync API | GGT-02 (DASH-08) | Planned |
-| Hapus halaman `/concerts` (legacy) | — | Planned |
-| Hapus halaman `/venues` (legacy) | — | Planned |
-
-#### Phase 3 — Payment & Tickets
-
-> Integrasi Midtrans + sistem tiket digital
-
-| Deliverable | Status |
-| --- | --- |
-| Midtrans Snap integration (backend) | Planned |
-| Payment webhook handler | Planned |
-| Auto-verify order saat payment sukses | Planned |
-| Auto-expire order saat payment timeout | Planned |
-| QR code generation per tiket (post-payment) | Planned |
-| QR scanner page (admin) | Planned |
-| Check-in endpoint + validasi | Planned |
-
-#### Phase 4 — Mobile App (React Native)
-
-> Customer-facing mobile application
-
-| Deliverable | Status |
-| --- | --- |
-| React Native project setup | Planned |
-| Auth screens (login, register) | Planned |
-| Home screen (event list, search, filter) | Planned |
-| Event detail screen + ticket categories | Planned |
-| Order/checkout flow + Midtrans payment | Planned |
-| Order history screen | Planned |
-| E-ticket display + QR code | Planned |
-| Profile screen | Planned |
-
-#### Phase 5 — Growth Features
-
-> Fitur-fitur untuk pertumbuhan & engagement
-
-| Deliverable | Status |
-| --- | --- |
-| Push notification (FCM) — event baru, status order, tiket hampir habis | Planned |
-| Promo code / voucher system | Planned |
-| Wishlist / reminder "Ingatkan saat tiket dijual" | Planned |
-| Virtual queue / waiting room untuk war tiket | Planned |
-| Social login (Google/Apple) | Future |
+#### Phase 5 — Growth & Scale Features ⚡ (Direncanakan)
+- Push Notification (FCM) untuk pengingat konser dan status order.
+- Sistem Promo Code & Voucher Diskon.
+- Virtual Waiting Room untuk war tiket rilis besar.
 
 ---
 
 ## 11. Deployment & Infrastruktur
 
-### 11.1 Environment Saat Ini (Development)
+### 11.1 Environment Development Lokal
 
-| Komponen | Detail |
-| --- | --- |
-| **Backend** | `bun run --hot src/index.ts` -> port 3000 |
-| **Frontend** | `nuxt dev` -> port 3001 |
-| **Database** | PostgreSQL via Docker Compose |
-| **CORS** | Auto-allow `localhost:5173`, `localhost:3001`, `localhost:3000` |
+| Komponen | Perintah / Konfigurasi | Port |
+| --- | --- | --- |
+| **Backend** | `bun dev` (Hono dengan hot reload) | `3000` |
+| **Frontend** | `bun dev` (Nuxt SSR dev server) | `3001` |
+| **Database** | Docker Compose PostgreSQL 16 | `5432` |
 
-### 11.2 Opsi Deployment Production
-
-| Opsi | Pro | Kontra | Cocok Untuk |
-| --- | --- | --- | --- |
-| **PaaS (Railway/Render)** | Simple deploy, auto-scale, managed DB | Biaya naik saat traffic tinggi | Fase awal, tim kecil |
-| **VPS (DigitalOcean/Hetzner)** | Murah, full control | Setup manual (nginx, SSL, PM2) | Budget terbatas |
-| **Cloud (AWS/GCP)** | Scalable, enterprise-grade | Kompleks, learning curve tinggi | Scale besar |
-
-### 11.3 Infrastruktur yang Dibutuhkan
-
-```mermaid
-graph TB
-    subgraph "Production Infrastructure"
-        LB["Load Balancer / Reverse Proxy<br/>(nginx / Caddy)"]
-        APP1["Backend API Instance 1"]
-        APP2["Backend API Instance 2"]
-        NUXT["Nuxt (SSR/SSG)"]
-        PG["PostgreSQL<br/>(Managed)"]
-        REDIS["Redis<br/>(Rate Limit, Queue, Cache)"]
-        S3["Object Storage<br/>(Payment Proofs, Assets)"]
-        CDN["CDN<br/>(Static Assets)"]
-    end
-
-    LB --> APP1
-    LB --> APP2
-    LB --> NUXT
-    APP1 --> PG
-    APP2 --> PG
-    APP1 --> REDIS
-    APP2 --> REDIS
-    APP1 --> S3
-    NUXT --> CDN
-```
-
-### 11.4 Environment Variables
+### 11.2 Environment Variables Backend (`.env`)
 
 | Variable | Deskripsi | Contoh |
 | --- | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@host:5432/ggtix` |
-| `JWT_SECRET` | Secret key untuk JWT (min 32 char) | `super-secret-key-at-least-32-chars` |
-| `JWT_ACCESS_TTL` | Access token TTL | `1h` |
-| `JWT_REFRESH_TTL` | Refresh token TTL | `7d` |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) | `https://admin.ggtix.com` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@localhost:5432/ggtix` |
+| `JWT_SECRET` | Secret key JWT (min 32 karakter) | `your-super-secret-key-32-chars-long` |
+| `JWT_ACCESS_TTL` | Access token lifetime | `1h` |
+| `JWT_REFRESH_TTL` | Refresh token lifetime | `7d` |
+| `CORS_ORIGINS` | Origin yang diizinkan | `http://localhost:3001,http://localhost:3000` |
 | `PORT` | Backend port | `3000` |
-| `MIDTRANS_SERVER_KEY` | Midtrans server key | (from Midtrans dashboard) |
-| `MIDTRANS_CLIENT_KEY` | Midtrans client key | (from Midtrans dashboard) |
-| `B2_KEY_ID` | Backblaze B2 application key ID (GGT-03) | (from B2 dashboard) |
-| `B2_APPLICATION_KEY` | Backblaze B2 application key (GGT-03) | (from B2 dashboard) |
-| `B2_BUCKET` | Nama bucket B2 (public) | `ggtix-assets` |
-| `IMAGE_MAX_BYTES` | Batas ukuran file upload (default 10 MB) | `10485760` |
+| `B2_KEY_ID` | Backblaze B2 Key ID | `005...` |
+| `B2_APPLICATION_KEY` | Backblaze B2 Application Key | `K005...` |
+| `B2_BUCKET` | Nama bucket B2 public | `ggtix-assets` |
+| `IMAGE_MAX_BYTES` | Batas ukuran upload (default 10 MB) | `10485760` |
+| `MIDTRANS_SERVER_KEY` | Midtrans server key | `SB-Mid-server-...` |
+| `MIDTRANS_CLIENT_KEY` | Midtrans client key | `SB-Mid-client-...` |
 
 ---
 
@@ -913,26 +694,22 @@ graph TB
 
 | Istilah | Definisi |
 | --- | --- |
-| **Event** | Konser atau acara yang dijual tiketnya di GG Tix. Di backend disebut `Event`, bukan `Concert`. |
-| **Ticket Category** | Jenis tiket dalam sebuah event (misal: VVIP, VIP, Reguler), masing-masing punya harga dan kuota sendiri. |
-| **Order** | Transaksi pembelian tiket oleh customer. Status: pending -> verified atau rejected. |
-| **Ticket** | Tiket digital individual dengan QR code unik. Satu order bisa menghasilkan beberapa tiket (sesuai quantity). |
-| **Quota** | Jumlah tiket yang tersedia (`quota_remaining`) dari total yang dialokasikan (`quota_total`). |
-| **Check-In** | Proses validasi tiket saat customer masuk venue — scan QR code -> mark `checked_in = true`. |
-| **War Tiket** | Istilah untuk situasi di mana banyak customer berlomba membeli tiket saat penjualan dibuka (high traffic spike). |
-| **Waiting Room** | Antrian virtual yang melindungi server dari crash saat war tiket. |
-| **Super Admin** | Admin dengan akses penuh: CRUD event, artis, kategori tiket. |
-| **Staff** | Admin dengan akses terbatas: verifikasi order, scan QR, lihat dashboard. |
-| **Midtrans Snap** | Layanan payment gateway Midtrans yang menyediakan halaman pembayaran siap pakai. |
-| **Rate Limiting** | Pembatasan jumlah request per waktu untuk mencegah abuse (brute-force, spam order). |
-| **Atomic Transaction** | Operasi database yang terjamin utuh — jika gagal, semua perubahan di-rollback. |
+| **Event** | Konser atau pertunjukan musik yang dijual tiketnya di GG Tix. |
+| **Venue** | Gedung atau lokasi fisik tempat konser berlangsung yang memiliki kapasitas dan alamat. |
+| **Ticket Category** | Kategori/tier tiket dalam konser (seperti VVIP, VIP, Festival, Reguler) beserta harga, kuota, dan benefit khusus. |
+| **Order** | Transaksi pemesanan tiket oleh customer. |
+| **Ticket** | Tiket digital individual dengan QR Code unik yang diterbitkan setelah order berstatus `verified`. |
+| **Check-In** | Proses verifikasi dan validasi tiket pengunjung di pintu masuk venue konser menggunakan scanner QR. |
+| **War Tiket** | Momen pembukaan penjualan tiket konser di mana banyak pengguna mengakses sistem secara bersamaan. |
+| **Waiting Room** | Antrian virtual untuk mengatur laju pengguna yang masuk ke proses pembelian saat terjadi lonjakan traffic. |
 
 ---
 
-> **Dokumen ini adalah living document.** Diperbarui seiring perkembangan produk.
+> **Dokumen ini adalah living document.** Diperbarui seiring perkembangan siklus rilis dan kebutuhan produk.
 >
-> **Referensi terkait:**
+> **Dokumen Terkait:**
 > - [Backend API Contract](file:///home/artdi/Projects/GG%20Tix/prd/Backend%20API%20Contract%20-%20Panduan%20Integrasi%20Frontend.md)
-> - [GGT-01: Security & Performance](file:///home/artdi/Projects/GG%20Tix/prd/GGT-01%20-%20Backend%20Security%20%26%20Performance%20Hardening.md)
-> - [GGT-02: Dashboard Analytics](file:///home/artdi/Projects/GG%20Tix/prd/GGT-02%20-%20Dashboard%20Analytics%20Penjualan%20Tiket.md)
-> - [PRD Template](file:///home/artdi/Projects/GG%20Tix/prd/KODE-PRD%20-%20JUDUL.md)
+> - [GGT-01: Backend Security & Performance](file:///home/artdi/Projects/GG%20Tix/prd/GGT-01%20-%20Backend%20Security%20%26%20Performance%20Hardening.md)
+> - [GGT-02: Dashboard Analytics Penjualan Tiket](file:///home/artdi/Projects/GG%20Tix/prd/GGT-02%20-%20Dashboard%20Analytics%20Penjualan%20Tiket.md)
+> - [GGT-03: Object Storage & Upload Gambar (B2)](file:///home/artdi/Projects/GG%20Tix/prd/GGT-03%20-%20Object%20Storage%20%26%20Upload%20Gambar%20(Backblaze%20B2).md)
+> - [GGT-04: Schema Enrichment, Session Persistence & Dashboard Completion](file:///home/artdi/Projects/GG%20Tix/prd/GGT-04%20-%20Schema%20Enrichment,%20Session%20Persistence%20&%20Dashboard%20Completion.md)

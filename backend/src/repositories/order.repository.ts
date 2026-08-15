@@ -1,6 +1,6 @@
 import { eq, and, desc, count, SQL, sql } from "drizzle-orm";
 import { db } from "../db";
-import { orders, ticketCategories, events, customers } from "../db/schema";
+import { orders, ticketCategories, events, customers, tickets } from "../db/schema";
 
 export interface CreateOrderInput {
   customerId: string;
@@ -10,7 +10,7 @@ export interface CreateOrderInput {
 }
 
 export interface OrderQueryFilters {
-  status?: "pending" | "verified" | "rejected";
+  status?: "pending" | "verified" | "rejected" | "expired";
   eventId?: string;
   page?: number;
   limit?: number;
@@ -100,8 +100,9 @@ export async function findOrderById(id: string) {
     where: eq(orders.id, id),
     with: {
       event: { columns: { id: true, title: true, dateTime: true } },
-      category: { columns: { id: true, name: true } },
+      category: { columns: { id: true, name: true, price: true } },
       customer: { columns: { id: true, name: true, email: true } },
+      paymentProofs: true,
     },
   });
   return order || null;
@@ -123,6 +124,7 @@ export async function findOrdersByCustomerId(
     with: {
       event: { columns: { title: true, dateTime: true } },
       category: { columns: { name: true } },
+      paymentProofs: true,
     },
   });
 
@@ -162,6 +164,7 @@ export async function findOrders(filters: OrderQueryFilters = {}) {
       event: { columns: { title: true, dateTime: true } },
       category: { columns: { name: true } },
       customer: { columns: { id: true, name: true, email: true } },
+      paymentProofs: true,
     },
   });
 
@@ -229,6 +232,24 @@ export async function verifyOrder(
       })
       .where(eq(orders.id, orderId))
       .returning();
+
+    // If verified, auto-generate tickets
+    if (decision === "verified") {
+      // Check if tickets already exist (idempotent)
+      const existingTickets = await tx
+        .select()
+        .from(tickets)
+        .where(eq(tickets.orderId, orderId));
+
+      if (existingTickets.length === 0) {
+        const ticketValues = Array.from({ length: updated.quantity }).map(() => ({
+          orderId: updated.id,
+          qrCodeValue: `tix_${crypto.randomUUID()}`,
+          checkedIn: false,
+        }));
+        await tx.insert(tickets).values(ticketValues);
+      }
+    }
 
     return updated;
   });

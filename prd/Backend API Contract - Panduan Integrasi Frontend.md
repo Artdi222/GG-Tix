@@ -8,7 +8,7 @@
 
 | Prioritas | Status |
 | --- | --- |
-| Disusun dari kode backend (authoritative) | ✓ Update: `2026-08-10` (GGT-03: upload B2 + venues) |
+| Disusun dari kode backend (authoritative) | ✓ Update: `2026-08-15` (GGT-02 s/d GGT-04) |
 
 ---
 
@@ -17,7 +17,9 @@
 | Topik | Backend (Kebenaran) | Frontend (Sebelumnya keliru) |
 | --- | --- | --- |
 | **Nama resource konser** | `Events` → `/api/events` | Memakai `/api/concerts` dan field `name` |
-| **Modul venue** | **Sudah ada** sejak GGT-03: `/api/venues` (CRUD + upload gambar). `events.venue` tetap string (bukan FK). | Halaman `/venues` (legacy) |
+| **Relasi Venue** | `events.venueId` adalah FK UUID ke tabel `venues`. Data venue terisi di nested object `venue: { id, name, city, address, imageUrl }`. | Mengira string `venue` & `city` mandiri di tabel event |
+| **Field Tambahan Event** | `description`, `endDateTime`, `maxTicketsPerOrder`, `tags`, `seatmapUrl`, `sortOrder`, `imageUrl` | Hanya membuat form sederhana tanpa seatmap/tags |
+| **Benefits Kategori Tiket** | `benefits` (string array) & `sortOrder` (integer) sudah didukung di backend | Mengira benefits belum ada kolom DB |
 | **Login admin** | `POST /api/auth/admin/login` | `POST /api/auth/login` |
 | **Login customer** | `POST /api/auth/customer/login` | (dipakai admin panel; gunakan admin) |
 | **ID** | `uuid` (string) | `number` |
@@ -49,7 +51,7 @@
 ```jsonc
 { "error": "Pesan error", "fields": { "title": "Per-field message" } }
 ```
-- `fields` hanya muncul saat validasi (422).
+- `fields` hanya muncul saat validasi (422/400).
 - Status: `400` bad request, `401` unauthorized, `403` forbidden/ditolak, `404` not found, `409` conflict, `413` body terlalu besar, `422` validasi, `429` rate limit.
 
 ### Aturan akses (role)
@@ -71,13 +73,11 @@
 | GET | `/auth/me` | 🔵/🟣 | — | 200 `data: { id, name, email, role }` |
 
 > Seed creds: admin `budi@ggtix.com / admin123`, `artdi@ggtix.com / admin123`, staff `siti@ggtix.com / admin123`; customer `sari@example.com / customer123` dst.
-> Tidak ada endpoint `POST /auth/logout` di backend; logout = buang token di client.
+> Tidak ada endpoint `POST /auth/logout` di backend; logout = buang token & cookie di client.
 
 ---
 
 ## 4. Events / Konser (`/api/events`)
-
-> **Backend menyebut konser = `Event`.** Frontend selama ini memakai "Concert / concat".
 
 ### Model Event (response)
 ```jsonc
@@ -86,11 +86,28 @@
   "title": "Wuthering Waves Live 2026",
   "artistId": "uuid",
   "publisherName": "Kuro Games",
-  "venue": "Gelora Bung Karno",
-  "city": "Jakarta",
+  "venueId": "uuid",
+  "venue": {
+    "id": "uuid",
+    "name": "Gelora Bung Karno",
+    "city": "Jakarta",
+    "address": "Jl. Pintu Satu Senayan",
+    "imageUrl": "https://.../venue.webp"
+  },
+  "artist": {
+    "id": "uuid",
+    "name": "Vanguard Sound",
+    "photoUrl": "https://..."
+  },
   "dateTime": "2026-10-12T19:00:00.000Z",
-  "imageUrl": "https://.../banner.webp",   // GGT-03, opsional
-  "status": "open"     // "open" | "closed"
+  "endDateTime": "2026-10-12T22:00:00.000Z",
+  "description": "Konser orkestra game resmi pertama di Indonesia.",
+  "maxTicketsPerOrder": 4,
+  "tags": ["gaming", "orchestra", "anime"],
+  "seatmapUrl": "https://.../seatmap.webp",
+  "imageUrl": "https://.../banner.webp",
+  "sortOrder": 0,
+  "status": "open",     // "open" | "closed"
   "createdBy": "uuid",
   "createdAt": "2026-..."
 }
@@ -98,19 +115,12 @@
 
 | Method | Path | Auth | Body / Query | Respon |
 | --- | --- | --- | --- | --- |
-| GET | `/events` | 🟢 | Query: `search`, `artistId`, `city`, `status open/closed`, `page`, `limit` (default 10, max 100) | `{ data, pagination }` |
-| GET | `/events/:id` | 🟢 | pathParam é | `{ data: eventWithArtistAndCategories }` |
-| POST | `/events` | 🔴 | `{ title, artistId, publisherName, venue, city, dateTime(ISO), status?, imageUrl? }` | 201 `{ data }` |
-| PUT | `/events/:id` | 🔴 | Partial dari create body | `{ data }` |
-| PATCH | `/events/:id/status` | 🔴 | `{ status: "open"|"closed" }` | `{ data }` |
+| GET | `/events` | 🟢 | Query: `search`, `artistId`, `venueId`, `status open/closed`, `page`, `limit` (default 10, max 100) | `{ data: [...], pagination }` |
+| GET | `/events/:id` | 🟢 | Param `:id` (UUID) | `{ data: eventWithDetailsAndCategories }` |
+| POST | `/events` | 🔴 | `{ title, artistId, publisherName, venueId, dateTime, endDateTime?, description?, maxTicketsPerOrder?, tags?, seatmapUrl?, imageUrl?, sortOrder?, status? }` | 201 `{ message, data }` |
+| PUT | `/events/:id` | 🔴 | Partial dari create body | `{ message, data }` |
+| PATCH | `/events/:id/status` | 🔴 | `{ status: "open"|"closed" }` | `{ message, data }` |
 | DELETE | `/events/:id` | 🔴 | — | `{ message }` |
-
-> Banner event diisi dari hasil `POST /api/uploads` (`kind=banner`, GGT-03). Saat banner diganti/event dihapus, file B2 lama ikut dihapus (UPL-09).
-
-> 🚨 **Tidak ada field `capacity`/`ticketsSold`/`status` 4-nilai pada event** di backend. Maping untuk frontend:
-> - `capacity` = jumlah kuota kategori → `ticketCategories` sum `quotaTotal` (didapat dari GET `/events/:id`).
-> - `ticketsSold` = berdasar order (belum ada di GET list, lihat dashboard untuk aggregate).
-> - Status frontend "On Sale / Almost Sold Out / Sold Out / Draft" **bukan** status backend; disarankan dihitung frontend dari data (atau tambah TBD di PRD).
 
 ---
 
@@ -118,21 +128,53 @@
 
 Model kategori:
 ```jsonc
-{ "id": "uuid", "eventId": "uuid", "name": "VIP", "price": "750000.00", "quotaTotal": 100, "quotaRemaining": 67 }
+{
+  "id": "uuid",
+  "eventId": "uuid",
+  "name": "VIP",
+  "price": "750000.00",
+  "quotaTotal": 100,
+  "quotaRemaining": 67,
+  "benefits": ["Early Entry", "Exclusive Merchandise Set", "Lanyard & PVC Card"],
+  "sortOrder": 1
+}
 ```
 
 | Method | Path | Auth | Body / Query | Respon |
 | --- | --- | --- | --- | --- |
 | GET | `/events/:eventId/categories` | 🟢 | — | `{ data: [category] }` |
-| POST | `/events/:eventId/categories` | 🔴 | `{ name, price(dec), quotaTotal }` | 201 `{ data }` |
-| PUT | `/categories/:id` | 🔴 | Partial `{ name?, price?, quotaTotal? }` | `{ data }` |
+| POST | `/events/:eventId/categories` | 🔴 | `{ name, price(dec), quotaTotal, benefits?, sortOrder? }` | 201 `{ data }` |
+| PUT | `/categories/:id` | 🔴 | Partial `{ name?, price?, quotaTotal?, benefits?, sortOrder? }` | `{ data }` |
 | DELETE | `/categories/:id` | 🔴 | — | `{ message }` |
-
-> `quotaRemaining` di-set = `quotaTotal` saat create; turun tiap order; naik saat order direject. `price` kirim string desimal (`"750000.00"`).
 
 ---
 
-## 6. Artists (`/api/artists`)
+## 6. Venues (`/api/venues`)
+
+Model:
+```jsonc
+{
+  "id": "uuid",
+  "name": "Gelora Bung Karno",
+  "address": "Jl. Pintu Satu Senayan, Gelora, Kecamatan Tanah Abang",
+  "city": "Jakarta",
+  "imageUrl": "https://.../gbk.webp",
+  "sortOrder": 0,
+  "createdAt": "..."
+}
+```
+
+| Method | Path | Auth | Body / Query | Respon |
+| --- | --- | --- | --- | --- |
+| GET | `/venues` | 🔵 | Query `q`, `page`, `limit` (default 10, max 100) | `{ data, pagination }` |
+| GET | `/venues/:id` | 🔵 | — | `{ data }` |
+| POST | `/venues` | 🔴 | `{ name, address, city, imageUrl?, sortOrder? }` | 201 `{ data }` |
+| PUT | `/venues/:id` | 🔴 | Partial | `{ data }` |
+| DELETE | `/venues/:id` | 🔴 | — | `{ message }` |
+
+---
+
+## 7. Artists (`/api/artists`)
 
 Model:
 ```jsonc
@@ -153,11 +195,9 @@ Model:
 | PUT | `/artists/:id` | 🔴 | Partial | `{ data }` |
 | DELETE | `/artists/:id` | 🔴 | — | `{ message, data }` (gagal 400 bila punya event) |
 
-> `photoUrl` adalah **URL string**. Disarankan diisi dari hasil `POST /api/uploads` (GGT-03). Saat foto diganti/dihapus, file B2 lama ikut dihapus otomatis (UPL-09).
-
 ---
 
-## 7. Orders (`/api/orders`)
+## 8. Orders (`/api/orders`)
 
 Model order (dari `GET /api/orders`):
 ```jsonc
@@ -167,7 +207,7 @@ Model order (dari `GET /api/orders`):
   "event": { "title": "...", "dateTime": "..." },
   "category": { "name": "VIP" },
   "quantity": 2,
-  "totalPrice": "3000000.00",   // string
+  "totalPrice": "1500000.00",   // string
   "status": "pending",           // "pending" | "verified" | "rejected"
   "createdAt": "..." ,
   "verifiedBy": null,
@@ -182,108 +222,101 @@ Model order (dari `GET /api/orders`):
 | GET | `/orders` | 🔵 | Query `status`, `eventId`, `page`, `limit` | `{ data, pagination }` |
 | PATCH | `/orders/:id/verify` | 🔵 | `{ decision: "verified"|"rejected" }` | `{ message, data }` |
 
-- Error khusus order: `404 EVENT_NOT_FOUND`, `403 EVENT_CLOSED`, `404 CATEGORY_NOT_FOUND`, `409 INSUFFICIENT_QUOTA`, `404 ORDER_NOT_FOUND`, `409 ORDER_ALREADY_PROCESSED`.
-
 ---
 
-## 8. Dashboard (`/api/dashboard`)
-
-### `GET /api/dashboard/summary` (🔵 admin)
-Response saat ini:
-```jsonc
-{
-  "overallStats": {
-    "verified": { "tickets": 0, "revenue": 0 },
-    "pending":  { "tickets": 0, "revenue": 0 },
-    "rejected": { "tickets": 0, "revenue": 0 }
-  },
-  "eventActivity": {
-    "openCount": 5, "closedCount": 1,
-    "upcoming":   [{ "id": "...", "title": "...", "dateTime": "...", "city": "..." }],  // max 5
-    "recentClosed": [...]
-  },
-  "byEvent":    [{ "eventId": "...", "title": "...", "ticketsSold": 0, "revenue": 0 }],
-  "byCategory": [{ "categoryId": "...", "name": "...", "ticketsSold": 0, "revenue": 0 }]
-}
-```
-> Direncanakan bertambah di **GGT-02**: `totalEvents`, `totalTicketsSold`, `totalRevenue`, `upcomingShows`, `pendingVerifications`, `capacity`/`sold`/`occupancyPct` per event, dan `revenueShare`.
-
-### `GET /api/dashboard/trend` — *(belum ada di kode, direncanakan GGT-02)*
-### `GET /api/dashboard/events` — *(belum ada di kode, direncanakan GGT-02)*
-> ⚠️ Kedua endpoint analitik trend & detail-event **belum diimplementasikan** di backend; baru direncanakan di PRD GGT-02. Frontend jangan andalkan dulu sampai implementasi.
-
----
-
-## 9. Upload & Venues (GGT-03 — Backblaze B2)
-
-### Upload (`POST /api/uploads`) — 🔴 super admin, rate limit 10/15 menit
-
-Upload file gambar, backend crop otomatis ke rasio sesuai `kind`, konversi WebP, simpan ke B2, return URL permanen. **DB/entity hanya menyimpan `url` utama.**
-
-| `kind` | Rasio | Dimensi hasil | Format |
-| --- | --- | --- | --- |
-| `profile` | 1:1 | 800x800 (center-crop) | WebP 85% |
-| `banner` | 16:9 | 1600x900 | WebP 85% |
-| `venue` | 9:16 | 900x1600 | WebP 85% |
-
-- Metode: `POST /api/uploads`, `multipart/form-data` — field `file` (wajib) + `kind` (opsional, default `profile`).
-- Batas: `image/png`, `image/jpeg`, `image/webp`, maks **10 MB** (validasi magic bytes via Sharp). Di luar itu → `400 INVALID_FILE_TYPE` / `413 UPLOAD_TOO_LARGE`.
-- Response `201`:
-```jsonc
-{ "data": { "url": "https://f.../file/ggtix-assets/uploads/2026/<uuid>.webp",
-            "thumbUrl": "..._thumb.webp", "key": "uploads/2026/<uuid>.webp" } }
-```
-- `url` = WebP hasil crop; `thumbUrl` = varian 400x400 WebP 80%; `key` = object key di bucket.
-- Alur frontend: (1) upload file → (2) simpan `url` ke field `imageUrl`/`photoUrl` saat POST/PUT entity → (3) B2 vars diisi sendiri oleh tim (env, bukan via API).
-
-### Venues (`/api/venues`) — 🔵 admin read, 🔴 super admin write
-
-Model:
-```jsonc
-{ "id": "uuid", "name": "Gelora Bung Karno", "address": "Jl. Pintu Satu Senayan, Jakarta",
-  "latitude": "-6.2187300", "longitude": "106.8026815",
-  "imageUrl": "https://.../layout.webp", "createdAt": "..." }
-```
-> `latitude`/`longitude` dikirim sebagai string desimal (numeric DB). `imageUrl` opsional, diisi dari hasil upload (`kind=venue`). Saat venue dihapus/gambarnya diganti, file B2 lama ikut dihapus (UPL-09).
+## 9. Users & Admin Management (`/api/users`)
 
 | Method | Path | Auth | Body / Query | Respon |
 | --- | --- | --- | --- | --- |
-| GET | `/venues` | 🔵 | `q`, `page`, `limit` (default 10, max 100) | `{ data, pagination }` |
-| GET | `/venues/:id` | 🔵 | — | `{ data }` |
-| POST | `/venues` | 🔴 | `{ name, address, latitude?, longitude?, imageUrl? }` | 201 `{ data }` |
-| PUT | `/venues/:id` | 🔴 | Partial | `{ data }` |
-| DELETE | `/venues/:id` | 🔴 | — | `{ message }` |
+| GET | `/users/customers` | 🔴 | Query `search`, `page`, `limit` | `{ data: [customer], pagination }` |
+| GET | `/users/admins` | 🔴 | Query `search`, `role super_admin/staff`, `page`, `limit` | `{ data: [admin], pagination }` |
+| POST | `/users/admins` | 🔴 | `{ name, email, password, role: "super_admin"|"staff" }` | 201 `{ message, data }` |
+| PUT | `/users/admins/:id` | 🔴 | Partial `{ name?, email?, password?, role? }` | `{ message, data }` |
+| DELETE | `/users/admins/:id` | 🔴 | Param `:id` (tidak bisa hapus diri sendiri) | `{ message }` |
 
 ---
 
-## 10. Health (`/api/health`)
+## 10. Dashboard Analytics (`/api/dashboard`)
 
-`GET /api/health` 🟢 → `{ status: "ok" }` (lihat file).
+### `GET /api/dashboard/summary` (🔵 admin)
+Query parameter opsional: `days` (misal: 7, 30, 90) atau `from` & `to` (ISO string).
+
+Response:
+```jsonc
+{
+  "kpi": {
+    "totalEvents": 8,
+    "totalTicketsSold": 342,
+    "totalRevenue": 178500000,
+    "upcomingShows": 4,
+    "pendingVerifications": 3
+  },
+  "overallStats": {
+    "verified": { "tickets": 342, "revenue": 178500000 },
+    "pending":  { "tickets": 6, "revenue": 3500000 },
+    "rejected": { "tickets": 12, "revenue": 6000000 }
+  },
+  "trend": [
+    { "date": "2026-08-01", "tickets": 15, "revenue": 7500000 },
+    { "date": "2026-08-02", "tickets": 28, "revenue": 14000000 }
+  ],
+  "occupancy": [
+    {
+      "eventId": "uuid",
+      "title": "Wuthering Waves Live",
+      "capacity": 500,
+      "sold": 450,
+      "occupancyPct": 90.0,
+      "revenue": 225000000
+    }
+  ],
+  "categoryBreakdown": [
+    { "name": "VVIP", "ticketsSold": 50, "revenue": 75000000, "sharePct": 42.0 }
+  ],
+  "eventActivity": {
+    "openCount": 6,
+    "closedCount": 2,
+    "upcoming": [...],
+    "recentClosed": [...]
+  }
+}
+```
 
 ---
 
-## 11. Ringkasan: Endpoint yang Belum Ada di Backend (Gap)
-Barang yang frontend harapkan tapi **belum ada** di backend — perlu PRD + implementasi backend:
+## 11. Uploads (Backblaze B2 — `/api/uploads`)
 
-| Fitur | Gap |
-| --- | --- |
-| **Venue (CRUD + upload gambar)** | ✅ Terimplementasi GGT-03: tabel `venues` + 5 endpoint (lihat §9). |
-| **Upload gambar** (event/artis/venue) | ✅ Terimplementasi GGT-03: `POST /api/uploads` (B2, WebP). Body limit JSON terpisah untuk multipart. |
-| **Event banner** | ✅ `events.imageUrl` tersedia (opsional). |
-| **`/api/concerts`** | Frontend varian "Conc" bukan nama resource backend; pakailah `/api/events`. |
-| **Dashboard trend / detail** | Belum diimplementasi (GGT-02). |
-| **Logout** | Tidak ada endpoint; logout di client. |
-| **Pagination default cap** | Sudah ada di list endpoint (`page` default 1, `limit` default 10, max 100). |
+### `POST /api/uploads` — 🔴 super admin, rate limit 10/15 menit
 
----
+Upload file gambar (`multipart/form-data`) dengan auto crop & kompresi WebP:
+- Field: `file` (wajib) + `kind` (`banner` 16:9 | `profile` 1:1 | `venue` 9:16)
+- Maksimal: 10 MB, MIME: `image/png`, `image/jpeg`, `image/webp`.
 
-## 12. Checklist Integrasi Frontend
-1. Pasang **proxy** di Nuxt agar `/api` → `http://localhost:3000/api` (atau gunakan runtime config + `$fetch`).
-2. Implement klien API wrapper yang: kirim `Authorization: Bearer`, tangani `401` → auto-refresh, `429`, dan parse error `{error, fields}`.
-3. Gunakan **tipe `string` untuk id** (uuid) dan **string untuk nominal uang**; parse dengan `Number()`/format IDR bila perlu.
-4. Gunakan nama **`event`** (pakai `/api/events`), bukan `concert`.
-5. Status event: gunakan `open`/`closed` dari backend, bukan enum 4 nilai.
+Response `201`:
+```jsonc
+{
+  "data": {
+    "url": "https://f005.backblazeb2.com/file/ggtix-assets/uploads/2026/<uuid>.webp",
+    "thumbUrl": "..._thumb.webp",
+    "key": "uploads/2026/<uuid>.webp"
+  }
+}
+```
 
 ---
 
-Dokumen dibangun dari kode backend (authoritative). Perbarui setiap kali model/endpoint berubah.
+## 12. Endpoint yang Akan Datang (Phase 3 Gap)
+
+Barang yang akan diimplementasikan pada **Phase 3 (Tickets & Payments)**:
+
+| Fitur | Target Endpoint | Status |
+| --- | --- | --- |
+| **Get Tiket QR Order** | `GET /api/tickets/order/:orderId` | Planned (Phase 3) |
+| **QR Scanner Check-In** | `POST /api/tickets/check-in` | Planned (Phase 3) |
+| **Midtrans Snap Token** | `POST /api/payments/midtrans/token` | Planned (Phase 3) |
+| **Midtrans Webhook** | `POST /api/payments/midtrans/notification` | Planned (Phase 3) |
+| **Promo Code Validation**| `POST /api/promo/validate` | Planned (Phase 5) |
+
+---
+
+Dokumen dibangun langsung dari kode backend (authoritative) dan disinkronkan dengan PRD Dokumen Konsep Lengkap.

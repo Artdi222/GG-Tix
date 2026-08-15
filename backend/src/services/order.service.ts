@@ -1,5 +1,7 @@
 import * as orderRepo from "../repositories/order.repository";
 import { AppError } from "../lib/errors";
+import { isMidtransConfigured } from "../lib/midtrans";
+import { createSnapToken } from "./payment.service";
 
 export interface PlaceOrderDTO {
   eventId: string;
@@ -31,7 +33,27 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
     }
   }
 
-  return result;
+  let payment:
+    | { snapToken: string; redirectUrl: string; expiresAt: string }
+    | undefined;
+
+  if (isMidtransConfigured()) {
+    try {
+      const snapData = await createSnapToken(customerId, result.id);
+      payment = {
+        snapToken: snapData.snapToken,
+        redirectUrl: snapData.redirectUrl,
+        expiresAt: snapData.expiresAt,
+      };
+    } catch (err) {
+      console.error("Failed to generate Midtrans Snap token on create order:", err);
+    }
+  }
+
+  return {
+    order: result,
+    payment,
+  };
 }
 
 export async function getCustomerOrders(
