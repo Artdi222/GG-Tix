@@ -65,7 +65,7 @@ async function fetchOrders() {
       orders.value = res.data
     }
   } catch {
-    // Keep mock if BE offline
+    // Keep mock
   } finally {
     isLoading.value = false
   }
@@ -87,6 +87,16 @@ const filteredOrders = computed(() => {
   })
 })
 
+// KPI Stats Computations
+const totalOrdersCount = computed(() => orders.value.length)
+const pendingCount = computed(() => orders.value.filter(o => o.status === 'pending').length)
+const verifiedCount = computed(() => orders.value.filter(o => o.status === 'verified').length)
+const totalRevenueNumber = computed(() => {
+  return orders.value
+    .filter(o => o.status === 'verified')
+    .reduce((sum, o) => sum + (parseFloat(o.totalPrice) || 0), 0)
+})
+
 async function handleVerify(orderId: string, decision: 'verified' | 'rejected') {
   try {
     await request(`/orders/${orderId}/verify`, {
@@ -101,9 +111,9 @@ async function handleVerify(orderId: string, decision: 'verified' | 'rejected') 
   }
 }
 
-function formatIDR(priceStr: string) {
-  const num = parseFloat(priceStr) || 0
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num)
+function formatIDR(priceStr: string | number) {
+  const num = typeof priceStr === 'number' ? priceStr : (parseFloat(priceStr) || 0)
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num)
 }
 
 function formatDate(dateStr?: string | null) {
@@ -133,33 +143,90 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  <div class="space-y-5">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
           Verifikasi Transaksi & Order
         </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           Daftar pemesanan tiket customer, status Midtrans Gateway & verifikasi order (/api/orders)
         </p>
       </div>
 
-      <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" :loading="isLoading" @click="fetchOrders">
+      <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" size="sm" class="font-medium text-xs shadow-xs" :loading="isLoading" @click="fetchOrders">
         Refresh Data
       </UButton>
     </div>
 
+    <!-- Stats KPI Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Order</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ totalOrdersCount }}</h3>
+          <p class="text-[11px] text-gray-500 mt-0.5 font-medium">Transaksi masuk</p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+          <UIcon name="i-lucide-receipt" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Pending Verifikasi</p>
+          <h3 class="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 tracking-tight">{{ pendingCount }}</h3>
+          <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-clock" class="w-3 h-3" />
+            Butuh konfirmasi
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <UIcon name="i-lucide-alert-circle" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Verified / Lunas</p>
+          <h3 class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 tracking-tight">{{ verifiedCount }}</h3>
+          <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-check-circle-2" class="w-3 h-3" />
+            Pembayaran sah
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <UIcon name="i-lucide-check-circle" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Pendapatan</p>
+          <h3 class="text-base font-bold text-gray-900 dark:text-white mt-0.5 truncate max-w-[130px]">{{ formatIDR(totalRevenueNumber) }}</h3>
+          <p class="text-[11px] text-purple-600 dark:text-purple-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-trending-up" class="w-3 h-3" />
+            Dari order lunas
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+          <UIcon name="i-lucide-wallet" class="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+
     <!-- Filter Bar -->
-    <div class="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row items-center gap-3">
+    <div class="p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex flex-col sm:flex-row items-center gap-3">
       <UInput
         v-model="search"
         icon="i-lucide-search"
         placeholder="Cari ID Order, customer, atau event..."
-        size="md"
-        class="w-full sm:w-80"
+        size="sm"
+        class="w-full sm:w-80 text-xs"
       />
 
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-1.5">
         <UButton
           v-for="st in [
             { label: 'Semua', val: 'ALL' },
@@ -172,6 +239,7 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
           :color="selectedStatus === st.val ? 'primary' : 'neutral'"
           :variant="selectedStatus === st.val ? 'solid' : 'ghost'"
           size="xs"
+          class="text-xs px-2.5 py-1"
           @click="selectedStatus = st.val as any"
         >
           {{ st.label }}
@@ -180,87 +248,96 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
     </div>
 
     <!-- Orders Table -->
-    <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <tr>
-              <th class="p-3.5">ID Order</th>
-              <th class="p-3.5">Customer</th>
-              <th class="p-3.5">Event & Kategori</th>
-              <th class="p-3.5">Qty</th>
-              <th class="p-3.5">Total Harga</th>
-              <th class="p-3.5">Pembayaran</th>
-              <th class="p-3.5">Status</th>
-              <th class="p-3.5 text-right">Aksi Verifikasi</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr v-for="order in filteredOrders" :key="order.id" class="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-              <td class="p-3.5 font-mono text-xs font-bold text-gray-900 dark:text-white">
-                <div>{{ order.id }}</div>
-                <div class="text-[10px] text-gray-400 font-sans font-normal">{{ formatDate(order.createdAt) }}</div>
-              </td>
-              <td class="p-3.5">
-                <p class="font-medium text-gray-900 dark:text-white leading-tight">{{ order.customer.name }}</p>
-                <p class="text-xs text-gray-500">{{ order.customer.email }}</p>
-              </td>
-              <td class="p-3.5">
-                <p class="font-semibold text-gray-900 dark:text-white">{{ order.event.title }}</p>
-                <UBadge color="neutral" variant="subtle" size="xs" class="mt-0.5">{{ order.category.name }}</UBadge>
-              </td>
-              <td class="p-3.5 font-semibold text-gray-900 dark:text-white">{{ order.quantity }}x</td>
-              <td class="p-3.5 font-bold text-gray-900 dark:text-white">{{ formatIDR(order.totalPrice) }}</td>
-              <td class="p-3.5">
-                <div v-if="order.paymentProofs?.[0]?.paymentType" class="flex flex-col gap-0.5">
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase">
-                    {{ order.paymentProofs[0].paymentType.replace('_', ' ') }}
-                  </span>
-                  <span v-if="order.paymentProofs[0].paidAt" class="text-[10px] text-emerald-600 dark:text-emerald-400">
-                    Dibayar: {{ formatDate(order.paymentProofs[0].paidAt) }}
-                  </span>
-                </div>
-                <span v-else class="text-xs text-gray-400">Midtrans Gateway</span>
-              </td>
-              <td class="p-3.5">
-                <UBadge
-                  :color="getPaymentBadgeColor(order.status)"
+    <div class="overflow-x-auto rounded-xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
+      <table class="w-full text-left text-xs divide-y divide-gray-200 dark:divide-gray-800">
+        <thead class="bg-gray-50 dark:bg-gray-800/50 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <tr>
+            <th class="px-4 py-3">ID Order</th>
+            <th class="px-4 py-3">Customer</th>
+            <th class="px-4 py-3">Event & Kategori</th>
+            <th class="px-4 py-3">Qty</th>
+            <th class="px-4 py-3">Total Harga</th>
+            <th class="px-4 py-3">Pembayaran</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3 text-right">Aksi Verifikasi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
+          <tr v-if="isLoading">
+            <td colspan="8" class="px-4 py-8 text-center text-gray-400 text-xs">
+              <UIcon name="i-lucide-loader" class="animate-spin w-4 h-4 mx-auto mb-1.5" />
+              Memuat data transaksi...
+            </td>
+          </tr>
+          <tr v-else-if="filteredOrders.length === 0">
+            <td colspan="8" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
+              Tidak ada data transaksi yang ditemukan.
+            </td>
+          </tr>
+          <tr v-for="order in filteredOrders" :key="order.id" class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors">
+            <td class="px-4 py-3 font-mono text-[11px] font-bold text-gray-900 dark:text-white">
+              <div>{{ order.id }}</div>
+              <div class="text-[10px] text-gray-400 font-sans font-normal">{{ formatDate(order.createdAt) }}</div>
+            </td>
+            <td class="px-4 py-3">
+              <p class="font-semibold text-xs text-gray-900 dark:text-white leading-tight">{{ order.customer.name }}</p>
+              <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ order.customer.email }}</p>
+            </td>
+            <td class="px-4 py-3">
+              <p class="font-semibold text-xs text-gray-900 dark:text-white">{{ order.event.title }}</p>
+              <UBadge color="neutral" variant="subtle" size="xs" class="mt-0.5">{{ order.category.name }}</UBadge>
+            </td>
+            <td class="px-4 py-3 font-semibold text-xs text-gray-900 dark:text-white">{{ order.quantity }}x</td>
+            <td class="px-4 py-3 font-bold text-xs text-gray-900 dark:text-white">{{ formatIDR(order.totalPrice) }}</td>
+            <td class="px-4 py-3">
+              <div v-if="order.paymentProofs?.[0]?.paymentType" class="flex flex-col gap-0.5">
+                <span class="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase">
+                  {{ order.paymentProofs[0].paymentType.replace('_', ' ') }}
+                </span>
+                <span v-if="order.paymentProofs[0].paidAt" class="text-[10px] text-emerald-600 dark:text-emerald-400">
+                  Dibayar: {{ formatDate(order.paymentProofs[0].paidAt) }}
+                </span>
+              </div>
+              <span v-else class="text-xs text-gray-400">Midtrans Gateway</span>
+            </td>
+            <td class="px-4 py-3">
+              <UBadge
+                :color="getPaymentBadgeColor(order.status)"
+                variant="soft"
+                size="sm"
+                class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs uppercase"
+              >
+                {{ order.status }}
+              </UBadge>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <div v-if="order.status === 'pending'" class="flex items-center justify-end gap-1.5">
+                <UButton
+                  color="success"
                   variant="soft"
                   size="xs"
-                  class="font-bold px-2 py-0.5 uppercase"
+                  icon="i-lucide-check-circle"
+                  @click="handleVerify(order.id, 'verified')"
                 >
-                  {{ order.status }}
-                </UBadge>
-              </td>
-              <td class="p-3.5 text-right">
-                <div v-if="order.status === 'pending'" class="flex items-center justify-end gap-2">
-                  <UButton
-                    color="success"
-                    variant="soft"
-                    size="xs"
-                    icon="i-lucide-check-circle"
-                    @click="handleVerify(order.id, 'verified')"
-                  >
-                    Setujui
-                  </UButton>
-                  <UButton
-                    color="error"
-                    variant="soft"
-                    size="xs"
-                    icon="i-lucide-x-circle"
-                    @click="handleVerify(order.id, 'rejected')"
-                  >
-                    Tolak
-                  </UButton>
-                </div>
-                <span v-else-if="order.status === 'verified'" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Terverifikasi</span>
-                <span v-else-if="order.status === 'expired'" class="text-xs text-gray-400 font-medium">Kadaluarsa</span>
-                <span v-else class="text-xs text-red-500 font-medium">Ditolak</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                  Setujui
+                </UButton>
+                <UButton
+                  color="error"
+                  variant="soft"
+                  size="xs"
+                  icon="i-lucide-x-circle"
+                  @click="handleVerify(order.id, 'rejected')"
+                >
+                  Tolak
+                </UButton>
+              </div>
+              <span v-else-if="order.status === 'verified'" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Terverifikasi</span>
+              <span v-else-if="order.status === 'expired'" class="text-[11px] text-gray-400 font-medium">Kadaluarsa</span>
+              <span v-else class="text-[11px] text-red-500 font-medium">Ditolak</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>

@@ -18,7 +18,7 @@ async function fetchVenues() {
       venuesList.value = res.data
     }
   } catch {
-    // Keep empty if BE offline
+    // Fallback
   } finally {
     isLoading.value = false
   }
@@ -32,9 +32,14 @@ const filteredVenues = computed(() => {
   if (!search.value) return venuesList.value
   const query = search.value.toLowerCase()
   return venuesList.value.filter(
-    (v) => v.name.toLowerCase().includes(query) || v.address.toLowerCase().includes(query)
+    (v) => v.name.toLowerCase().includes(query) || v.address.toLowerCase().includes(query) || (v.city && v.city.toLowerCase().includes(query))
   )
 })
+
+// KPI Stats Computations
+const totalVenuesCount = computed(() => venuesList.value.length)
+const withMapCount = computed(() => venuesList.value.filter(v => !!v.imageUrl).length)
+const citiesCount = computed(() => new Set(venuesList.value.map(v => v.city || 'Jakarta')).size)
 
 function openCreateModal() {
   editingVenue.value = null
@@ -69,55 +74,106 @@ async function deleteVenue(id?: string) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
           Master Venue & Lokasi Konser
         </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Kelola master gedung, stadium, denah area, dan koordinat lokasi (/api/venues)
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          Kelola master gedung, stadium, denah area, dan lokasi kota (/api/venues)
         </p>
       </div>
 
       <UButton
         color="primary"
         icon="i-lucide-plus-circle"
-        size="md"
-        class="font-semibold shadow-sm"
+        size="sm"
+        class="font-medium text-xs shadow-xs"
         @click="openCreateModal"
       >
         Tambah Venue
       </UButton>
     </div>
 
+    <!-- Stats KPI Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Master Venue</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ totalVenuesCount }}</h3>
+          <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-map-pin" class="w-3 h-3" />
+            Lokasi konser terdaftar
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <UIcon name="i-lucide-building-2" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Denah Area Terpasang</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ withMapCount }}</h3>
+          <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-check-circle" class="w-3 h-3" />
+            Visual layout 9:16
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <UIcon name="i-lucide-map" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between sm:col-span-2 lg:col-span-1">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Cakupan Kota</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ citiesCount }} Kota</h3>
+          <p class="text-[11px] text-blue-600 dark:text-blue-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-navigation" class="w-3 h-3" />
+            Sebaran lokasi acara
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+          <UIcon name="i-lucide-globe" class="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+
     <!-- Search Bar -->
-    <div class="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
+    <div class="p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs">
       <UInput
         v-model="search"
         icon="i-lucide-search"
-        placeholder="Cari nama venue atau alamat..."
-        size="md"
-        class="w-full sm:w-80"
+        placeholder="Cari nama venue, alamat, atau kota..."
+        size="sm"
+        class="w-full sm:w-72 text-xs"
       />
     </div>
 
     <!-- Venues Table -->
-    <div class="overflow-x-auto rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-xs">
+    <div class="overflow-x-auto rounded-xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-xs">
+        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[11px]">
           <tr>
-            <th scope="col" class="px-6 py-4">Denah / Visual</th>
-            <th scope="col" class="px-6 py-4">Nama Venue</th>
-            <th scope="col" class="px-6 py-4">Alamat Lengkap</th>
-            <th scope="col" class="px-6 py-4">Kota</th>
-            <th scope="col" class="px-6 py-4 text-right">Aksi</th>
+            <th scope="col" class="px-4 py-3">Denah / Visual</th>
+            <th scope="col" class="px-4 py-3">Nama Venue</th>
+            <th scope="col" class="px-4 py-3">Alamat Lengkap</th>
+            <th scope="col" class="px-4 py-3">Kota</th>
+            <th scope="col" class="px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
-          <tr v-if="filteredVenues.length === 0">
-            <td colspan="5" class="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
+          <tr v-if="isLoading">
+            <td colspan="5" class="px-4 py-8 text-center text-gray-400 text-xs">
+              <UIcon name="i-lucide-loader" class="animate-spin w-4 h-4 mx-auto mb-1.5" />
+              Memuat data venue...
+            </td>
+          </tr>
+          <tr v-else-if="filteredVenues.length === 0">
+            <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
               Tidak ada venue yang ditemukan.
             </td>
           </tr>
@@ -127,32 +183,32 @@ async function deleteVenue(id?: string) {
             class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
           >
             <!-- Denah preview -->
-            <td class="px-6 py-4 whitespace-nowrap">
-              <div class="w-12 h-16 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
+            <td class="px-4 py-3 whitespace-nowrap">
+              <div class="w-9 h-12 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
                 <img v-if="v.imageUrl" :src="v.imageUrl" :alt="v.name" class="w-full h-full object-cover">
-                <UIcon v-else name="i-lucide-map" class="w-5 h-5 text-gray-400" />
+                <UIcon v-else name="i-lucide-map" class="w-4 h-4 text-gray-400" />
               </div>
             </td>
 
             <!-- Nama -->
-            <td class="px-6 py-4">
-              <div class="font-bold text-gray-900 dark:text-white">{{ v.name }}</div>
+            <td class="px-4 py-3">
+              <div class="font-semibold text-xs text-gray-900 dark:text-white">{{ v.name }}</div>
             </td>
 
             <!-- Alamat -->
-            <td class="px-6 py-4">
-              <div class="text-gray-600 dark:text-gray-300 max-w-sm line-clamp-2">{{ v.address }}</div>
+            <td class="px-4 py-3">
+              <div class="text-gray-600 dark:text-gray-300 max-w-sm line-clamp-2 text-xs">{{ v.address }}</div>
             </td>
 
             <!-- Kota -->
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2.5 py-1 rounded-full text-xs font-medium">
-                {{ v.city }}
+            <td class="px-4 py-3 whitespace-nowrap">
+              <span class="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded-md text-[11px] font-medium">
+                {{ v.city || 'Jakarta' }}
               </span>
             </td>
 
             <!-- Aksi -->
-            <td class="px-6 py-4 whitespace-nowrap text-right">
+            <td class="px-4 py-3 whitespace-nowrap text-right">
               <div class="flex items-center justify-end gap-1">
                 <UButton
                   color="neutral"

@@ -67,7 +67,7 @@ async function fetchArtists() {
       artists.value = res.data
     }
   } catch {
-    // Keep mock data if BE is offline
+    // Keep mock
   }
 }
 
@@ -117,7 +117,7 @@ async function fetchEvents() {
       events.value = res.data
     }
   } catch {
-    // Keep mock data if BE is offline
+    // Keep mock data
   } finally {
     isLoading.value = false
   }
@@ -132,7 +132,7 @@ async function fetchVenues() {
       venues.value = res.data
     }
   } catch {
-    // Keep empty if offline
+    // Keep mock
   }
 }
 
@@ -141,6 +141,11 @@ onMounted(() => {
   fetchArtists()
   fetchVenues()
 })
+
+// KPI Stats Computations
+const totalEventsCount = computed(() => events.value.length)
+const openEventsCount = computed(() => events.value.filter(e => e.status === 'open').length)
+const closedEventsCount = computed(() => events.value.filter(e => e.status === 'closed').length)
 
 const cityOptions = computed(() => {
   const cities = new Set<string>()
@@ -196,17 +201,14 @@ function openEditModal(event: EventItem) {
 async function handleSaveEvent(saved: EventItem) {
   try {
     if (saved.id) {
-      // PUT /api/events/:id
       await request(`/events/${saved.id}`, { method: 'PUT', body: saved })
       const idx = events.value.findIndex(e => e.id === saved.id)
       if (idx !== -1) events.value[idx] = saved
     } else {
-      // POST /api/events
       const res = await request<{ data: EventItem }>('/events', { method: 'POST', body: saved })
       events.value.unshift(res.data || { ...saved, id: `evt-${Date.now()}` })
     }
   } catch {
-    // Fallback local update
     if (saved.id) {
       const idx = events.value.findIndex(e => e.id === saved.id)
       if (idx !== -1) events.value[idx] = saved
@@ -249,14 +251,14 @@ function formatDate(iso: string) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header Page -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
           Manajemen Event Konser
         </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           Kelola daftar konser, venue, tanggal, dan status penjualan tiket (/api/events)
         </p>
       </div>
@@ -264,58 +266,103 @@ function formatDate(iso: string) {
       <UButton
         color="primary"
         icon="i-lucide-plus-circle"
-        size="md"
-        class="font-semibold shadow-sm"
+        size="sm"
+        class="font-medium text-xs shadow-xs"
         @click="openCreateModal"
       >
         Tambah Event
       </UButton>
     </div>
 
+    <!-- Stats KPI Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Event Konser</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ totalEventsCount }}</h3>
+          <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-calendar" class="w-3 h-3" />
+            Jadwal konser terdaftar
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <UIcon name="i-lucide-calendar-range" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Event OPEN (Aktif)</p>
+          <h3 class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 tracking-tight">{{ openEventsCount }}</h3>
+          <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-ticket" class="w-3 h-3" />
+            Penjualan tiket dibuka
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <UIcon name="i-lucide-play-circle" class="w-5 h-5" />
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between sm:col-span-2 lg:col-span-1">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Event CLOSED (Selesai/Tutup)</p>
+          <h3 class="text-xl font-bold text-gray-700 dark:text-gray-300 mt-0.5 tracking-tight">{{ closedEventsCount }}</h3>
+          <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-pause-circle" class="w-3 h-3" />
+            Penjualan ditutup
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center">
+          <UIcon name="i-lucide-lock" class="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+
     <!-- Filters Bar -->
-    <div class="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row items-center gap-3">
+    <div class="p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex flex-col sm:flex-row items-center gap-3">
       <div class="flex-1 w-full">
         <UInput
           v-model="search"
           icon="i-lucide-search"
           placeholder="Cari nama event atau venue..."
-          size="md"
-          class="w-full"
+          size="sm"
+          class="w-full text-xs"
         />
       </div>
 
-      <div class="flex items-center gap-3 w-full sm:w-auto">
+      <div class="flex items-center gap-2.5 w-full sm:w-auto">
         <USelect
           v-model="selectedCity"
           :items="cityOptions"
-          size="md"
-          class="w-full sm:w-40"
+          size="sm"
+          class="w-full sm:w-36 text-xs"
         />
         <USelect
           v-model="selectedStatus"
           :items="statusOptions"
-          size="md"
-          class="w-full sm:w-40"
+          size="sm"
+          class="w-full sm:w-36 text-xs"
         />
       </div>
     </div>
 
     <!-- Events Table -->
-    <div class="overflow-x-auto rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-xs">
+    <div class="overflow-x-auto rounded-xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-xs">
+        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[11px]">
           <tr>
-            <th scope="col" class="px-6 py-4">Event & Promoter</th>
-            <th scope="col" class="px-6 py-4">Artis / Performer</th>
-            <th scope="col" class="px-6 py-4">Waktu</th>
-            <th scope="col" class="px-6 py-4">Lokasi & Venue</th>
-            <th scope="col" class="px-6 py-4 text-center">Status</th>
-            <th scope="col" class="px-6 py-4 text-right">Aksi</th>
+            <th scope="col" class="px-4 py-3">Event & Promoter</th>
+            <th scope="col" class="px-4 py-3">Artis / Performer</th>
+            <th scope="col" class="px-4 py-3">Waktu</th>
+            <th scope="col" class="px-4 py-3">Lokasi & Venue</th>
+            <th scope="col" class="px-4 py-3 text-center">Status</th>
+            <th scope="col" class="px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
           <tr v-if="filteredEvents.length === 0">
-            <td colspan="6" class="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
+            <td colspan="6" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
               Tidak ada event yang ditemukan.
             </td>
           </tr>
@@ -325,63 +372,61 @@ function formatDate(iso: string) {
             class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
           >
             <!-- Event & Promoter -->
-            <td class="px-6 py-4">
-              <div class="font-bold text-gray-900 dark:text-white">{{ event.title }}</div>
-              <div class="text-xs text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wider mt-0.5">
+            <td class="px-4 py-3">
+              <div class="font-semibold text-xs text-gray-900 dark:text-white">{{ event.title }}</div>
+              <div class="text-[10px] text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wider mt-0.5">
                 {{ event.publisherName }}
               </div>
             </td>
             
             <!-- Artist -->
-            <td class="px-6 py-4">
-              <span class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2.5 py-1 rounded-full text-xs font-medium">
-                <UIcon name="i-lucide-music" class="w-3.5 h-3.5 text-gray-400" />
+            <td class="px-4 py-3 whitespace-nowrap">
+              <span class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded-md text-[11px] font-medium">
+                <UIcon name="i-lucide-music" class="w-3 h-3 text-gray-400" />
                 {{ getArtistName(event.artistId) }}
               </span>
             </td>
             
             <!-- Date/Time -->
-            <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
-              <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-calendar" class="w-4 h-4 text-gray-400" />
+            <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400 text-xs">
+              <div class="flex items-center gap-1.5">
+                <UIcon name="i-lucide-calendar" class="w-3.5 h-3.5 text-gray-400" />
                 <span>{{ formatDate(event.dateTime) }}</span>
               </div>
             </td>
             
             <!-- Venue / City -->
-            <td class="px-6 py-4">
-              <div class="text-gray-900 dark:text-white font-medium truncate max-w-xs">{{ getVenueName(event) }}</div>
-              <div class="text-xs text-gray-400 mt-0.5">{{ getVenueCity(event) }}</div>
+            <td class="px-4 py-3">
+              <div class="text-gray-900 dark:text-white font-medium truncate max-w-xs text-xs">{{ getVenueName(event) }}</div>
+              <div class="text-[11px] text-gray-400 mt-0.5">{{ getVenueCity(event) }}</div>
             </td>
             
             <!-- Status Badge -->
-            <td class="px-6 py-4 text-center whitespace-nowrap">
+            <td class="px-4 py-3 text-center whitespace-nowrap">
               <UBadge
                 :color="event.status === 'open' ? 'success' : 'neutral'"
                 variant="soft"
-                size="xs"
-                class="font-bold px-2 py-0.5"
+                size="sm"
+                class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs uppercase"
               >
                 {{ event.status === 'open' ? 'OPEN' : 'CLOSED' }}
               </UBadge>
             </td>
             
             <!-- Actions -->
-            <td class="px-6 py-4 whitespace-nowrap text-right">
-              <div class="flex items-center justify-end gap-2">
-                <!-- Manage categories button -->
+            <td class="px-4 py-3 whitespace-nowrap text-right">
+              <div class="flex items-center justify-end gap-1.5">
                 <UButton
                   color="neutral"
                   variant="outline"
                   icon="i-lucide-ticket"
                   size="xs"
-                  class="font-medium"
+                  class="font-medium text-[11px]"
                   @click="openCategoryManager(event)"
                 >
-                  Kategori Tiket
+                  Kategori
                 </UButton>
                 
-                <!-- Toggle status sale button -->
                 <UButton
                   color="neutral"
                   variant="ghost"
@@ -391,7 +436,6 @@ function formatDate(iso: string) {
                   @click="toggleStatus(event)"
                 />
                 
-                <!-- Edit & Delete -->
                 <UButton
                   color="neutral"
                   variant="ghost"
