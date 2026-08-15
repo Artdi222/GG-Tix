@@ -154,8 +154,15 @@ async function saveAdmin() {
     if (editingAdmin.value) {
       await request(`/users/admins/${editingAdmin.value.id}`, { method: 'PUT', body: payload })
       const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      if (idx !== -1) {
-        admins.value[idx] = { ...admins.value[idx], ...payload }
+      if (idx !== -1 && admins.value[idx]) {
+        const existing = admins.value[idx]
+        admins.value[idx] = {
+          id: existing.id,
+          name: payload.name,
+          email: payload.email,
+          role: payload.role,
+          createdAt: existing.createdAt
+        }
       }
     } else {
       const res = await request<{ data: AdminUser }>('/users/admins', {
@@ -178,8 +185,15 @@ async function saveAdmin() {
     errorMsg.value = err?.data?.message || 'Gagal menyimpan data admin.'
     if (editingAdmin.value) {
       const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      if (idx !== -1) {
-        admins.value[idx] = { ...admins.value[idx], name: adminForm.name, email: adminForm.email, role: adminForm.role }
+      if (idx !== -1 && admins.value[idx]) {
+        const existing = admins.value[idx]
+        admins.value[idx] = {
+          id: existing.id,
+          name: adminForm.name,
+          email: adminForm.email,
+          role: adminForm.role,
+          createdAt: existing.createdAt
+        }
       }
     } else {
       admins.value.unshift({
