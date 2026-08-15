@@ -14,6 +14,7 @@ import dashboardRoute from "./routes/dashboard";
 import uploadRoute from "./routes/uploads";
 import venueRoute from "./routes/venues";
 import usersRoute from "./routes/users";
+import ticketRoute from "./routes/tickets";
 
 assertB2Configured();
 
@@ -48,6 +49,7 @@ api.route("/dashboard", dashboardRoute);
 api.route("/uploads", uploadRoute);
 api.route("/venues", venueRoute);
 api.route("/users", usersRoute);
+api.route("/tickets", ticketRoute);
 
 // Mount under /api prefix
 app.route("/api", api);

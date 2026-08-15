@@ -155,6 +155,7 @@ export const tickets = pgTable("tickets", {
     .references(() => orders.id, { onDelete: "cascade" }),
   qrCodeValue: varchar("qr_code_value", { length: 255 }).notNull().unique(),
   checkedIn: boolean("checked_in").notNull().default(false),
+  checkedInAt: timestamp("checked_in_at"),
 });
 
 // relations
@@ -187,6 +188,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   verifiedByAdmin: one(admins, { fields: [orders.verifiedBy], references: [admins.id] }),
   paymentProofs: many(paymentProofs),
   tickets: many(tickets),
+}));
+
+export const ticketsRelations = relations(tickets, ({ one }) => ({
+  order: one(orders, { fields: [tickets.orderId], references: [orders.id] }),
 }));
 
 export const customersRelations = relations(customers, ({ many }) => ({
