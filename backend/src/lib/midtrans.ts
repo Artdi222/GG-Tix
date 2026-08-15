@@ -56,10 +56,10 @@ export function isMidtransConfigured(): boolean {
 
 export function assertMidtransConfigured(): void {
   if (!isMidtransConfigured()) {
-    console.warn("⚠️  MIDTRANS_SERVER_KEY not set — automated payment features disabled");
+    console.warn("MIDTRANS_SERVER_KEY not set — automated payment features disabled");
   } else {
     const mode = process.env.MIDTRANS_IS_PRODUCTION === "true" ? "PRODUCTION" : "SANDBOX";
-    console.log(`💳 Midtrans configured (${mode})`);
+    console.log(`Midtrans configured (${mode})`);
   }
 }
 

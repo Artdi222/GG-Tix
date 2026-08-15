@@ -27,10 +27,10 @@ setInterval(async () => {
   try {
     const res = await expireOverduePendingOrders();
     if (res.expiredCount > 0) {
-      console.log(`⏱️ [Auto-Expire] Swept ${res.expiredCount} overdue pending orders:`, res.orderIds);
+      console.log(`[Auto-Expire] Swept ${res.expiredCount} overdue pending orders:`, res.orderIds);
     }
   } catch (err) {
-    console.error("❌ [Auto-Expire] Error sweeping overdue orders:", err);
+    console.error("[Auto-Expire] Error sweeping overdue orders:", err);
   }
 }, 5 * 60 * 1000);
 
