@@ -250,20 +250,20 @@ const categorySegments = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-8 pb-10">
+  <div class="space-y-6 pb-10">
     <!-- Header Title & Filter Controls -->
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
           Dashboard Analytics Penjualan Tiket
         </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           Pantau tren revenue, kuantitas tiket, dan distribusi kategori secara terpisah (GGT-02)
         </p>
       </div>
 
       <!-- Filter Controls (DASH-06) -->
-      <div class="flex flex-wrap items-center gap-2.5 p-2 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs">
         <div class="flex items-center gap-1">
           <UButton
             v-for="preset in [
@@ -275,7 +275,7 @@ const categorySegments = computed(() => {
             :color="presetDays === preset.val ? 'primary' : 'neutral'"
             :variant="presetDays === preset.val ? 'solid' : 'ghost'"
             size="xs"
-            class="font-medium"
+            class="font-medium text-xs px-2.5 py-1"
             @click="presetDays = preset.val"
           >
             {{ preset.label }}
@@ -284,7 +284,7 @@ const categorySegments = computed(() => {
             :color="presetDays === 'custom' ? 'primary' : 'neutral'"
             :variant="presetDays === 'custom' ? 'solid' : 'ghost'"
             size="xs"
-            class="font-medium"
+            class="font-medium text-xs px-2.5 py-1"
             @click="presetDays = 'custom'"
           >
             Custom Range
@@ -293,9 +293,9 @@ const categorySegments = computed(() => {
 
         <!-- Custom Date Range Inputs -->
         <div v-if="presetDays === 'custom'" class="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-800 sm:pl-2 w-full sm:w-auto">
-          <UInput v-model="fromDate" type="date" size="xs" placeholder="Dari" class="w-32" />
+          <UInput v-model="fromDate" type="date" size="xs" placeholder="Dari" class="w-28 text-xs" />
           <span class="text-xs text-gray-400">s/d</span>
-          <UInput v-model="toDate" type="date" size="xs" placeholder="Sampai" class="w-32" />
+          <UInput v-model="toDate" type="date" size="xs" placeholder="Sampai" class="w-28 text-xs" />
           <UButton color="primary" size="xs" icon="i-lucide-filter" @click="fetchDashboardData">
             Terapkan
           </UButton>
@@ -310,75 +310,75 @@ const categorySegments = computed(() => {
       variant="soft"
       icon="i-lucide-alert-circle"
       :title="errorMessage"
-      class="rounded-xl shadow-sm"
+      class="rounded-xl shadow-xs text-xs"
     />
 
     <!-- KPI STATS CARDS GRID (DASH-02) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
       <!-- Total Revenue -->
-      <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
-        <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Pendapatan</p>
-          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-            <UIcon name="i-lucide-dollar-sign" class="w-5 h-5" />
-          </div>
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Pendapatan</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">
+            {{ formatIDR(summary?.overview.totalRevenue || 0) }}
+          </p>
+          <p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 flex items-center gap-1">
+            <UIcon name="i-lucide-trending-up" class="w-3 h-3" />
+            Status Verified
+          </p>
         </div>
-        <p class="text-2xl font-black text-gray-900 dark:text-white mt-3 tracking-tight">
-          {{ formatIDR(summary?.overview.totalRevenue || 0) }}
-        </p>
-        <p class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-2 flex items-center gap-1">
-          <UIcon name="i-lucide-trending-up" class="w-3.5 h-3.5" />
-          Status Verified
-        </p>
+        <div class="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+          <UIcon name="i-lucide-dollar-sign" class="w-5 h-5" />
+        </div>
       </div>
 
       <!-- Tiket Terjual -->
-      <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
-        <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tiket Terjual</p>
-          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-            <UIcon name="i-lucide-ticket" class="w-5 h-5" />
-          </div>
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Tiket Terjual</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">
+            {{ (summary?.overview.totalTicketsSold || 0).toLocaleString('id-ID') }} <span class="text-xs font-normal text-gray-400">tiket</span>
+          </p>
+          <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+            Terverifikasi dari order publik
+          </p>
         </div>
-        <p class="text-2xl font-black text-gray-900 dark:text-white mt-3 tracking-tight">
-          {{ (summary?.overview.totalTicketsSold || 0).toLocaleString('id-ID') }} <span class="text-xs font-normal text-gray-400">tiket</span>
-        </p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Terverifikasi dari order publik
-        </p>
+        <div class="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+          <UIcon name="i-lucide-ticket" class="w-5 h-5" />
+        </div>
       </div>
 
       <!-- Total Event -->
-      <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
-        <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Event Konser</p>
-          <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
-            <UIcon name="i-lucide-calendar" class="w-5 h-5" />
-          </div>
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Event Konser</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">
+            {{ summary?.overview.totalEvents || 0 }} <span class="text-xs font-normal text-gray-400">event</span>
+          </p>
+          <p class="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
+            {{ summary?.overview.upcomingShows || 0 }} event aktif mendatang
+          </p>
         </div>
-        <p class="text-2xl font-black text-gray-900 dark:text-white mt-3 tracking-tight">
-          {{ summary?.overview.totalEvents || 0 }} <span class="text-xs font-normal text-gray-400">event</span>
-        </p>
-        <p class="text-xs text-purple-600 dark:text-purple-400 font-semibold mt-2">
-          {{ summary?.overview.upcomingShows || 0 }} event aktif mendatang
-        </p>
+        <div class="w-9 h-9 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+          <UIcon name="i-lucide-calendar" class="w-5 h-5" />
+        </div>
       </div>
 
       <!-- Pending Verifications -->
-      <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
-        <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Antrian Verifikasi</p>
-          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-            <UIcon name="i-lucide-clock" class="w-5 h-5" />
-          </div>
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Antrian Verifikasi</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">
+            {{ summary?.overview.pendingVerifications || 0 }} <span class="text-xs font-normal text-gray-400">order</span>
+          </p>
+          <p class="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-0.5 flex items-center gap-1">
+            <UIcon name="i-lucide-alert-triangle" class="w-3 h-3" />
+            Verifikasi menunggu
+          </p>
         </div>
-        <p class="text-2xl font-black text-gray-900 dark:text-white mt-3 tracking-tight">
-          {{ summary?.overview.pendingVerifications || 0 }} <span class="text-xs font-normal text-gray-400">order</span>
-        </p>
-        <p class="text-xs text-amber-600 dark:text-amber-400 font-medium mt-2 flex items-center gap-1">
-          <UIcon name="i-lucide-alert-triangle" class="w-3.5 h-3.5" />
-          Verifikasi menunggu dikerjakan
-        </p>
+        <div class="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+          <UIcon name="i-lucide-clock" class="w-5 h-5" />
+        </div>
       </div>
     </div>
 

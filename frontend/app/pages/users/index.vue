@@ -69,7 +69,6 @@ async function loadCustomers() {
     })
     customers.value = res?.data ?? DUMMY_CUSTOMERS
   } catch {
-    // Fallback local mock data when offline
     customers.value = DUMMY_CUSTOMERS
   } finally {
     customersLoading.value = false
@@ -84,7 +83,6 @@ async function loadAdmins() {
     })
     admins.value = res?.data ?? DUMMY_ADMINS
   } catch {
-    // Fallback local mock data when offline
     admins.value = DUMMY_ADMINS
   } finally {
     adminsLoading.value = false
@@ -178,7 +176,6 @@ async function saveAdmin() {
     loadAdmins()
   } catch (err: any) {
     errorMsg.value = err?.data?.message || 'Gagal menyimpan data admin.'
-    // Local fallback update if offline
     if (editingAdmin.value) {
       const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
       if (idx !== -1) {
@@ -204,7 +201,7 @@ async function deleteAdmin(id: string) {
   try {
     await request(`/users/admins/${id}`, { method: 'DELETE' })
   } catch {
-    // Local delete fallback
+    // Fallback
   }
   admins.value = admins.value.filter((a) => a.id !== id)
 }
@@ -218,25 +215,21 @@ function formatDate(iso: string) {
   })
 }
 
-watch(activeTab, (newTab) => {
-  if (newTab === 'customers') loadCustomers()
-  else loadAdmins()
-})
-
 onMounted(() => {
   loadCustomers()
+  loadAdmins()
 })
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header Page -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
           Manajemen Data Pengguna
         </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           Kelola data akun pelanggan (customer) dan tim admin GGTIX (/api/users)
         </p>
       </div>
@@ -246,8 +239,8 @@ onMounted(() => {
         v-if="activeTab === 'admins' && user?.role === 'super_admin'"
         color="primary"
         icon="i-lucide-user-plus"
-        size="md"
-        class="font-semibold shadow-sm"
+        size="sm"
+        class="font-medium text-xs shadow-xs"
         @click="openAdminModal()"
       >
         Tambah Admin
@@ -255,128 +248,113 @@ onMounted(() => {
     </div>
 
     <!-- Stats Summary KPI Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm flex items-center justify-between">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Pelanggan</p>
-          <h3 class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">{{ customers.length }}</h3>
-          <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
-            <UIcon name="i-lucide-trending-up" class="w-3.5 h-3.5" />
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Pelanggan</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ customers.length }}</h3>
+          <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-trending-up" class="w-3 h-3" />
             Terdaftar di platform
           </p>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-          <UIcon name="i-lucide-users" class="w-6 h-6" />
+        <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <UIcon name="i-lucide-users" class="w-5 h-5" />
         </div>
       </div>
 
-      <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm flex items-center justify-between">
+      <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tim Admin & Staff</p>
-          <h3 class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">{{ admins.length }}</h3>
-          <p class="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
-            <UIcon name="i-lucide-shield-check" class="w-3.5 h-3.5" />
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Tim Admin & Staff</p>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight">{{ admins.length }}</h3>
+          <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium flex items-center gap-1">
+            <UIcon name="i-lucide-shield-check" class="w-3 h-3" />
             Pengelola internal
           </p>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-          <UIcon name="i-lucide-user-cog" class="w-6 h-6" />
-        </div>
-      </div>
-
-      <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm flex items-center justify-between sm:col-span-2 lg:col-span-1">
-        <div>
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Status Hak Akses</p>
-          <h3 class="text-lg font-bold text-gray-900 dark:text-white mt-1">
-            {{ user?.role === 'super_admin' ? 'Super Admin' : 'Staff Admin' }}
-          </h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {{ user?.email || 'admin@ggtix.com' }}
-          </p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-          <UIcon name="i-lucide-key-round" class="w-6 h-6" />
+        <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <UIcon name="i-lucide-user-cog" class="w-5 h-5" />
         </div>
       </div>
     </div>
 
-    <!-- Navigation Pills / Tabs -->
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm">
+    <!-- Navigation Pills / Tabs & Search -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs">
       <!-- Tabs Switcher -->
-      <div class="inline-flex p-1 rounded-xl bg-gray-100 dark:bg-gray-800 w-full sm:w-auto">
+      <div class="inline-flex p-1 rounded-lg bg-gray-100 dark:bg-gray-800 w-full sm:w-auto">
         <button
           type="button"
           :class="[
-            'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all',
+            'flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all',
             activeTab === 'customers'
-              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
+              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-xs'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
           ]"
           @click="activeTab = 'customers'"
         >
-          <UIcon name="i-lucide-users" class="w-4 h-4 text-emerald-500" />
+          <UIcon name="i-lucide-users" class="w-3.5 h-3.5 text-emerald-500" />
           <span>Data Pelanggan ({{ customers.length }})</span>
         </button>
 
         <button
           type="button"
           :class="[
-            'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all',
+            'flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all',
             activeTab === 'admins'
-              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
+              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-xs'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
           ]"
           @click="activeTab = 'admins'"
         >
-          <UIcon name="i-lucide-shield-check" class="w-4 h-4 text-amber-500" />
+          <UIcon name="i-lucide-shield-check" class="w-3.5 h-3.5 text-amber-500" />
           <span>Tim Admin ({{ admins.length }})</span>
         </button>
       </div>
 
       <!-- Search Input -->
-      <div class="w-full sm:w-72">
+      <div class="w-full sm:w-64">
         <UInput
           v-if="activeTab === 'customers'"
           v-model="customerSearch"
           icon="i-lucide-search"
-          placeholder="Cari nama atau email pelanggan..."
-          size="md"
-          class="w-full"
+          placeholder="Cari nama / email..."
+          size="sm"
+          class="w-full text-xs"
           @input="debouncedLoadCustomers"
         />
         <UInput
           v-else
           v-model="adminSearch"
           icon="i-lucide-search"
-          placeholder="Cari nama atau email admin..."
-          size="md"
-          class="w-full"
+          placeholder="Cari nama / email admin..."
+          size="sm"
+          class="w-full text-xs"
           @input="debouncedLoadAdmins"
         />
       </div>
     </div>
 
     <!-- TAB 1: DATA PELANGGAN -->
-    <div v-if="activeTab === 'customers'" class="space-y-4">
-      <div class="overflow-x-auto rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-sm">
-          <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-xs">
+    <div v-if="activeTab === 'customers'">
+      <div class="overflow-x-auto rounded-xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-xs">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[11px]">
             <tr>
-              <th scope="col" class="px-6 py-4">Pelanggan</th>
-              <th scope="col" class="px-6 py-4">Alamat Email</th>
-              <th scope="col" class="px-6 py-4">Tipe Akun</th>
-              <th scope="col" class="px-6 py-4 text-right">Tanggal Terdaftar</th>
+              <th scope="col" class="px-4 py-3">Pelanggan</th>
+              <th scope="col" class="px-4 py-3">Alamat Email</th>
+              <th scope="col" class="px-4 py-3">Tipe Akun</th>
+              <th scope="col" class="px-4 py-3 text-right">Tanggal Terdaftar</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
             <tr v-if="customersLoading">
-              <td colspan="4" class="px-6 py-10 text-center text-gray-400">
-                <UIcon name="i-lucide-loader" class="animate-spin w-5 h-5 mx-auto mb-2" />
+              <td colspan="4" class="px-4 py-8 text-center text-gray-400 text-xs">
+                <UIcon name="i-lucide-loader" class="animate-spin w-4 h-4 mx-auto mb-1.5" />
                 Memuat data pelanggan...
               </td>
             </tr>
             <tr v-else-if="filteredCustomers.length === 0">
-              <td colspan="4" class="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
+              <td colspan="4" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
                 Tidak ada data pelanggan yang ditemukan.
               </td>
             </tr>
@@ -385,28 +363,25 @@ onMounted(() => {
               :key="customer.id"
               class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
             >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center gap-3">
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
                   <UAvatar
                     :alt="customer.name"
-                    size="md"
-                    class="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold"
+                    size="sm"
+                    class="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs"
                   />
-                  <div>
-                    <div class="font-bold text-gray-900 dark:text-white">{{ customer.name }}</div>
-                    <div class="text-xs text-gray-400">ID: {{ customer.id }}</div>
-                  </div>
+                  <div class="font-semibold text-xs text-gray-900 dark:text-white">{{ customer.name }}</div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
+              <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-300 text-xs">
                 {{ customer.email }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <UBadge color="success" variant="soft" size="xs" class="font-semibold">
+              <td class="px-4 py-3 whitespace-nowrap">
+                <UBadge color="success" variant="soft" size="sm" class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs">
                   Customer
                 </UBadge>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-gray-500 dark:text-gray-400">
+              <td class="px-4 py-3 whitespace-nowrap text-right text-gray-500 dark:text-gray-400 text-xs">
                 {{ formatDate(customer.createdAt) }}
               </td>
             </tr>
@@ -416,27 +391,27 @@ onMounted(() => {
     </div>
 
     <!-- TAB 2: TIM ADMIN -->
-    <div v-if="activeTab === 'admins'" class="space-y-4">
-      <div class="overflow-x-auto rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-sm">
-          <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-xs">
+    <div v-if="activeTab === 'admins'">
+      <div class="overflow-x-auto rounded-xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-xs">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[11px]">
             <tr>
-              <th scope="col" class="px-6 py-4">Anggota Tim Admin</th>
-              <th scope="col" class="px-6 py-4">Email</th>
-              <th scope="col" class="px-6 py-4">Hak Akses (Role)</th>
-              <th scope="col" class="px-6 py-4">Terdaftar</th>
-              <th v-if="user?.role === 'super_admin'" scope="col" class="px-6 py-4 text-right">Aksi</th>
+              <th scope="col" class="px-4 py-3">Anggota Tim Admin</th>
+              <th scope="col" class="px-4 py-3">Email</th>
+              <th scope="col" class="px-4 py-3">Hak Akses (Role)</th>
+              <th scope="col" class="px-4 py-3">Terdaftar</th>
+              <th v-if="user?.role === 'super_admin'" scope="col" class="px-4 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
             <tr v-if="adminsLoading">
-              <td colspan="5" class="px-6 py-10 text-center text-gray-400">
-                <UIcon name="i-lucide-loader" class="animate-spin w-5 h-5 mx-auto mb-2" />
+              <td colspan="5" class="px-4 py-8 text-center text-gray-400 text-xs">
+                <UIcon name="i-lucide-loader" class="animate-spin w-4 h-4 mx-auto mb-1.5" />
                 Memuat data admin...
               </td>
             </tr>
             <tr v-else-if="filteredAdmins.length === 0">
-              <td colspan="5" class="px-6 py-10 text-center text-gray-400 dark:text-gray-500">
+              <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
                 Tidak ada data admin yang ditemukan.
               </td>
             </tr>
@@ -445,41 +420,38 @@ onMounted(() => {
               :key="admin.id"
               class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
             >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center gap-3">
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
                   <UAvatar
                     :alt="admin.name"
-                    size="md"
+                    size="sm"
                     :class="[
-                      'font-bold',
+                      'font-bold text-xs',
                       admin.role === 'super_admin'
                         ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
                         : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
                     ]"
                   />
-                  <div>
-                    <div class="font-bold text-gray-900 dark:text-white">{{ admin.name }}</div>
-                    <div class="text-xs text-gray-400">ID: {{ admin.id }}</div>
-                  </div>
+                  <div class="font-semibold text-xs text-gray-900 dark:text-white">{{ admin.name }}</div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
+              <td class="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-300 text-xs">
                 {{ admin.email }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <UBadge
                   :color="admin.role === 'super_admin' ? 'warning' : 'info'"
                   variant="soft"
-                  size="xs"
-                  class="font-bold"
+                  size="sm"
+                  class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs"
                 >
                   {{ admin.role === 'super_admin' ? 'Super Admin' : 'Staff Admin' }}
                 </UBadge>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+              <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400 text-xs">
                 {{ formatDate(admin.createdAt) }}
               </td>
-              <td v-if="user?.role === 'super_admin'" class="px-6 py-4 whitespace-nowrap text-right">
+              <td v-if="user?.role === 'super_admin'" class="px-4 py-3 whitespace-nowrap text-right">
                 <div class="flex items-center justify-end gap-1">
                   <UButton
                     color="neutral"
@@ -510,7 +482,7 @@ onMounted(() => {
       description="Isi form untuk membuat atau mengubah akun tim admin."
     >
       <template #body>
-        <div class="space-y-4">
+        <div class="space-y-3.5 text-xs">
           <UAlert
             v-if="errorMsg"
             color="error"
@@ -520,30 +492,31 @@ onMounted(() => {
           />
 
           <UFormField label="Nama Lengkap" required>
-            <UInput v-model="adminForm.name" placeholder="Contoh: Budi Santoso" class="w-full" />
+            <UInput v-model="adminForm.name" placeholder="Contoh: Budi Santoso" size="sm" class="w-full text-xs" />
           </UFormField>
 
           <UFormField label="Alamat Email" required>
-            <UInput v-model="adminForm.email" type="email" placeholder="budi@ggtix.com" class="w-full" />
+            <UInput v-model="adminForm.email" type="email" placeholder="budi@ggtix.com" size="sm" class="w-full text-xs" />
           </UFormField>
 
           <UFormField :label="editingAdmin ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Password'" :required="!editingAdmin">
-            <UInput v-model="adminForm.password" type="password" placeholder="••••••••" class="w-full" />
+            <UInput v-model="adminForm.password" type="password" placeholder="••••••••" size="sm" class="w-full text-xs" />
           </UFormField>
 
           <UFormField label="Role / Hak Akses" required>
-            <USelect v-model="adminForm.role" :items="roleOptions" class="w-full" />
+            <USelect v-model="adminForm.role" :items="roleOptions" size="sm" class="w-full text-xs" />
           </UFormField>
         </div>
       </template>
 
       <template #footer>
         <div class="flex items-center justify-end gap-2 w-full">
-          <UButton color="neutral" variant="outline" @click="isModalOpen = false">
+          <UButton color="neutral" variant="outline" size="sm" @click="isModalOpen = false">
             Batal
           </UButton>
           <UButton
             :loading="isSaving"
+            size="sm"
             class="bg-[#1B1330] hover:bg-[#2A1F49] text-white"
             @click="saveAdmin"
           >
