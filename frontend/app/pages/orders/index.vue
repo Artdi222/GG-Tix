@@ -28,6 +28,15 @@ const selectedStatus = ref<'ALL' | 'pending' | 'verified' | 'rejected' | 'expire
 const search = ref('')
 const isLoading = ref(false)
 
+// Ticket Modal State
+const isTicketModalOpen = ref(false)
+const selectedOrderForTickets = ref<OrderItem | null>(null)
+
+function openTicketsModal(order: OrderItem) {
+  selectedOrderForTickets.value = order
+  isTicketModalOpen.value = true
+}
+
 const orders = ref<OrderItem[]>([
   {
     id: 'ord-1001',
@@ -151,7 +160,7 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
           Verifikasi Transaksi & Order
         </h1>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          Daftar pemesanan tiket customer, status Midtrans Gateway & verifikasi order (/api/orders)
+          Daftar pemesanan tiket customer, status Midtrans Gateway & penerbitan e-tiket (/api/orders)
         </p>
       </div>
 
@@ -193,7 +202,7 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
           <h3 class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 tracking-tight">{{ verifiedCount }}</h3>
           <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium flex items-center gap-1">
             <UIcon name="i-lucide-check-circle-2" class="w-3 h-3" />
-            Pembayaran sah
+            E-Tiket Terbit
           </p>
         </div>
         <div class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
@@ -223,7 +232,7 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
         icon="i-lucide-search"
         placeholder="Cari ID Order, customer, atau event..."
         size="sm"
-        class="w-full sm:w-80 text-xs"
+        class="w-full sm:w-72 text-xs"
       />
 
       <div class="flex flex-wrap items-center gap-1.5">
@@ -259,7 +268,7 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
             <th class="px-4 py-3">Total Harga</th>
             <th class="px-4 py-3">Pembayaran</th>
             <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3 text-right">Aksi Verifikasi</th>
+            <th class="px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
@@ -291,14 +300,14 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
             <td class="px-4 py-3 font-bold text-xs text-gray-900 dark:text-white">{{ formatIDR(order.totalPrice) }}</td>
             <td class="px-4 py-3">
               <div v-if="order.paymentProofs?.[0]?.paymentType" class="flex flex-col gap-0.5">
-                <span class="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase">
+                <span class="text-[11px] font-semibold text-gray-800 dark:text-gray-200 uppercase">
                   {{ order.paymentProofs[0].paymentType.replace('_', ' ') }}
                 </span>
                 <span v-if="order.paymentProofs[0].paidAt" class="text-[10px] text-emerald-600 dark:text-emerald-400">
                   Dibayar: {{ formatDate(order.paymentProofs[0].paidAt) }}
                 </span>
               </div>
-              <span v-else class="text-xs text-gray-400">Midtrans Gateway</span>
+              <span v-else class="text-[11px] text-gray-400">Midtrans Gateway</span>
             </td>
             <td class="px-4 py-3">
               <UBadge
@@ -331,7 +340,18 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
                   Tolak
                 </UButton>
               </div>
-              <span v-else-if="order.status === 'verified'" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Terverifikasi</span>
+              <div v-else-if="order.status === 'verified'" class="flex items-center justify-end gap-1.5">
+                <UButton
+                  color="primary"
+                  variant="soft"
+                  size="xs"
+                  icon="i-lucide-qr-code"
+                  class="font-medium text-[11px]"
+                  @click="openTicketsModal(order)"
+                >
+                  E-Tiket
+                </UButton>
+              </div>
               <span v-else-if="order.status === 'expired'" class="text-[11px] text-gray-400 font-medium">Kadaluarsa</span>
               <span v-else class="text-[11px] text-red-500 font-medium">Ditolak</span>
             </td>
@@ -339,5 +359,12 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
         </tbody>
       </table>
     </div>
+
+    <!-- Order Tickets Modal Component (GGT-05) -->
+    <OrderTicketsModal
+      v-model:open="isTicketModalOpen"
+      :order-id="selectedOrderForTickets?.id"
+      :order-data="selectedOrderForTickets"
+    />
   </div>
 </template>
