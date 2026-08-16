@@ -17,6 +17,8 @@ import {
   events,
   ticketCategories,
   orders,
+  tickets,
+  paymentProofs,
 } from "./schema";
 
 async function seed() {
@@ -369,8 +371,72 @@ async function seed() {
     },
   ];
 
-  await db.insert(orders).values(orderData);
+  const insertedOrders = await db.insert(orders).values(orderData).returning();
   console.log("  8 sample orders created (5 verified, 2 pending, 1 rejected)");
+
+  // 7. Seed Tickets & Payment Proofs for Orders
+  const paymentMethods = [
+    { type: "qris", status: "settlement" },
+    { type: "bank_transfer", status: "pending" },
+    { type: "gopay", status: "settlement" },
+    { type: "bca_va", status: "settlement" },
+    { type: "qris", status: "pending" },
+    { type: "bni_va", status: "deny" },
+    { type: "shopeepay", status: "settlement" },
+    { type: "echannel", status: "settlement" },
+  ];
+
+  const ticketsToInsert: Array<{
+    orderId: string;
+    qrCodeValue: string;
+    checkedIn: boolean;
+    checkedInAt?: Date | null;
+  }> = [];
+
+  const paymentProofsToInsert: Array<{
+    orderId: string;
+    paymentType: string;
+    transactionStatus: string;
+    midtransTransactionId: string;
+    paidAt?: Date | null;
+  }> = [];
+
+  insertedOrders.forEach((ord, index) => {
+    const pm = paymentMethods[index % paymentMethods.length];
+    
+    // Add Payment Proof
+    paymentProofsToInsert.push({
+      orderId: ord.id,
+      paymentType: pm.type,
+      transactionStatus: ord.status === "verified" ? "settlement" : ord.status === "rejected" ? "deny" : "pending",
+      midtransTransactionId: `midtrans-demo-${crypto.randomUUID().slice(0, 8)}`,
+      paidAt: ord.status === "verified" ? (ord.verifiedAt || new Date()) : null,
+    });
+
+    // Add Tickets if verified
+    if (ord.status === "verified") {
+      for (let i = 0; i < ord.quantity; i++) {
+        // randomly set some as checked-in for demo
+        const isCheckedIn = i === 0 && index % 2 === 0;
+        ticketsToInsert.push({
+          orderId: ord.id,
+          qrCodeValue: `tix_${crypto.randomUUID()}`,
+          checkedIn: isCheckedIn,
+          checkedInAt: isCheckedIn ? new Date("2026-08-05T18:00:00Z") : null,
+        });
+      }
+    }
+  });
+
+  if (paymentProofsToInsert.length > 0) {
+    await db.insert(paymentProofs).values(paymentProofsToInsert);
+    console.log(`  ${paymentProofsToInsert.length} payment proofs created`);
+  }
+
+  if (ticketsToInsert.length > 0) {
+    await db.insert(tickets).values(ticketsToInsert);
+    console.log(`  ${ticketsToInsert.length} digital tickets created for verified orders`);
+  }
 
   // Done
   console.log("\nSeed complete!");

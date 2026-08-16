@@ -154,8 +154,8 @@ async function saveAdmin() {
     if (editingAdmin.value) {
       await request(`/users/admins/${editingAdmin.value.id}`, { method: 'PUT', body: payload })
       const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      if (idx !== -1 && admins.value[idx]) {
-        const existing = admins.value[idx]
+      const existing = admins.value[idx]
+      if (idx !== -1 && existing) {
         admins.value[idx] = {
           id: existing.id,
           name: payload.name,
@@ -185,8 +185,8 @@ async function saveAdmin() {
     errorMsg.value = err?.data?.message || 'Gagal menyimpan data admin.'
     if (editingAdmin.value) {
       const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      if (idx !== -1 && admins.value[idx]) {
-        const existing = admins.value[idx]
+      const existing = admins.value[idx]
+      if (idx !== -1 && existing) {
         admins.value[idx] = {
           id: existing.id,
           name: adminForm.name,

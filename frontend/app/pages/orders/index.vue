@@ -213,7 +213,7 @@ function getPaymentBadgeColor(status: OrderItem['status']) {
       <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
         <div>
           <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Pendapatan</p>
-          <h3 class="text-base font-bold text-gray-900 dark:text-white mt-0.5 truncate max-w-[130px]">{{ formatIDR(totalRevenueNumber) }}</h3>
+          <h3 class="text-base font-bold text-gray-900 dark:text-white mt-0.5 truncate max-w-32.5">{{ formatIDR(totalRevenueNumber) }}</h3>
           <p class="text-[11px] text-purple-600 dark:text-purple-400 mt-0.5 font-medium flex items-center gap-1">
             <UIcon name="i-lucide-trending-up" class="w-3 h-3" />
             Dari order lunas
