@@ -2,12 +2,61 @@ import { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
 import { verifyToken, TokenPayload } from "./auth";
 import { AppError } from "./errors";
+import { recordAuditLog } from "./audit";
 
 declare module "hono" {
   interface ContextVariableMap {
     user: TokenPayload;
+    requestId: string;
+    startTime: number;
   }
 }
+
+// ─── MID-01: REQUEST ID & TIMING MIDDLEWARE ─────────────────────────────────
+
+export async function requestIdMiddleware(c: Context, next: Next) {
+  const existingId = c.req.header("X-Request-ID") || c.req.header("x-request-id");
+  const requestId = existingId && existingId.length < 128 ? existingId : `req_${crypto.randomUUID()}`;
+
+  c.set("requestId", requestId);
+  c.header("X-Request-ID", requestId);
+
+  await next();
+}
+
+export async function timingMiddleware(c: Context, next: Next) {
+  const start = performance.now();
+  c.set("startTime", start);
+
+  await next();
+
+  const duration = performance.now() - start;
+  c.header("X-Response-Time", `${duration.toFixed(2)}ms`);
+}
+
+// ─── MID-02: SECURITY HEADERS (HELMET-GRADE) ────────────────────────────────
+
+export async function securityHeadersMiddleware(c: Context, next: Next) {
+  await next();
+
+  // Prevent MIME type sniffing
+  c.header("X-Content-Type-Options", "nosniff");
+  // Clickjacking protection
+  c.header("X-Frame-Options", "DENY");
+  // Legacy XSS filter
+  c.header("X-XSS-Protection", "1; mode=block");
+  // Referrer policy
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Restrict sensitive browser APIs
+  c.header("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+
+  // HSTS on HTTPS/Production
+  if (process.env.NODE_ENV === "production") {
+    c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+}
+
+// ─── AUTHENTICATION MIDDLEWARE ──────────────────────────────────────────────
 
 export async function authMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header("Authorization");
@@ -21,6 +70,8 @@ export async function authMiddleware(c: Context, next: Next) {
   c.set("user", payload);
   await next();
 }
+
+// ─── MID-04: ROLE-BASED ACCESS CONTROL (RBAC) ───────────────────────────────
 
 export async function adminOnly(c: Context, next: Next) {
   const user = c.get("user");
@@ -46,20 +97,56 @@ export async function customerOnly(c: Context, next: Next) {
   await next();
 }
 
-// Rate Limiting
+// Declarative granular permission checker
+export type PermissionAction = "create" | "read" | "update" | "delete" | "verify" | "scan" | "manage_admins";
+export type PermissionResource = "events" | "venues" | "artists" | "orders" | "tickets" | "users" | "dashboard";
 
-const RATE_LIMIT_WINDOW_MS = parseInt(
-  process.env.RATE_LIMIT_WINDOW_MS || "900000",
-  10
-);
-const RATE_LIMIT_AUTH_MAX = parseInt(
-  process.env.RATE_LIMIT_AUTH_MAX || "10",
-  10
-);
-const RATE_LIMIT_ORDER_MAX = parseInt(
-  process.env.RATE_LIMIT_ORDER_MAX || "20",
-  10
-);
+export function requirePermission(action: PermissionAction, resource: PermissionResource) {
+  return async function permissionGuard(c: Context, next: Next) {
+    const user = c.get("user");
+    if (!user) {
+      throw new AppError("Authorization token required", 401);
+    }
+
+    // Super Admin has all permissions
+    if (user.role === "admin" && user.adminRole === "super_admin") {
+      await next();
+      return;
+    }
+
+    // Staff Admin rules
+    if (user.role === "admin") {
+      if (resource === "users" && action === "manage_admins") {
+        throw new AppError("Akses ditolak: Hanya Super Admin yang dapat mengelola akun admin.", 403);
+      }
+      await next();
+      return;
+    }
+
+    // Customer rules
+    if (user.role === "customer") {
+      if (resource === "orders" && (action === "create" || action === "read")) {
+        await next();
+        return;
+      }
+      if (resource === "tickets" && action === "read") {
+        await next();
+        return;
+      }
+    }
+
+    throw new AppError("Akses ditolak: Anda tidak memiliki izin untuk melakukan aksi ini.", 403);
+  };
+}
+
+// ─── MID-03: SLIDING-WINDOW RATE LIMITER & MEMORY SWEEPER GC ────────────────
+
+const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10);
+const RATE_LIMIT_AUTH_MAX = parseInt(process.env.RATE_LIMIT_AUTH_MAX || "10", 10);
+const RATE_LIMIT_ORDER_MAX = parseInt(process.env.RATE_LIMIT_ORDER_MAX || "20", 10);
+const RATE_LIMIT_SCANNER_MAX = parseInt(process.env.RATE_LIMIT_SCANNER_MAX || "120", 10);
+const RATE_LIMIT_GENERAL_MAX = parseInt(process.env.RATE_LIMIT_GENERAL_MAX || "100", 10);
+const RATE_LIMIT_CLEANUP_INTERVAL = parseInt(process.env.RATE_LIMIT_CLEANUP_INTERVAL || "180000", 10);
 
 interface RateLimitOptions {
   windowMs?: number;
@@ -78,28 +165,48 @@ function getClientIp(c: Context): string {
       return info.remote.address;
     }
   } catch {
-    // Fall through to header-based detection
+    // Fall through
   }
   return (
     c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
     c.req.header("x-real-ip") ||
-    "unknown"
+    "127.0.0.1"
   );
 }
+
+// Global bucket registry with automatic garbage collection
+const globalBuckets = new Map<string, RateLimitBucket>();
+
+// Periodic Memory Sweeper GC to eliminate memory leaks
+setInterval(() => {
+  const now = Date.now();
+  let deletedCount = 0;
+  for (const [key, bucket] of globalBuckets.entries()) {
+    if (bucket.resetAt <= now) {
+      globalBuckets.delete(key);
+      deletedCount++;
+    }
+  }
+  if (deletedCount > 0 && process.env.NODE_ENV !== "production") {
+    // Debug log in dev
+  }
+}, RATE_LIMIT_CLEANUP_INTERVAL);
 
 export function rateLimit(options: RateLimitOptions = {}) {
   const windowMs = options.windowMs ?? RATE_LIMIT_WINDOW_MS;
   const max = options.max ?? 10;
-  const buckets = new Map<string, RateLimitBucket>();
 
   return async function rateLimitMiddleware(c: Context, next: Next) {
     const ip = getClientIp(c);
+    const user = c.get("user");
+    const identifier = user?.sub ? `user_${user.sub}` : `ip_${ip}`;
+    const key = `${c.req.path}:${identifier}`;
     const now = Date.now();
 
-    let bucket = buckets.get(ip);
+    let bucket = globalBuckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
       bucket = { count: 0, resetAt: now + windowMs };
-      buckets.set(ip, bucket);
+      globalBuckets.set(key, bucket);
     }
 
     bucket.count++;
@@ -109,7 +216,9 @@ export function rateLimit(options: RateLimitOptions = {}) {
       c.header("Retry-After", String(retryAfterSec));
       return c.json(
         {
-          error: "Terlalu banyak percobaan. Silakan coba lagi nanti.",
+          error: "TOO_MANY_REQUESTS",
+          message: "Terlalu banyak percobaan. Silakan coba lagi nanti.",
+          retryAfterSeconds: retryAfterSec,
         },
         429 as any
       );
@@ -129,17 +238,23 @@ export const orderRateLimiter = rateLimit({
   max: RATE_LIMIT_ORDER_MAX,
 });
 
-// Body Size Limit
+export const scannerRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: RATE_LIMIT_SCANNER_MAX,
+});
 
-const BODY_SIZE_LIMIT = parseInt(
-  process.env.BODY_SIZE_LIMIT || "10485760",
-  10
-);
+export const generalApiRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: RATE_LIMIT_GENERAL_MAX,
+});
+
+// ─── MID-05: BODY SIZE & PAYLOAD GUARD ──────────────────────────────────────
+
+const BODY_SIZE_LIMIT = parseInt(process.env.BODY_SIZE_LIMIT || "10485760", 10);
 
 export function bodySizeLimit(bytes: number = BODY_SIZE_LIMIT) {
   return async function bodySizeLimitMiddleware(c: Context, next: Next) {
-    // UPL-07: multipart upload endpoint bypasses the general JSON limit;
-    // its own cap is enforced in the upload service (IMAGE_MAX_BYTES).
+    // UPL-07: multipart upload endpoint bypasses the general JSON limit
     if (c.req.path.startsWith("/api/uploads")) {
       await next();
       return;
@@ -148,11 +263,47 @@ export function bodySizeLimit(bytes: number = BODY_SIZE_LIMIT) {
     if (contentLength > bytes) {
       return c.json(
         {
-          error: "Request body terlalu besar. Batas ukuran terlampaui.",
+          error: "PAYLOAD_TOO_LARGE",
+          message: "Request body terlalu besar. Batas ukuran terlampaui.",
+          maxAllowedBytes: bytes,
         },
         413 as any
       );
     }
     await next();
   };
+}
+
+// ─── MID-06: STRUCTURED AUDIT TRAIL MIDDLEWARE ──────────────────────────────
+
+export async function auditTrailMiddleware(c: Context, next: Next) {
+  const method = c.req.method;
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+
+  await next();
+
+  // Record audit trail for mutating administrative operations
+  if (isMutation && c.req.path.startsWith("/api/")) {
+    const user = c.get("user");
+    const status = c.res.status;
+    const ip = getClientIp(c);
+    const requestId = c.get("requestId");
+    const startTime = c.get("startTime");
+    const durationMs = startTime ? Math.round(performance.now() - startTime) : undefined;
+
+    if (user?.role === "admin") {
+      recordAuditLog({
+        requestId,
+        userId: user.sub,
+        userRole: user.adminRole || user.role,
+        method,
+        path: c.req.path,
+        statusCode: status,
+        ip,
+        userAgent: c.req.header("user-agent"),
+        timestamp: new Date().toISOString(),
+        durationMs,
+      });
+    }
+  }
 }

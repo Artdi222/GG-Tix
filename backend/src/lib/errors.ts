@@ -15,10 +15,13 @@ export class AppError extends Error {
 }
 
 export function errorHandler(err: Error, c: Context) {
+  const requestId = c.get("requestId");
+
   if (err instanceof AppError) {
     return c.json(
       {
         error: err.message,
+        requestId,
         ...(err.fields ? { fields: err.fields } : {}),
       },
       err.statusCode as any
@@ -35,6 +38,7 @@ export function errorHandler(err: Error, c: Context) {
     return c.json(
       {
         error: "Validation failed",
+        requestId,
         fields,
       },
       422
@@ -42,9 +46,9 @@ export function errorHandler(err: Error, c: Context) {
   }
 
   if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status);
+    return c.json({ error: err.message, requestId }, err.status);
   }
 
-  console.error("Unhandled Server Error:", err);
-  return c.json({ error: "Internal Server Error" }, 500);
+  console.error(`[Unhandled Server Error] ReqID: ${requestId || "-"}`, err);
+  return c.json({ error: "Internal Server Error", requestId }, 500);
 }
