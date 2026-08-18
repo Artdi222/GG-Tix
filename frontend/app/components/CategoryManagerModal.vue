@@ -22,7 +22,7 @@ export interface Category {
   benefits?: string[]  // TODO: Koordinasikan dengan BE untuk menambahkan kolom ini
 }
 
-// ── Dummy data fallback saat BE offline ──────────────────────────────────────
+// Dummy data fallback saat BE offline
 const DUMMY_CATEGORIES: Category[] = [
   {
     id: 'cat-dummy-1',
@@ -80,7 +80,7 @@ const DUMMY_CATEGORIES: Category[] = [
   },
 ]
 
-// ── Props & Emits ─────────────────────────────────────────────────────────────
+// Props & Emits
 const props = defineProps<{
   eventId: string
   eventTitle?: string
@@ -93,7 +93,7 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 const { request } = useApi()
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// State
 const mode = ref<'list' | 'form'>('list')
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -110,7 +110,7 @@ const formState = reactive({
 })
 const benefitInput = ref('')
 
-// ── Watch ─────────────────────────────────────────────────────────────────────
+// Watch
 watch(open, (isOpen) => {
   if (isOpen) {
     mode.value = 'list'
@@ -119,7 +119,7 @@ watch(open, (isOpen) => {
   }
 })
 
-// ── API & Dummy Fallback ──────────────────────────────────────────────────────
+// API & Dummy Fallback
 async function fetchCategories() {
   isLoading.value = true
   isUsingDummyData.value = false
@@ -225,7 +225,7 @@ async function onDeleteCategory(category: Category) {
   emit('updated')
 }
 
-// ── Form Helpers ──────────────────────────────────────────────────────────────
+// Form Helpers
 function openCreateForm() {
   editingCategory.value = null
   formState.name = ''
@@ -264,7 +264,7 @@ function removeBenefit(index: number) {
   formState.benefits.splice(index, 1)
 }
 
-// ── Display Helpers ───────────────────────────────────────────────────────────
+// Display Helpers
 function formatIDR(priceStr: string) {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -300,7 +300,7 @@ function quotaBarColor(percent: number) {
   >
     <template #body>
 
-      <!-- ─── Mode List ─── -->
+      <!-- Mode List -->
       <div v-if="mode === 'list'" class="space-y-3 no-scrollbar">
 
         <!-- Banner dummy data -->
@@ -423,7 +423,7 @@ function quotaBarColor(percent: number) {
         </UButton>
       </div>
 
-      <!-- ─── Mode Form ─── -->
+      <!-- Mode Form -->
       <div v-else class="space-y-4 no-scrollbar">
 
         <!-- Error Alert -->

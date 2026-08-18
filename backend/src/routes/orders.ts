@@ -4,7 +4,7 @@ import { z } from "zod";
 import * as orderService from "../services/order.service";
 import {
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   customerOnly,
   orderRateLimiter,
 } from "../lib/middleware";
@@ -98,7 +98,7 @@ orderRoute.get(
 orderRoute.get(
   "/",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("query", adminQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -114,7 +114,7 @@ orderRoute.get(
 orderRoute.patch(
   "/:id/verify",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("param", orderIdParamSchema),
   zValidator("json", verifyOrderSchema),
   async (c) => {

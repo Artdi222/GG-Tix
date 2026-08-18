@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as venueService from "../services/venue.service";
-import { authMiddleware, adminOnly, superAdminOnly } from "../lib/middleware";
+import { authMiddleware, superAdminOnly } from "../lib/middleware";
 
 const venueRoute = new Hono();
 
@@ -46,7 +46,7 @@ const updateVenueSchema = z.object({
 });
 
 // GET /api/venues — admin list (admin + staff read)
-venueRoute.get("/", authMiddleware, adminOnly, zValidator("query", listQuerySchema), async (c) => {
+venueRoute.get("/", authMiddleware, superAdminOnly, zValidator("query", listQuerySchema), async (c) => {
   const query = c.req.valid("query");
   const result = await venueService.getAllVenues(query.q, query.page, query.limit);
   return c.json({
@@ -56,7 +56,7 @@ venueRoute.get("/", authMiddleware, adminOnly, zValidator("query", listQuerySche
 });
 
 // GET /api/venues/:id — admin detail
-venueRoute.get("/:id", authMiddleware, adminOnly, zValidator("param", venueIdParamSchema), async (c) => {
+venueRoute.get("/:id", authMiddleware, superAdminOnly, zValidator("param", venueIdParamSchema), async (c) => {
   const { id } = c.req.valid("param");
   const data = await venueService.getVenueById(id);
   return c.json({ data });

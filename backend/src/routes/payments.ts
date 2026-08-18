@@ -7,7 +7,7 @@ import { z } from "zod";
 import * as paymentService from "../services/payment.service";
 import {
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   customerOnly,
 } from "../lib/middleware";
 
@@ -38,11 +38,11 @@ paymentRoute.post("/midtrans/notification", async (c) => {
   return c.json(result, 200);
 });
 
-// POST /api/payments/expire-pending — (Admin triggers overdue order sweep)
+// POST /api/payments/expire-pending — (Super Admin triggers overdue order sweep)
 paymentRoute.post(
   "/expire-pending",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   async (c) => {
     const result = await paymentService.expireOverduePendingOrders();
     return c.json({

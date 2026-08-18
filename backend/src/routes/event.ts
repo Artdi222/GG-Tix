@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as eventService from "../services/event.service";
-import { authMiddleware, adminOnly, superAdminOnly } from "../lib/middleware";
+import { authMiddleware, superAdminOnly } from "../lib/middleware";
 
 const eventRoute = new Hono();
 

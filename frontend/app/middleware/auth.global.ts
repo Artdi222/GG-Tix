@@ -5,6 +5,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // 1. Redirect already logged-in users away from /login
   if (to.path === '/login') {
     if (token.value) {
+      if (user.value?.role === 'gate_staff') {
+        return navigateTo('/scanner')
+      }
       return navigateTo('/')
     }
     return
@@ -23,8 +26,15 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
 
-  // 4. Granular RBAC Route Guards (MID-07)
-  // Restrict sensitive administration routes to Super Admin
+  // 4. Gate Staff RBAC: Force redirect to /scanner & block all other routes
+  if (user.value?.role === 'gate_staff') {
+    if (to.path !== '/scanner') {
+      return navigateTo('/scanner')
+    }
+    return
+  }
+
+  // 5. Super Admin RBAC Route Guards
   if (to.path.startsWith('/users') && to.query.tab === 'admins') {
     const isSuperAdmin = user.value?.role === 'super_admin'
     if (!isSuperAdmin) {

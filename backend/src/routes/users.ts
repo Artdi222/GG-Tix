@@ -14,7 +14,7 @@ const querySchema = z.object({
 });
 
 const roleQuerySchema = querySchema.extend({
-  role: z.enum(["super_admin", "staff"]).optional(),
+  role: z.enum(["super_admin", "gate_staff"]).optional(),
 });
 
 const adminIdParamSchema = z.object({
@@ -25,14 +25,14 @@ const createAdminSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email format").max(150),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["super_admin", "staff"]).optional(),
+  role: z.enum(["super_admin", "gate_staff"]).optional(),
 });
 
 const updateAdminSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).optional(),
   email: z.string().email("Invalid email format").max(150).optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
-  role: z.enum(["super_admin", "staff"]).optional(),
+  role: z.enum(["super_admin", "gate_staff"]).optional(),
 });
 
 // GET /api/users/customers - List customers

@@ -6,31 +6,43 @@ const { logout, user } = useAuth()
 const isMobileSidebarOpen = ref(false)
 
 // Admin navigation menu structure aligned with BE resource names
-const navigationGroups = [
-  {
-    title: 'Utama',
-    items: [
-      { label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/' },
-      { label: 'Event Konser', icon: 'i-lucide-calendar-range', to: '/events'},
-      { label: 'Transaksi & Orders', icon: 'i-lucide-receipt', to: '/orders' },
-      { label: 'Scan QR Check-In', icon: 'i-lucide-qr-code', to: '/scanner' }
-    ]
-  },
-  {
-    title: 'Manajemen Data',
-    items: [
-      { label: 'Master Venue', icon: 'i-lucide-map-pin', to: '/venues' },
-      { label: 'Data Artis / Performer', icon: 'i-lucide-mic', to: '/artists' },
-      { label: 'Data Pengguna', icon: 'i-lucide-users', to: '/users' }
-    ]
-  },
-  {
-    title: 'Sistem',
-    items: [
-      { label: 'Pengaturan', icon: 'i-lucide-settings', to: '/settings' }
+const navigationGroups = computed(() => {
+  if (user.value?.role === 'gate_staff') {
+    return [
+      {
+        title: 'Check-In',
+        items: [
+          { label: 'Scan QR Ticket', icon: 'i-lucide-qr-code', to: '/scanner' }
+        ]
+      }
     ]
   }
-]
+  return [
+    {
+      title: 'Utama',
+      items: [
+        { label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/' },
+        { label: 'Event Konser', icon: 'i-lucide-calendar-range', to: '/events'},
+        { label: 'Transaksi & Orders', icon: 'i-lucide-receipt', to: '/orders' },
+        { label: 'Scan QR Check-In', icon: 'i-lucide-qr-code', to: '/scanner' }
+      ]
+    },
+    {
+      title: 'Manajemen Data',
+      items: [
+        { label: 'Master Venue', icon: 'i-lucide-map-pin', to: '/venues' },
+        { label: 'Data Artis / Performer', icon: 'i-lucide-mic', to: '/artists' },
+        { label: 'Data Pengguna', icon: 'i-lucide-users', to: '/users' }
+      ]
+    },
+    {
+      title: 'Sistem',
+      items: [
+        { label: 'Pengaturan', icon: 'i-lucide-settings', to: '/settings' }
+      ]
+    }
+  ]
+})
 
 // Profile dropdown menu items
 const profileMenuItems = computed(() => [

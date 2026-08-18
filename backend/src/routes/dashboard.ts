@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as dashboardService from "../services/dashboard.service";
-import { authMiddleware, adminOnly } from "../lib/middleware";
+import { authMiddleware, superAdminOnly } from "../lib/middleware";
 import { AppError } from "../lib/errors";
 
 const dashboardRoute = new Hono();
@@ -51,7 +51,7 @@ function buildQuery(query: z.infer<typeof rangeQuerySchema>) {
 dashboardRoute.get(
   "/summary",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("query", rangeQuerySchema, (result) => rangeValidationHook(result)),
   async (c) => {
     const query = c.req.valid("query");
@@ -64,7 +64,7 @@ dashboardRoute.get(
 dashboardRoute.get(
   "/events",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("query", z.object({ eventId: z.string().uuid().optional() })),
   async (c) => {
     const { eventId } = c.req.valid("query");
@@ -77,7 +77,7 @@ dashboardRoute.get(
 dashboardRoute.get(
   "/trend",
   authMiddleware,
-  adminOnly,
+  superAdminOnly,
   zValidator("query", rangeQuerySchema, (result) => rangeValidationHook(result)),
   async (c) => {
     const query = c.req.valid("query");

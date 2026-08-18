@@ -10,7 +10,7 @@ interface AdminUser {
   id: string
   name: string
   email: string
-  role: 'super_admin' | 'staff' | string
+  role: 'super_admin' | 'gate_staff' | string
   createdAt: string
 }
 
@@ -36,7 +36,7 @@ const DUMMY_CUSTOMERS: CustomerUser[] = [
 const DUMMY_ADMINS: AdminUser[] = [
   { id: 'adm-1', name: 'Budi Santoso', email: 'budi@ggtix.com', role: 'super_admin', createdAt: '2026-07-15T08:00:00Z' },
   { id: 'adm-2', name: 'Artdi', email: 'artdi@ggtix.com', role: 'super_admin', createdAt: '2026-07-15T08:00:00Z' },
-  { id: 'adm-3', name: 'Siti Rahayu', email: 'siti@ggtix.com', role: 'staff', createdAt: '2026-07-20T09:30:00Z' }
+  { id: 'adm-3', name: 'Siti Rahayu', email: 'siti@ggtix.com', role: 'gate_staff', createdAt: '2026-07-20T09:30:00Z' }
 ]
 
 const customers = ref<CustomerUser[]>([])
@@ -52,12 +52,12 @@ const adminForm = reactive({
   name: '',
   email: '',
   password: '',
-  role: 'staff' as 'staff' | 'super_admin'
+  role: 'gate_staff' as 'gate_staff' | 'super_admin'
 })
 
 const roleOptions = [
-  { label: 'Staff Admin', value: 'staff' },
-  { label: 'Super Admin', value: 'super_admin' }
+  { label: 'Super Admin (Akses Penuh Platform)', value: 'super_admin' },
+  { label: 'Gate Staff (Petugas Scan Tiket Venue)', value: 'gate_staff' }
 ]
 
 // Data Fetching
@@ -120,12 +120,12 @@ function openAdminModal(admin?: AdminUser) {
     adminForm.name = admin.name
     adminForm.email = admin.email
     adminForm.password = ''
-    adminForm.role = (admin.role === 'super_admin' ? 'super_admin' : 'staff')
+    adminForm.role = (admin.role === 'super_admin' ? 'super_admin' : 'gate_staff')
   } else {
     adminForm.name = ''
     adminForm.email = ''
     adminForm.password = ''
-    adminForm.role = 'staff'
+    adminForm.role = 'gate_staff'
   }
   isModalOpen.value = true
 }
@@ -459,7 +459,7 @@ onMounted(() => {
                   size="sm"
                   class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs"
                 >
-                  {{ admin.role === 'super_admin' ? 'Super Admin' : 'Staff Admin' }}
+                  {{ admin.role === 'super_admin' ? 'Super Admin' : 'Gate Staff' }}
                 </UBadge>
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400 text-xs">

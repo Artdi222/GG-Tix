@@ -1,8 +1,8 @@
 # GG Tix — Dokumen Konsep Lengkap
 
-> **Platform Penjualan Tiket Konser Gaming & Pop Culture Indonesia**
+> **Platform Penjualan Tiket Konser Game Culture Indonesia**
 >
-> Versi: `1.1` · Terakhir diperbarui: `2026-08-15` · Status: **Living Document**
+> Versi: `1.2` · Terakhir diperbarui: `2026-08-18` · Status: **Living Document**
 
 ---
 
@@ -188,6 +188,7 @@ graph LR
 | **UI Kit** | Nuxt UI | 4.10.x | Komponen UI, form, modal, & icons |
 | **CSS** | TailwindCSS | 4.3.x | Utility-first styling |
 | **Validasi (FE)** | Valibot | 1.4.x | Schema validation form frontend |
+| **QR Scanner (Web)** | HTML5-QRCode | 2.3.x | Kamera & manual scanner check-in di venue |
 | **Backend** | Hono | 4.12.x | Lightweight web framework di atas Bun |
 | **Runtime** | Bun | Latest | JavaScript/TypeScript runtime performa tinggi |
 | **ORM** | Drizzle ORM | 0.40.x | Type-safe SQL ORM |
@@ -196,16 +197,15 @@ graph LR
 | **Validasi (BE)** | Zod | 3.24.x | Schema validation request payload |
 | **Image Processing** | Sharp | 0.33.x | Kompresi WebP otomatis saat upload |
 | **Object Storage** | Backblaze B2 | S3 API | Storage publik untuk banner, venue, seatmap |
+| **Payment Gateway** | Midtrans (Snap) | Core API / Snap | Integrasi Snap token, webhook payment notification, auto-expire |
+| **Digital Tickets & QR** | `qrcode` / SVG | Latest | Generasi tiket digital ber-QR unik per order verified |
 | **Package Manager** | Bun / pnpm | — | Workspace package management |
 
 ### 4.2 Stack Direncanakan (Fase Selanjutnya)
 
 | Layer | Teknologi | Status | Catatan |
 | --- | --- | --- | --- |
-| **Payment Gateway** | Midtrans (Snap) | Active/Next (Phase 3) | Pembayaran otomatis QRIS, VA, E-Wallet |
-| **Digital Tickets & QR** | `qrcode` / SVG | Active/Next (Phase 3) | Generasi tiket ber-QR unik per order verified |
-| **QR Scanner (Web/Mobile)** | HTML5-QRCode | Active/Next (Phase 3) | Scanner check-in tiket pada venue konser |
-| **Mobile App** | React Native | Planned (Phase 4) | Aplikasi customer (iOS & Android) |
+| **Mobile App** | React Native / Expo | Active / Next (Phase 4) | Aplikasi customer (iOS & Android) |
 | **Push Notification** | Firebase Cloud Messaging | Planned (Phase 5) | Notifikasi tiket rilis, update status order |
 | **Virtual Queue** | Redis + SSE / WebSocket | Planned (Phase 5) | Ruang tunggu saat war tiket |
 
@@ -394,9 +394,9 @@ erDiagram
 #### QR Scanner (Check-In)
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| Scan QR Tiket | Kamera scanner QR code tiket di pintu masuk venue | Active / Next (Phase 3) |
-| Manual Input QR | Input kode tiket manual jika kamera bermasalah | Active / Next (Phase 3) |
-| Check-in Stats | Monitoring real-time jumlah pengunjung yang sudah check-in di venue | Active / Next (Phase 3) |
+| Scan QR Tiket | Kamera scanner QR code tiket di pintu masuk venue (`/scanner`) | Implemented |
+| Manual Input QR | Input kode tiket manual jika kamera bermasalah | Implemented |
+| Check-in Stats | Monitoring real-time jumlah pengunjung yang sudah check-in di venue | Implemented |
 
 ---
 
@@ -421,13 +421,13 @@ erDiagram
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
 | Pemesanan Tiket | Pemilihan kategori & quantity dengan atomic locking anti-oversell | Backend ready |
-| Midtrans Snap Payment | Integrasi pembayaran otomatis (QRIS, VA, GoPay/ShopeePay, Kartu) | Active / Next (Phase 3) |
+| Midtrans Snap Payment | Integrasi pembayaran otomatis (QRIS, VA, GoPay/ShopeePay, Kartu) | Implemented (Backend) |
 | Riwayat Transaksi | List transaksi customer (`/api/orders/me`) | Backend ready |
 
 #### E-Ticket & Digital QR
 | Fitur | Deskripsi | Status |
 | --- | --- | --- |
-| E-Ticket dengan QR Unik | Tiket digital yang diterbitkan setelah pesanan terverifikasi | Active / Next (Phase 3) |
+| E-Ticket dengan QR Unik | Tiket digital yang diterbitkan setelah pesanan terverifikasi | Implemented |
 | Akses Tiket Offline | Simpan tiket digital untuk kemudahan check-in tanpa koneksi | Planned (Phase 4) |
 
 #### Antrian Virtual & Promo
@@ -494,7 +494,7 @@ flowchart TD
     A["Customer Membuka E-Ticket di App"] --> B["Tunjukkan QR Code di Gate Venue"]
     B --> C["Staff Membuka Halaman Scanner di Dashboard<br/>(/scanner)"]
     C --> D["Scan QR Code Tiket (Kamera / Input Manual)"]
-    D --> E["POST /api/tickets/:id/check-in<br/>atau POST /api/tickets/check-in"]
+    D --> E["POST /api/tickets/check-in<br/>{qrCodeValue, eventId}"]
     E --> F{"Validasi Tiket"}
     F -->|QR Valid & Belum Check-in| G["Check-in BERHASIL!<br/>Set checked_in = true<br/>Bunyikan Suara Sukses"]
     F -->|QR Valid Tapi Sudah Pernah Check-in| H["PERINGATAN: Tiket Sudah Digunakan!<br/>Tampilkan Waktu Check-In Sebelumnya"]
@@ -552,6 +552,12 @@ flowchart TD
 | | GET | `/orders/me` | Customer | Riwayat pesanan tiket customer |
 | | GET | `/orders` | Admin | List seluruh order transaksi |
 | | PATCH | `/orders/:id/verify` | Admin | Verifikasi atau tolak order manual |
+| **Tickets** | GET | `/tickets/order/:orderId` | Customer / Admin | Mengambil daftar tiket QR per order |
+| | POST | `/tickets/check-in` | Admin (Staff) | Validasi & mark check-in tiket di venue |
+| | GET | `/tickets/stats/:eventId` | Admin (Staff) | Statistik real-time check-in per event |
+| **Payments** | POST | `/payments/midtrans/token` | Customer | Inisiasi token Midtrans Snap |
+| | POST | `/payments/midtrans/notification` | Public (Webhook) | Webhook callback status pembayaran dari Midtrans |
+| | POST | `/payments/expire-pending` | Admin | Pembersihan/sweep order kadaluarsa otomatis |
 | **Users** | GET | `/customers` | Admin | List data pelanggan |
 | | GET | `/admins` | Admin | List tim internal admin/staff |
 | | POST | `/admins` | Super Admin | Buat akun admin/staff baru |
@@ -560,15 +566,12 @@ flowchart TD
 | **Dashboard**| GET | `/dashboard/summary` | Admin | Summary metrics, tren, occupancy, category breakdown |
 | **Health** | GET | `/health` | Public | Health check server |
 
-### 8.3 Endpoint Target Fase Selanjutnya (Phase 3)
+### 8.3 Endpoint Target Fase Selanjutnya (Phase 5)
 
 | Method | Path | Auth / Role | Deskripsi |
 | --- | --- | --- | --- |
-| GET | `/tickets/order/:orderId` | Customer / Admin | Mengambil daftar tiket QR per order |
-| POST | `/tickets/check-in` | Admin (Staff) | Validasi & mark check-in tiket di venue |
-| POST | `/payments/midtrans/token` | Customer | Membuat Midtrans Snap Token untuk order |
-| POST | `/payments/midtrans/notification` | Public (Webhook) | Webhook notifikasi pembayaran dari Midtrans |
 | POST | `/promo/validate` | Customer | Validasi kode voucher promo |
+| POST | `/notifications/fcm/register` | Customer | Registrasi token FCM perangkat mobile |
 
 ---
 
@@ -614,20 +617,21 @@ gantt
     Backblaze B2 Uploads & WebP (GGT-03)      :done, p2b, 2026-08-10, 2026-08-14
     Schema Enrichment, Users & Session (GGT-04):done, p2c, 2026-08-12, 2026-08-15
 
-    section Phase 3 - Tickets & Payments (ACTIVE / NEXT)
-    Digital Ticket QR Generation              :active, p3a, 2026-08-16, 10d
-    Admin QR Scanner Page (/scanner)          :active, p3b, 2026-08-20, 10d
-    Midtrans Payment Gateway Integration      :p3c, 2026-08-25, 14d
+    section Phase 3 - Tickets & Payments (DONE)
+    Digital Ticket QR Generation (GGT-05)     :done, p3a, 2026-08-16, 2026-08-17
+    Admin QR Scanner Page /scanner (GGT-05)   :done, p3b, 2026-08-16, 2026-08-17
+    Midtrans Payment Gateway (GGT-06)         :done, p3c, 2026-08-17, 2026-08-18
+    Unified Middleware & RBAC (GGT-07)        :done, p3d, 2026-08-17, 2026-08-18
 
-    section Phase 4 - Mobile App (PLANNED)
-    React Native Setup & Auth                 :p4a, 2026-09-10, 14d
-    Event Discovery & Ticket Purchase         :p4b, 2026-09-24, 21d
-    Digital Ticket & Offline QR View          :p4c, 2026-10-15, 14d
+    section Phase 4 - Mobile App (ACTIVE / NEXT)
+    React Native Setup & Auth                 :active, p4a, 2026-08-19, 14d
+    Event Discovery & Ticket Purchase         :p4b, 2026-09-02, 21d
+    Digital Ticket & Offline QR View          :p4c, 2026-09-23, 14d
 
     section Phase 5 - Growth Features (PLANNED)
-    Push Notification (FCM)                   :p5a, 2026-11-01, 14d
-    Promo / Voucher Engine                    :p5b, 2026-11-15, 14d
-    Virtual Queue / Waiting Room              :p5c, 2026-12-01, 21d
+    Push Notification (FCM)                   :p5a, 2026-10-10, 14d
+    Promo / Voucher Engine                    :p5b, 2026-10-24, 14d
+    Virtual Queue / Waiting Room              :p5c, 2026-11-10, 21d
 ```
 
 ### 10.2 Rincian Deliverable Per Fase
@@ -645,12 +649,13 @@ gantt
 - Field enrichment (`benefits`, `seatmap_url`, `tags`, `sort_order`, `description`) — PRD GGT-04.
 - Session persistence fix & User Management (`/users`) — PRD GGT-04.
 
-#### Phase 3 — Tickets, QR Scanner & Payment Gateway 🚀 (Fokus Aktif Selanjutnya)
-- **Generasi Tiket Digital**: Pembuatan record tabel `tickets` dengan nilai QR unik otomatis saat order berstatus `verified`.
-- **QR Scanner & Check-In**: Endpoint check-in tiket dan implementasi halaman UI `/scanner` untuk operasional staf venue di hari H konser.
-- **Midtrans Payment Integration**: Integrasi Midtrans Snap & webhook auto-verification dan auto-refund saat transaksi gagal/expired.
+#### Phase 3 — Tickets, QR Scanner & Payment Gateway ✅ (Selesai)
+- **Generasi Tiket Digital**: Pembuatan record tabel `tickets` dengan nilai QR unik otomatis saat order berstatus `verified` — PRD GGT-05.
+- **QR Scanner & Check-In**: Endpoint check-in tiket dan implementasi halaman UI `/scanner` untuk operasional staf venue di hari H konser — PRD GGT-05.
+- **Midtrans Payment Integration**: Integrasi Midtrans Snap & webhook auto-verification dan auto-refund saat transaksi gagal/expired — PRD GGT-06.
+- **Unified Middleware & RBAC Architecture**: Request ID tracing, memory sliding rate limiter, audit trail & API route gatekeeping — PRD GGT-07.
 
-#### Phase 4 — Mobile App (React Native) 📱 (Direncanakan)
+#### Phase 4 — Mobile App (React Native) 📱 (Fokus Aktif Selanjutnya)
 - Frontend mobile untuk customer (iOS & Android).
 - Discovery konser, checkout flow, e-ticket viewer, dan profil customer.
 
@@ -713,3 +718,8 @@ gantt
 > - [GGT-02: Dashboard Analytics Penjualan Tiket](file:///home/artdi/Projects/GG%20Tix/prd/GGT-02%20-%20Dashboard%20Analytics%20Penjualan%20Tiket.md)
 > - [GGT-03: Object Storage & Upload Gambar (B2)](file:///home/artdi/Projects/GG%20Tix/prd/GGT-03%20-%20Object%20Storage%20%26%20Upload%20Gambar%20(Backblaze%20B2).md)
 > - [GGT-04: Schema Enrichment, Session Persistence & Dashboard Completion](file:///home/artdi/Projects/GG%20Tix/prd/GGT-04%20-%20Schema%20Enrichment,%20Session%20Persistence%20&%20Dashboard%20Completion.md)
+> - [GGT-05: Digital Ticket Generation & QR Check-In System](file:///home/artdi/Projects/GG%20Tix/prd/GGT-05%20-%20Digital%20Ticket%20Generation%20%26%20QR%20Check-In%20System.md)
+> - [GGT-06: Midtrans Payment Gateway Integration](file:///home/artdi/Projects/GG%20Tix/prd/GGT-06%20-%20Midtrans%20Payment%20Gateway%20Integration.md)
+> - [GGT-07: Unified Middleware Architecture, RBAC & API Gatekeeping System](file:///home/artdi/Projects/GG%20Tix/prd/GGT-07%20-%20Unified%20Middleware%20Architecture,%20RBAC%20%26%20API%20Gatekeeping%20System.md)
+> - [GGT-08: Role-Based Access Control & Gate Staff Operational Management](file:///home/artdi/Projects/GG%20Tix/prd/GGT-08%20-%20Role-Based%20Access%20Control%20%26%20Gate%20Staff%20Operational%20Management.md)
+

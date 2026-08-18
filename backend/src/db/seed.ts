@@ -52,7 +52,7 @@ async function seed() {
       name: "Siti Rahayu",
         email: "siti@ggtix.com",
         passwordHash: adminPassword,
-        role: "staff",
+        role: "gate_staff",
       },
     ])
     .returning();

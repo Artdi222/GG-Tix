@@ -12,7 +12,7 @@ declare module "hono" {
   }
 }
 
-// ─── MID-01: REQUEST ID & TIMING MIDDLEWARE ─────────────────────────────────
+// Request ID & Timing Middleware
 
 export async function requestIdMiddleware(c: Context, next: Next) {
   const existingId = c.req.header("X-Request-ID") || c.req.header("x-request-id");
@@ -34,7 +34,7 @@ export async function timingMiddleware(c: Context, next: Next) {
   c.header("X-Response-Time", `${duration.toFixed(2)}ms`);
 }
 
-// ─── MID-02: SECURITY HEADERS (HELMET-GRADE) ────────────────────────────────
+// Security Headers
 
 export async function securityHeadersMiddleware(c: Context, next: Next) {
   await next();
@@ -56,7 +56,7 @@ export async function securityHeadersMiddleware(c: Context, next: Next) {
   }
 }
 
-// ─── AUTHENTICATION MIDDLEWARE ──────────────────────────────────────────────
+// Authentication Middleware
 
 export async function authMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header("Authorization");
@@ -71,7 +71,7 @@ export async function authMiddleware(c: Context, next: Next) {
   await next();
 }
 
-// ─── MID-04: ROLE-BASED ACCESS CONTROL (RBAC) ───────────────────────────────
+// Role-Based Access Control (RBAC)
 
 export async function adminOnly(c: Context, next: Next) {
   const user = c.get("user");
@@ -97,49 +97,8 @@ export async function customerOnly(c: Context, next: Next) {
   await next();
 }
 
-// Declarative granular permission checker
-export type PermissionAction = "create" | "read" | "update" | "delete" | "verify" | "scan" | "manage_admins";
-export type PermissionResource = "events" | "venues" | "artists" | "orders" | "tickets" | "users" | "dashboard";
 
-export function requirePermission(action: PermissionAction, resource: PermissionResource) {
-  return async function permissionGuard(c: Context, next: Next) {
-    const user = c.get("user");
-    if (!user) {
-      throw new AppError("Authorization token required", 401);
-    }
-
-    // Super Admin has all permissions
-    if (user.role === "admin" && user.adminRole === "super_admin") {
-      await next();
-      return;
-    }
-
-    // Staff Admin rules
-    if (user.role === "admin") {
-      if (resource === "users" && action === "manage_admins") {
-        throw new AppError("Akses ditolak: Hanya Super Admin yang dapat mengelola akun admin.", 403);
-      }
-      await next();
-      return;
-    }
-
-    // Customer rules
-    if (user.role === "customer") {
-      if (resource === "orders" && (action === "create" || action === "read")) {
-        await next();
-        return;
-      }
-      if (resource === "tickets" && action === "read") {
-        await next();
-        return;
-      }
-    }
-
-    throw new AppError("Akses ditolak: Anda tidak memiliki izin untuk melakukan aksi ini.", 403);
-  };
-}
-
-// ─── MID-03: SLIDING-WINDOW RATE LIMITER & MEMORY SWEEPER GC ────────────────
+// Sliding-Window Rate Limiter & Memory Sweeper GC
 
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10);
 const RATE_LIMIT_AUTH_MAX = parseInt(process.env.RATE_LIMIT_AUTH_MAX || "10", 10);
@@ -248,7 +207,7 @@ export const generalApiRateLimiter = rateLimit({
   max: RATE_LIMIT_GENERAL_MAX,
 });
 
-// ─── MID-05: BODY SIZE & PAYLOAD GUARD ──────────────────────────────────────
+// Body Size & Payload Guard
 
 const BODY_SIZE_LIMIT = parseInt(process.env.BODY_SIZE_LIMIT || "10485760", 10);
 
@@ -274,7 +233,7 @@ export function bodySizeLimit(bytes: number = BODY_SIZE_LIMIT) {
   };
 }
 
-// ─── MID-06: STRUCTURED AUDIT TRAIL MIDDLEWARE ──────────────────────────────
+// Structured Audit Trail Middleware
 
 export async function auditTrailMiddleware(c: Context, next: Next) {
   const method = c.req.method;

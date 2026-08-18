@@ -4,7 +4,7 @@ import { admins } from "../db/schema";
 
 export interface AdminQueryFilters {
   search?: string;
-  role?: "super_admin" | "staff";
+  role?: "super_admin" | "gate_staff";
   page?: number;
   limit?: number;
 }
@@ -78,7 +78,7 @@ export async function createAdmin(data: {
   name: string;
   email: string;
   passwordHash: string;
-  role?: "super_admin" | "staff";
+  role?: "super_admin" | "gate_staff";
 }) {
   const [newAdmin] = await db
     .insert(admins)
@@ -86,7 +86,7 @@ export async function createAdmin(data: {
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
       passwordHash: data.passwordHash,
-      role: data.role || "staff",
+      role: data.role || "gate_staff",
     })
     .returning({
       id: admins.id,
@@ -104,7 +104,7 @@ export async function updateAdmin(
     name?: string;
     email?: string;
     passwordHash?: string;
-    role?: "super_admin" | "staff";
+    role?: "super_admin" | "gate_staff";
   }
 ) {
   const updateData: Record<string, any> = {};

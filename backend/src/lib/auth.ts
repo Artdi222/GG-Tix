@@ -16,7 +16,7 @@ const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
 export interface TokenPayload {
   sub: string;
   role: "admin" | "customer";
-  adminRole?: "super_admin" | "staff";
+  adminRole?: "super_admin" | "gate_staff";
 }
 
 type TokenType = "access" | "refresh";
@@ -56,7 +56,7 @@ async function verifyTokenInternal(token: string, expectedType: TokenType): Prom
     return {
       sub: payload.sub as string,
       role: payload.role as "admin" | "customer",
-      ...(payload.adminRole ? { adminRole: payload.adminRole as "super_admin" | "staff" } : {}),
+      ...(payload.adminRole ? { adminRole: payload.adminRole as "super_admin" | "gate_staff" } : {}),
     };
   } catch (error) {
     if (error instanceof AppError) throw error;

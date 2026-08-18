@@ -2,7 +2,7 @@ interface AdminUser {
   id: string
   name: string
   email: string
-  role: 'super_admin' | 'admin' | string
+  role: 'super_admin' | 'gate_staff' | string
 }
 
 interface LoginResponse {

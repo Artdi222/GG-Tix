@@ -51,7 +51,7 @@ if (process.env.NODE_ENV !== "production") {
   corsOrigins.push("http://localhost:5173", "http://localhost:3001", "http://localhost:3000");
 }
 
-// ─── Deterministic Global Middlewares Pipeline (GGT-07) ─────────────────────
+// Global Middlewares Pipeline
 // 1. Request ID injector & Response Time metrics
 app.use("*", requestIdMiddleware);
 app.use("*", timingMiddleware);

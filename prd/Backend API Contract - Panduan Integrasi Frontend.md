@@ -8,7 +8,7 @@
 
 | Prioritas | Status |
 | --- | --- |
-| Disusun dari kode backend (authoritative) | ✓ Update: `2026-08-15` (GGT-02 s/d GGT-04) |
+| Disusun dari kode backend (authoritative) | ✓ Update: `2026-08-18` (GGT-01 s/d GGT-07) |
 
 ---
 
@@ -305,17 +305,32 @@ Response `201`:
 
 ---
 
-## 12. Endpoint yang Akan Datang (Phase 3 Gap)
+## 12. Digital Tickets & QR Check-In (`/api/tickets`)
 
-Barang yang akan diimplementasikan pada **Phase 3 (Tickets & Payments)**:
+| Method | Path | Auth | Body / Query / Param | Respon |
+| --- | --- | --- | --- | --- |
+| GET | `/tickets/order/:orderId` | 🟣/🔵 | Param `orderId` (UUID) | 200 `{ data: { order, tickets: [...] } }` |
+| POST | `/tickets/check-in` | 🔵 (Staff/Admin) | `{ qrCodeValue: string, eventId: uuid }` | 200 `{ data: { message, ticket, order, event } }` / `409 ALREADY_CHECKED_IN` / `403 WRONG_EVENT` |
+| GET | `/tickets/stats/:eventId` | 🔵 (Staff/Admin) | Param `eventId` (UUID) | 200 `{ data: { eventId, totalTickets, checkedIn, remaining, checkedInPct, byCategory: [...] } }` |
+
+---
+
+## 13. Payments & Midtrans Gateway (`/api/payments`)
+
+| Method | Path | Auth | Body / Param | Respon |
+| --- | --- | --- | --- | --- |
+| POST | `/payments/midtrans/token` | 🟣 (Customer) | `{ orderId: uuid }` | 201 `{ data: { snapToken, redirectUrl, orderId, grossAmount } }` |
+| POST | `/payments/midtrans/notification` | 🟢 (Public Webhook) | JSON payload callback Midtrans | 200 `{ status: "ok", message, orderId, orderStatus }` |
+| POST | `/payments/expire-pending` | 🔵 (Admin) | — | 200 `{ message, expiredCount, refundedQuotaCount }` |
+
+---
+
+## 14. Endpoint Target Fase Selanjutnya (Phase 5)
 
 | Fitur | Target Endpoint | Status |
 | --- | --- | --- |
-| **Get Tiket QR Order** | `GET /api/tickets/order/:orderId` | Planned (Phase 3) |
-| **QR Scanner Check-In** | `POST /api/tickets/check-in` | Planned (Phase 3) |
-| **Midtrans Snap Token** | `POST /api/payments/midtrans/token` | Planned (Phase 3) |
-| **Midtrans Webhook** | `POST /api/payments/midtrans/notification` | Planned (Phase 3) |
-| **Promo Code Validation**| `POST /api/promo/validate` | Planned (Phase 5) |
+| **Promo Code Validation** | `POST /api/promo/validate` | Planned (Phase 5) |
+| **FCM Device Registration** | `POST /api/notifications/fcm/register` | Planned (Phase 5) |
 
 ---
 
