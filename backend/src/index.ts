@@ -2,7 +2,13 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { errorHandler } from "./lib/errors";
-import { bodySizeLimit } from "./lib/middleware";
+import {
+  requestIdMiddleware,
+  timingMiddleware,
+  securityHeadersMiddleware,
+  bodySizeLimit,
+  auditTrailMiddleware,
+} from "./lib/middleware";
 import { assertB2Configured } from "./lib/storage";
 import { assertMidtransConfigured } from "./lib/midtrans";
 import { expireOverduePendingOrders } from "./services/payment.service";
@@ -45,10 +51,25 @@ if (process.env.NODE_ENV !== "production") {
   corsOrigins.push("http://localhost:5173", "http://localhost:3001", "http://localhost:3000");
 }
 
-// Global Middlewares
+// ─── Deterministic Global Middlewares Pipeline (GGT-07) ─────────────────────
+// 1. Request ID injector & Response Time metrics
+app.use("*", requestIdMiddleware);
+app.use("*", timingMiddleware);
+
+// 2. Security Headers (Helmet-Grade)
+app.use("*", securityHeadersMiddleware);
+
+// 3. Structured Request Logger
 app.use("*", logger());
+
+// 4. CORS Whitelist
 app.use("*", cors({ origin: corsOrigins, credentials: true }));
+
+// 5. Payload & Body Size Safety Guard
 app.use("*", bodySizeLimit());
+
+// 6. Administrative Audit Trail Logger
+app.use("*", auditTrailMiddleware);
 
 // Global Error Handler
 app.onError(errorHandler);
