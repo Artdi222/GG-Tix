@@ -26,8 +26,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   isLoading.value = true
   loginError.value = ''
   try {
-    await login(event.data.email, event.data.password)
-    await navigateTo('/')
+    const user = await login(event.data.email, event.data.password)
+    if (user?.role === 'gate_staff') {
+      await navigateTo('/scanner')
+    } else {
+      await navigateTo('/')
+    }
   } catch (err: any) {
     loginError.value = err.data?.error || err.message || 'Email atau password salah'
   } finally {
