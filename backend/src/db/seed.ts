@@ -24,6 +24,18 @@ import {
 async function seed() {
   console.log("Seeding database…");
 
+  // Ensure schema migrations are applied
+  try {
+    await db.execute(sql`ALTER TYPE admin_role ADD VALUE IF NOT EXISTS 'gate_staff'`);
+  } catch {
+    // Ignore if already exists
+  }
+  try {
+    await db.execute(sql`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP`);
+  } catch {
+    // Ignore if already exists
+  }
+
   // Truncate in correct order (respecting FK constraints)
   await db.execute(
     sql`TRUNCATE orders, ticket_categories, events, venues, artists, customers, admins CASCADE`
