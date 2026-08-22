@@ -722,4 +722,5 @@ gantt
 > - [GGT-06: Midtrans Payment Gateway Integration](file:///home/artdi/Projects/GG%20Tix/prd/GGT-06%20-%20Midtrans%20Payment%20Gateway%20Integration.md)
 > - [GGT-07: Unified Middleware Architecture, RBAC & API Gatekeeping System](file:///home/artdi/Projects/GG%20Tix/prd/GGT-07%20-%20Unified%20Middleware%20Architecture,%20RBAC%20%26%20API%20Gatekeeping%20System.md)
 > - [GGT-08: Role-Based Access Control & Gate Staff Operational Management](file:///home/artdi/Projects/GG%20Tix/prd/GGT-08%20-%20Role-Based%20Access%20Control%20%26%20Gate%20Staff%20Operational%20Management.md)
+> - [GGT-10: System Settings, Profile Management & Platform Configuration](file:///home/artdi/Projects/GG%20Tix/prd/GGT-10%20-%20System%20Settings,%20Profile%20Management%20%26%20Platform%20Configuration.md)
 

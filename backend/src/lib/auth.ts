@@ -16,7 +16,9 @@ const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
 export interface TokenPayload {
   sub: string;
   role: "admin" | "customer";
-  adminRole?: "super_admin" | "gate_staff";
+  adminRole?: "super_admin" | "admin" | "gate_staff";
+  email?: string;
+  name?: string;
 }
 
 type TokenType = "access" | "refresh";
@@ -27,6 +29,8 @@ async function signTokenInternal(payload: TokenPayload, type: TokenType): Promis
     role: payload.role,
     type,
     ...(payload.adminRole ? { adminRole: payload.adminRole } : {}),
+    ...(payload.email ? { email: payload.email } : {}),
+    ...(payload.name ? { name: payload.name } : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
@@ -56,7 +60,9 @@ async function verifyTokenInternal(token: string, expectedType: TokenType): Prom
     return {
       sub: payload.sub as string,
       role: payload.role as "admin" | "customer",
-      ...(payload.adminRole ? { adminRole: payload.adminRole as "super_admin" | "gate_staff" } : {}),
+      ...(payload.adminRole ? { adminRole: payload.adminRole as "super_admin" | "admin" | "gate_staff" } : {}),
+      ...(payload.email ? { email: payload.email as string } : {}),
+      ...(payload.name ? { name: payload.name as string } : {}),
     };
   } catch (error) {
     if (error instanceof AppError) throw error;

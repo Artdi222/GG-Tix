@@ -23,6 +23,7 @@ interface OrderItem {
 }
 
 const { request } = useApi()
+const toast = useToast()
 
 const selectedStatus = ref<'ALL' | 'pending' | 'verified' | 'rejected' | 'expired'>('ALL')
 const search = ref('')
@@ -37,34 +38,7 @@ function openTicketsModal(order: OrderItem) {
   isTicketModalOpen.value = true
 }
 
-const orders = ref<OrderItem[]>([
-  {
-    id: 'ord-1001',
-    customer: { id: 'cust-1', name: 'Sari Dewi', email: 'sari@example.com' },
-    event: { title: 'Wuthering Waves Live 2026', dateTime: '2026-10-12T19:00:00.000Z' },
-    category: { name: 'VIP' },
-    quantity: 2,
-    totalPrice: '1500000.00',
-    status: 'pending',
-    createdAt: '2026-08-07T10:00:00.000Z',
-    paymentProofs: [
-      { id: 'pp-1', paymentType: 'qris', transactionStatus: 'pending' }
-    ]
-  },
-  {
-    id: 'ord-1002',
-    customer: { id: 'cust-2', name: 'Budi Santoso', email: 'budi@gmail.com' },
-    event: { title: 'Coldplay Music of the Spheres', dateTime: '2026-11-15T20:00:00.000Z' },
-    category: { name: 'CAT 1' },
-    quantity: 1,
-    totalPrice: '1250000.00',
-    status: 'verified',
-    createdAt: '2026-08-06T14:30:00.000Z',
-    paymentProofs: [
-      { id: 'pp-2', paymentType: 'bank_transfer', transactionStatus: 'settlement', paidAt: '2026-08-06T14:35:00.000Z' }
-    ]
-  }
-])
+const orders = ref<OrderItem[]>([])
 
 async function fetchOrders() {
   isLoading.value = true
@@ -73,8 +47,8 @@ async function fetchOrders() {
     if (res?.data) {
       orders.value = res.data
     }
-  } catch {
-    // Keep mock
+  } catch (err: any) {
+    toast.add({ title: 'Gagal memuat data transaksi', color: 'error' })
   } finally {
     isLoading.value = false
   }
@@ -114,9 +88,15 @@ async function handleVerify(orderId: string, decision: 'verified' | 'rejected') 
     })
     const target = orders.value.find(o => o.id === orderId)
     if (target) target.status = decision
-  } catch {
-    const target = orders.value.find(o => o.id === orderId)
-    if (target) target.status = decision
+    toast.add({
+      title: decision === 'verified' ? 'Pesanan berhasil disetujui' : 'Pesanan berhasil ditolak',
+      color: decision === 'verified' ? 'success' : 'neutral'
+    })
+  } catch (err: any) {
+    toast.add({
+      title: err?.data?.error || 'Gagal memperbarui status verifikasi pesanan',
+      color: 'error'
+    })
   }
 }
 

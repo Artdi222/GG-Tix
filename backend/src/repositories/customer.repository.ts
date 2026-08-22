@@ -36,6 +36,28 @@ export async function createCustomer(data: {
   return newCustomer;
 }
 
+export async function updateCustomer(
+  id: string,
+  data: {
+    name?: string;
+    email?: string;
+    passwordHash?: string;
+  }
+) {
+  const updateData: Record<string, any> = {};
+  if (data.name !== undefined) updateData.name = data.name.trim();
+  if (data.email !== undefined) updateData.email = data.email.toLowerCase().trim();
+  if (data.passwordHash !== undefined) updateData.passwordHash = data.passwordHash;
+
+  const [updated] = await db
+    .update(customers)
+    .set(updateData)
+    .where(eq(customers.id, id))
+    .returning();
+
+  return updated || null;
+}
+
 export interface CustomerQueryFilters {
   search?: string;
   page?: number;

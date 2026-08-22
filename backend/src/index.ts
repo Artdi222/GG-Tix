@@ -24,6 +24,7 @@ import venueRoute from "./routes/venues";
 import usersRoute from "./routes/users";
 import ticketRoute from "./routes/tickets";
 import paymentRoute from "./routes/payments";
+import settingsRoute from "./routes/settings";
 
 assertB2Configured();
 assertMidtransConfigured();
@@ -88,6 +89,7 @@ api.route("/venues", venueRoute);
 api.route("/users", usersRoute);
 api.route("/tickets", ticketRoute);
 api.route("/payments", paymentRoute);
+api.route("/settings", settingsRoute);
 
 // Mount under /api prefix
 app.route("/api", api);

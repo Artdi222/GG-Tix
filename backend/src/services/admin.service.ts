@@ -9,7 +9,7 @@ export async function createAdmin(data: {
   name: string;
   email: string;
   password: string;
-    role?: "super_admin" | "gate_staff";
+  role?: "super_admin" | "admin" | "gate_staff";
 }) {
   const existing = await adminRepo.findAdminByEmail(data.email);
   if (existing) {
@@ -31,7 +31,7 @@ export async function updateAdmin(
     name?: string;
     email?: string;
     password?: string;
-  role?: "super_admin" | "gate_staff";
+    role?: "super_admin" | "admin" | "gate_staff";
   },
   currentAdminId: string
 ) {

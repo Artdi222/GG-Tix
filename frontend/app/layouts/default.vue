@@ -71,10 +71,7 @@ const profileMenuItems = computed(() => [
 ])
 
 // Notifications dropdown state
-const notifications = ref([
-  { id: 1, title: 'Order Baru Verified', desc: 'Order ORD-9821 berhasil diverifikasi', time: '5m lalu', unread: true },
-  { id: 2, title: 'Kuota Kategori VIP Hampi Habis', desc: 'Sisa kuota VIP: 3 tiket', time: '1 jam lalu', unread: true }
-])
+const notifications = ref<Array<{ id: number; title: string; desc: string; time: string; unread: boolean }>>([])
 
 function isPathActive(targetPath: string) {
   if (targetPath === '/') {
@@ -224,7 +221,7 @@ watch(() => route.path, () => {
 
         <div class="flex items-center gap-2 sm:gap-3">
 
-          <UDropdownMenu :items="[notifications.map(n => ({ label: n.title, description: n.desc, icon: 'i-lucide-bell' }))]">
+          <UDropdownMenu :items="notifications.length ? [notifications.map(n => ({ label: n.title, description: n.desc, icon: 'i-lucide-bell' }))] : [[{ label: 'Tidak ada notifikasi baru', disabled: true }]]">
             <UButton
               color="neutral"
               variant="ghost"
@@ -233,7 +230,7 @@ watch(() => route.path, () => {
               class="relative"
               aria-label="Notifications"
             >
-              <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-white dark:ring-gray-900 animate-pulse" />
+              <span v-if="notifications.length > 0" class="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-white dark:ring-gray-900 animate-pulse" />
             </UButton>
           </UDropdownMenu>
 

@@ -10,12 +10,13 @@ interface AdminUser {
   id: string
   name: string
   email: string
-  role: 'super_admin' | 'gate_staff' | string
+  role: 'super_admin' | 'admin' | 'gate_staff' | string
   createdAt: string
 }
 
 const { request } = useApi()
 const { user } = useAuth()
+const toast = useToast()
 
 // State
 const activeTab = ref<'customers' | 'admins'>('customers')
@@ -23,21 +24,6 @@ const customerSearch = ref('')
 const adminSearch = ref('')
 const customersLoading = ref(false)
 const adminsLoading = ref(false)
-
-// Fallback Mock Data
-const DUMMY_CUSTOMERS: CustomerUser[] = [
-  { id: 'cust-1', name: 'Sari Dewi', email: 'sari@example.com', createdAt: '2026-08-01T10:00:00Z' },
-  { id: 'cust-2', name: 'Andi Pratama', email: 'andi@example.com', createdAt: '2026-08-02T14:30:00Z' },
-  { id: 'cust-3', name: 'Rina Kartika', email: 'rina@example.com', createdAt: '2026-08-03T09:15:00Z' },
-  { id: 'cust-4', name: 'Budi Kurniawan', email: 'budi.k@example.com', createdAt: '2026-08-05T11:20:00Z' },
-  { id: 'cust-5', name: 'Maya Indah', email: 'maya@example.com', createdAt: '2026-08-07T16:45:00Z' }
-]
-
-const DUMMY_ADMINS: AdminUser[] = [
-  { id: 'adm-1', name: 'Budi Santoso', email: 'budi@ggtix.com', role: 'super_admin', createdAt: '2026-07-15T08:00:00Z' },
-  { id: 'adm-2', name: 'Artdi', email: 'artdi@ggtix.com', role: 'super_admin', createdAt: '2026-07-15T08:00:00Z' },
-  { id: 'adm-3', name: 'Siti Rahayu', email: 'siti@ggtix.com', role: 'gate_staff', createdAt: '2026-07-20T09:30:00Z' }
-]
 
 const customers = ref<CustomerUser[]>([])
 const admins = ref<AdminUser[]>([])
@@ -52,11 +38,12 @@ const adminForm = reactive({
   name: '',
   email: '',
   password: '',
-  role: 'gate_staff' as 'gate_staff' | 'super_admin'
+  role: 'admin' as 'gate_staff' | 'admin' | 'super_admin'
 })
 
 const roleOptions = [
-  { label: 'Super Admin (Akses Penuh Platform)', value: 'super_admin' },
+  { label: 'Super Admin (Akses Penuh Master Platform)', value: 'super_admin' },
+  { label: 'Admin (Operasional Event, Venue & Order)', value: 'admin' },
   { label: 'Gate Staff (Petugas Scan Tiket Venue)', value: 'gate_staff' }
 ]
 
@@ -65,11 +52,12 @@ async function loadCustomers() {
   customersLoading.value = true
   try {
     const res = await request<{ data: CustomerUser[] }>('/users/customers', {
-      query: { search: customerSearch.value, limit: 50 }
+      query: { search: customerSearch.value || undefined, limit: 50 }
     })
-    customers.value = res?.data ?? DUMMY_CUSTOMERS
-  } catch {
-    customers.value = DUMMY_CUSTOMERS
+    customers.value = res?.data ?? []
+  } catch (err: any) {
+    customers.value = []
+    toast.add({ title: 'Gagal memuat data pelanggan', color: 'error' })
   } finally {
     customersLoading.value = false
   }
@@ -79,38 +67,28 @@ async function loadAdmins() {
   adminsLoading.value = true
   try {
     const res = await request<{ data: AdminUser[] }>('/users/admins', {
-      query: { search: adminSearch.value, limit: 50 }
+      query: { search: adminSearch.value || undefined, limit: 50 }
     })
-    admins.value = res?.data ?? DUMMY_ADMINS
-  } catch {
-    admins.value = DUMMY_ADMINS
+    admins.value = res?.data ?? []
+  } catch (err: any) {
+    admins.value = []
+    toast.add({ title: 'Gagal memuat data admin', color: 'error' })
   } finally {
     adminsLoading.value = false
   }
 }
 
-let debounceTimer: any = null
+let customerDebounceTimer: ReturnType<typeof setTimeout> | null = null
 function debouncedLoadCustomers() {
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(loadCustomers, 300)
+  if (customerDebounceTimer) clearTimeout(customerDebounceTimer)
+  customerDebounceTimer = setTimeout(loadCustomers, 300)
 }
+
+let adminDebounceTimer: ReturnType<typeof setTimeout> | null = null
 function debouncedLoadAdmins() {
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(loadAdmins, 300)
+  if (adminDebounceTimer) clearTimeout(adminDebounceTimer)
+  adminDebounceTimer = setTimeout(loadAdmins, 300)
 }
-
-// Filtered Computed Lists
-const filteredCustomers = computed(() => {
-  if (!customerSearch.value) return customers.value
-  const q = customerSearch.value.toLowerCase()
-  return customers.value.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
-})
-
-const filteredAdmins = computed(() => {
-  if (!adminSearch.value) return admins.value
-  const q = adminSearch.value.toLowerCase()
-  return admins.value.filter((a) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
-})
 
 // Modal Handlers
 function openAdminModal(admin?: AdminUser) {
@@ -120,12 +98,12 @@ function openAdminModal(admin?: AdminUser) {
     adminForm.name = admin.name
     adminForm.email = admin.email
     adminForm.password = ''
-    adminForm.role = (admin.role === 'super_admin' ? 'super_admin' : 'gate_staff')
+    adminForm.role = (admin.role as 'gate_staff' | 'admin' | 'super_admin') || 'admin'
   } else {
     adminForm.name = ''
     adminForm.email = ''
     adminForm.password = ''
-    adminForm.role = 'gate_staff'
+    adminForm.role = 'admin'
   }
   isModalOpen.value = true
 }
@@ -153,58 +131,18 @@ async function saveAdmin() {
 
     if (editingAdmin.value) {
       await request(`/users/admins/${editingAdmin.value.id}`, { method: 'PUT', body: payload })
-      const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      const existing = admins.value[idx]
-      if (idx !== -1 && existing) {
-        admins.value[idx] = {
-          id: existing.id,
-          name: payload.name,
-          email: payload.email,
-          role: payload.role,
-          createdAt: existing.createdAt
-        }
-      }
+      toast.add({ title: 'Data admin berhasil diperbarui', color: 'success' })
     } else {
-      const res = await request<{ data: AdminUser }>('/users/admins', {
+      await request<{ data: AdminUser }>('/users/admins', {
         method: 'POST',
-        body: { ...payload, password: adminForm.password }
+        body: payload
       })
-      admins.value.unshift(
-        res?.data ?? {
-          id: `adm-${Date.now()}`,
-          name: adminForm.name,
-          email: adminForm.email,
-          role: adminForm.role,
-          createdAt: new Date().toISOString()
-        }
-      )
+      toast.add({ title: 'Admin baru berhasil ditambahkan', color: 'success' })
     }
     isModalOpen.value = false
-    loadAdmins()
+    await loadAdmins()
   } catch (err: any) {
-    errorMsg.value = err?.data?.message || 'Gagal menyimpan data admin.'
-    if (editingAdmin.value) {
-      const idx = admins.value.findIndex((a) => a.id === editingAdmin.value!.id)
-      const existing = admins.value[idx]
-      if (idx !== -1 && existing) {
-        admins.value[idx] = {
-          id: existing.id,
-          name: adminForm.name,
-          email: adminForm.email,
-          role: adminForm.role,
-          createdAt: existing.createdAt
-        }
-      }
-    } else {
-      admins.value.unshift({
-        id: `adm-${Date.now()}`,
-        name: adminForm.name,
-        email: adminForm.email,
-        role: adminForm.role,
-        createdAt: new Date().toISOString()
-      })
-    }
-    isModalOpen.value = false
+    errorMsg.value = err?.data?.error || err?.data?.message || 'Gagal menyimpan data admin.'
   } finally {
     isSaving.value = false
   }
@@ -214,10 +152,11 @@ async function deleteAdmin(id: string) {
   if (!confirm('Yakin ingin menghapus admin ini?')) return
   try {
     await request(`/users/admins/${id}`, { method: 'DELETE' })
-  } catch {
-    // Fallback
+    toast.add({ title: 'Admin berhasil dihapus', color: 'success' })
+    admins.value = admins.value.filter((a) => a.id !== id)
+  } catch (err: any) {
+    toast.add({ title: err?.data?.error || 'Gagal menghapus admin', color: 'error' })
   }
-  admins.value = admins.value.filter((a) => a.id !== id)
 }
 
 function formatDate(iso: string) {
@@ -311,6 +250,7 @@ onMounted(() => {
         </button>
 
         <button
+          v-if="user?.role === 'super_admin'"
           type="button"
           :class="[
             'flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all',
@@ -367,13 +307,13 @@ onMounted(() => {
                 Memuat data pelanggan...
               </td>
             </tr>
-            <tr v-else-if="filteredCustomers.length === 0">
+            <tr v-else-if="customers.length === 0">
               <td colspan="4" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
                 Tidak ada data pelanggan yang ditemukan.
               </td>
             </tr>
             <tr
-              v-for="customer in filteredCustomers"
+              v-for="customer in customers"
               :key="customer.id"
               class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
             >
@@ -424,13 +364,13 @@ onMounted(() => {
                 Memuat data admin...
               </td>
             </tr>
-            <tr v-else-if="filteredAdmins.length === 0">
+            <tr v-else-if="admins.length === 0">
               <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
                 Tidak ada data admin yang ditemukan.
               </td>
             </tr>
             <tr
-              v-for="admin in filteredAdmins"
+              v-for="admin in admins"
               :key="admin.id"
               class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors"
             >
@@ -454,12 +394,12 @@ onMounted(() => {
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <UBadge
-                  :color="admin.role === 'super_admin' ? 'warning' : 'info'"
+                  :color="admin.role === 'super_admin' ? 'warning' : admin.role === 'admin' ? 'primary' : 'info'"
                   variant="soft"
                   size="sm"
                   class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs"
                 >
-                  {{ admin.role === 'super_admin' ? 'Super Admin' : 'Gate Staff' }}
+                  {{ admin.role === 'super_admin' ? 'Super Admin' : admin.role === 'admin' ? 'Admin Operasional' : 'Gate Staff' }}
                 </UBadge>
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400 text-xs">

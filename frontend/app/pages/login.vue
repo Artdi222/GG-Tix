@@ -14,8 +14,7 @@ type Schema = v.InferOutput<typeof schema>
 
 const state = reactive({
   email: '',
-  password: '',
-  remember: false
+  password: ''
 })
 
 const showPassword = ref(false)
