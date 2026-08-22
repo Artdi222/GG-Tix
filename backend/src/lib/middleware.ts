@@ -2,7 +2,7 @@ import { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
 import { verifyToken, TokenPayload } from "./auth";
 import { AppError } from "./errors";
-import { recordAuditLog } from "./audit";
+import { createAuditLog } from "../services/settings.service";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -89,6 +89,14 @@ export async function superAdminOnly(c: Context, next: Next) {
   await next();
 }
 
+export async function adminOrHigher(c: Context, next: Next) {
+  const user = c.get("user");
+  if (!user || user.role !== "admin" || (user.adminRole !== "super_admin" && user.adminRole !== "admin")) {
+    throw new AppError("Access denied: Admin or Super Admin role required", 403);
+  }
+  await next();
+}
+
 export async function customerOnly(c: Context, next: Next) {
   const user = c.get("user");
   if (!user || user.role !== "customer") {
@@ -103,13 +111,12 @@ export async function customerOnly(c: Context, next: Next) {
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10);
 const RATE_LIMIT_AUTH_MAX = parseInt(process.env.RATE_LIMIT_AUTH_MAX || "10", 10);
 const RATE_LIMIT_ORDER_MAX = parseInt(process.env.RATE_LIMIT_ORDER_MAX || "20", 10);
-const RATE_LIMIT_SCANNER_MAX = parseInt(process.env.RATE_LIMIT_SCANNER_MAX || "120", 10);
-const RATE_LIMIT_GENERAL_MAX = parseInt(process.env.RATE_LIMIT_GENERAL_MAX || "100", 10);
 const RATE_LIMIT_CLEANUP_INTERVAL = parseInt(process.env.RATE_LIMIT_CLEANUP_INTERVAL || "180000", 10);
 
 interface RateLimitOptions {
   windowMs?: number;
   max?: number;
+  key?: string;
 }
 
 interface RateLimitBucket {
@@ -139,33 +146,29 @@ const globalBuckets = new Map<string, RateLimitBucket>();
 // Periodic Memory Sweeper GC to eliminate memory leaks
 setInterval(() => {
   const now = Date.now();
-  let deletedCount = 0;
   for (const [key, bucket] of globalBuckets.entries()) {
     if (bucket.resetAt <= now) {
       globalBuckets.delete(key);
-      deletedCount++;
     }
-  }
-  if (deletedCount > 0 && process.env.NODE_ENV !== "production") {
-    // Debug log in dev
   }
 }, RATE_LIMIT_CLEANUP_INTERVAL);
 
 export function rateLimit(options: RateLimitOptions = {}) {
   const windowMs = options.windowMs ?? RATE_LIMIT_WINDOW_MS;
   const max = options.max ?? 10;
+  const keyPrefix = options.key;
 
   return async function rateLimitMiddleware(c: Context, next: Next) {
     const ip = getClientIp(c);
     const user = c.get("user");
     const identifier = user?.sub ? `user_${user.sub}` : `ip_${ip}`;
-    const key = `${c.req.path}:${identifier}`;
+    const bucketKey = `${keyPrefix ?? c.req.routePath ?? c.req.path}:${identifier}`;
     const now = Date.now();
 
-    let bucket = globalBuckets.get(key);
+    let bucket = globalBuckets.get(bucketKey);
     if (!bucket || bucket.resetAt <= now) {
       bucket = { count: 0, resetAt: now + windowMs };
-      globalBuckets.set(key, bucket);
+      globalBuckets.set(bucketKey, bucket);
     }
 
     bucket.count++;
@@ -190,22 +193,16 @@ export function rateLimit(options: RateLimitOptions = {}) {
 export const authRateLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: RATE_LIMIT_AUTH_MAX,
+  key: "auth",
 });
 
 export const orderRateLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: RATE_LIMIT_ORDER_MAX,
+  key: "orders",
 });
 
-export const scannerRateLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: RATE_LIMIT_SCANNER_MAX,
-});
 
-export const generalApiRateLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: RATE_LIMIT_GENERAL_MAX,
-});
 
 // Body Size & Payload Guard
 
@@ -235,33 +232,30 @@ export function bodySizeLimit(bytes: number = BODY_SIZE_LIMIT) {
 
 // Structured Audit Trail Middleware
 
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 export async function auditTrailMiddleware(c: Context, next: Next) {
   const method = c.req.method;
-  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
 
   await next();
 
   // Record audit trail for mutating administrative operations
-  if (isMutation && c.req.path.startsWith("/api/")) {
+  if (MUTATION_METHODS.has(method) && c.req.path.startsWith("/api/")) {
     const user = c.get("user");
-    const status = c.res.status;
-    const ip = getClientIp(c);
-    const requestId = c.get("requestId");
-    const startTime = c.get("startTime");
-    const durationMs = startTime ? Math.round(performance.now() - startTime) : undefined;
 
     if (user?.role === "admin") {
-      recordAuditLog({
-        requestId,
+      const startTime = c.get("startTime");
+      createAuditLog({
+        requestId: c.get("requestId"),
         userId: user.sub,
+        userEmail: user.email,
         userRole: user.adminRole || user.role,
         method,
         path: c.req.path,
-        statusCode: status,
-        ip,
+        statusCode: c.res.status,
+        ip: getClientIp(c),
         userAgent: c.req.header("user-agent"),
-        timestamp: new Date().toISOString(),
-        durationMs,
+        durationMs: startTime ? Math.round(performance.now() - startTime) : undefined,
       });
     }
   }

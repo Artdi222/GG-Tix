@@ -72,4 +72,51 @@ authRoute.get("/me", authMiddleware, async (c) => {
   });
 });
 
+// Update Profile (All roles)
+authRoute.patch(
+  "/profile",
+  authMiddleware,
+  zValidator(
+    "json",
+    z.object({
+      name: z.string().min(2).max(100).optional(),
+      email: z.string().email().optional(),
+    })
+  ),
+  async (c) => {
+    const user = c.get("user");
+    const body = c.req.valid("json");
+    const updated = await authService.updateProfile(user.sub, user.role, body);
+    return c.json({
+      message: "Profil Anda berhasil diperbarui.",
+      data: updated,
+    });
+  }
+);
+
+// Change Password (All roles)
+authRoute.patch(
+  "/change-password",
+  authMiddleware,
+  zValidator(
+    "json",
+    z.object({
+      currentPassword: z.string().min(1, "Password saat ini wajib diisi"),
+      newPassword: z.string().min(6, "Password baru minimal 6 karakter"),
+      confirmNewPassword: z.string().min(6),
+    }).refine((data) => data.newPassword === data.confirmNewPassword, {
+      message: "Konfirmasi kata sandi tidak sesuai",
+      path: ["confirmNewPassword"],
+    })
+  ),
+  async (c) => {
+    const user = c.get("user");
+    const { currentPassword, newPassword } = c.req.valid("json");
+    await authService.changePassword(user.sub, user.role, currentPassword, newPassword);
+    return c.json({
+      message: "Kata sandi berhasil diubah. Silakan gunakan kata sandi baru untuk login berikutnya.",
+    });
+  }
+);
+
 export default authRoute;

@@ -19,66 +19,8 @@ export interface Category {
   price: string        // String desimal dari BE, contoh: "750000.00"
   quotaTotal: number
   quotaSold?: number
-  benefits?: string[]  // TODO: Koordinasikan dengan BE untuk menambahkan kolom ini
+  benefits?: string[]
 }
-
-// Dummy data fallback saat BE offline
-const DUMMY_CATEGORIES: Category[] = [
-  {
-    id: 'cat-dummy-1',
-    eventId: '',
-    name: 'VVIP',
-    price: '2500000.00',
-    quotaTotal: 100,
-    quotaSold: 63,
-    benefits: [
-      'Best available seat (barisan 1–5)',
-      'Soundcheck session bersama artis',
-      'Group photo 4:20',
-      'Signed poster eksklusif',
-      'Laminated lanyard & goodie bag',
-      'Price exclude government tax & convenience fee',
-    ],
-  },
-  {
-    id: 'cat-dummy-2',
-    eventId: '',
-    name: 'VIP',
-    price: '1500000.00',
-    quotaTotal: 300,
-    quotaSold: 210,
-    benefits: [
-      'Priority seating (barisan 6–15)',
-      'Exclusive merchandise bundle',
-      'Early gate entry (1 jam sebelum umum)',
-      'Price exclude government tax & convenience fee',
-    ],
-  },
-  {
-    id: 'cat-dummy-3',
-    eventId: '',
-    name: 'Kategori 1',
-    price: '750000.00',
-    quotaTotal: 1000,
-    quotaSold: 480,
-    benefits: [
-      'Standing area zona A (dekat panggung)',
-      'Price exclude government tax & convenience fee',
-    ],
-  },
-  {
-    id: 'cat-dummy-4',
-    eventId: '',
-    name: 'Reguler',
-    price: '350000.00',
-    quotaTotal: 2000,
-    quotaSold: 0,
-    benefits: [
-      'Standing area zona B',
-      'Price exclude government tax & convenience fee',
-    ],
-  },
-]
 
 // Props & Emits
 const props = defineProps<{
@@ -92,6 +34,7 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 const { request } = useApi()
+const toast = useToast()
 
 // State
 const mode = ref<'list' | 'form'>('list')
@@ -100,7 +43,6 @@ const isSaving = ref(false)
 const categories = ref<Category[]>([])
 const editingCategory = ref<Category | null>(null)
 const errorMsg = ref('')
-const isUsingDummyData = ref(false)
 
 const formState = reactive({
   name: '',
@@ -119,16 +61,15 @@ watch(open, (isOpen) => {
   }
 })
 
-// API & Dummy Fallback
+// API Operations
 async function fetchCategories() {
   isLoading.value = true
-  isUsingDummyData.value = false
   try {
     const res = await request<{ data: Category[] }>(`/events/${props.eventId}/categories`)
     categories.value = res?.data ?? []
-  } catch {
-    categories.value = DUMMY_CATEGORIES.map(c => ({ ...c, eventId: props.eventId }))
-    isUsingDummyData.value = true
+  } catch (err: any) {
+    categories.value = []
+    toast.add({ title: 'Gagal memuat kategori tiket', color: 'error' })
   } finally {
     isLoading.value = false
   }
@@ -155,62 +96,32 @@ async function onSubmitCategory() {
 
   isSaving.value = true
 
-  // Payload ke BE — benefits dikirim jika BE sudah mendukung
   const payload = {
     name: formState.name.trim(),
     price: parsedPrice.toFixed(2),
     quotaTotal: parsedQuota,
-    benefits: formState.benefits,   // TODO: hapus baris ini jika BE belum support
+    benefits: formState.benefits,
   }
 
   try {
     if (editingCategory.value) {
-      const res = await request<{ data: Category }>(`/categories/${editingCategory.value.id}`, {
+      await request<{ data: Category }>(`/categories/${editingCategory.value.id}`, {
         method: 'PUT',
         body: payload,
       })
-      const updated = res?.data ?? { ...editingCategory.value, ...payload }
-      const idx = categories.value.findIndex(c => c.id === editingCategory.value!.id)
-      if (idx !== -1) categories.value[idx] = updated
+      toast.add({ title: 'Kategori tiket berhasil diperbarui', color: 'success' })
     } else {
-      const res = await request<{ data: Category }>(`/events/${props.eventId}/categories`, {
+      await request<{ data: Category }>(`/events/${props.eventId}/categories`, {
         method: 'POST',
         body: payload,
       })
-      categories.value.unshift(
-        res?.data ?? {
-          id: `cat-${Date.now()}`,
-          eventId: props.eventId,
-          quotaSold: 0,
-          ...payload,
-        }
-      )
+      toast.add({ title: 'Kategori tiket berhasil ditambahkan', color: 'success' })
     }
     emit('updated')
     mode.value = 'list'
-  } catch (err: unknown) {
-    // Fallback lokal jika BE offline
-    if (editingCategory.value) {
-      const idx = categories.value.findIndex(c => c.id === editingCategory.value!.id)
-      if (idx !== -1) {
-        const existing = categories.value[idx]!
-        categories.value[idx] = {
-          id: existing.id,
-          eventId: existing.eventId,
-          quotaSold: existing.quotaSold,
-          ...payload,
-        }
-      }
-    } else {
-      categories.value.unshift({
-        id: `cat-${Date.now()}`,
-        eventId: props.eventId,
-        quotaSold: 0,
-        ...payload,
-      })
-    }
-    emit('updated')
-    mode.value = 'list'
+    await fetchCategories()
+  } catch (err: any) {
+    errorMsg.value = err?.data?.error || err?.data?.message || 'Gagal menyimpan kategori tiket.'
   } finally {
     isSaving.value = false
   }
@@ -220,9 +131,12 @@ async function onDeleteCategory(category: Category) {
   if (!confirm(`Hapus kategori "${category.name}"? Tindakan ini tidak dapat dibatalkan.`)) return
   try {
     await request(`/categories/${category.id}`, { method: 'DELETE' })
-  } catch { /* tetap hapus lokal */ }
-  categories.value = categories.value.filter(c => c.id !== category.id)
-  emit('updated')
+    toast.add({ title: 'Kategori berhasil dihapus', color: 'success' })
+    categories.value = categories.value.filter(c => c.id !== category.id)
+    emit('updated')
+  } catch (err: any) {
+    toast.add({ title: err?.data?.error || 'Gagal menghapus kategori', color: 'error' })
+  }
 }
 
 // Form Helpers
@@ -303,14 +217,6 @@ function quotaBarColor(percent: number) {
       <!-- Mode List -->
       <div v-if="mode === 'list'" class="space-y-3 no-scrollbar">
 
-        <!-- Banner dummy data -->
-        <div
-          v-if="isUsingDummyData"
-          class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2"
-        >
-          <UIcon name="i-lucide-wifi-off" class="w-3.5 h-3.5 shrink-0" />
-          <span>Menampilkan data dummy — backend tidak dapat dijangkau.</span>
-        </div>
 
         <!-- Loading -->
         <div v-if="isLoading" class="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">

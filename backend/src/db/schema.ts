@@ -18,7 +18,11 @@ import { relations } from "drizzle-orm";
 
 // enums
 
-export const adminRoleEnum = pgEnum("admin_role", ["super_admin", "gate_staff"]);
+export const adminRoleEnum = pgEnum("admin_role", [
+  "super_admin",
+  "admin",
+  "gate_staff",
+]);
 export const eventStatusEnum = pgEnum("event_status", ["open", "closed"]);
 export const orderStatusEnum = pgEnum("order_status", [
   "pending",
@@ -32,9 +36,44 @@ export const admins = pgTable("admins", {
   name: varchar("name", { length: 100 }).notNull(),
   email: varchar("email", { length: 150 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  role: adminRoleEnum("role").notNull().default("gate_staff"),
+  role: adminRoleEnum("role").notNull().default("admin"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const systemSettings = pgTable("system_settings", {
+  id: varchar("id", { length: 50 }).primaryKey().default("default"),
+  defaultMaxTicketsPerOrder: integer("default_max_tickets_per_order").notNull().default(4),
+  pendingOrderExpiryMinutes: integer("pending_order_expiry_minutes").notNull().default(15),
+  supportEmail: varchar("support_email", { length: 150 }).notNull().default("support@ggtix.id"),
+  supportWhatsapp: varchar("support_whatsapp", { length: 50 }).notNull().default("+6281234567890"),
+  maintenanceMode: boolean("maintenance_mode").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: varchar("request_id", { length: 128 }),
+    userId: uuid("user_id").references(() => admins.id, { onDelete: "set null" }),
+    userEmail: varchar("user_email", { length: 150 }),
+    userRole: varchar("user_role", { length: 50 }),
+    method: varchar("method", { length: 10 }).notNull(),
+    path: text("path").notNull(),
+    statusCode: integer("status_code").notNull(),
+    ip: varchar("ip", { length: 50 }).notNull(),
+    userAgent: text("user_agent"),
+    durationMs: integer("duration_ms"),
+    details: jsonb("details"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("audit_logs_user_id_idx").on(table.userId),
+    createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
+    pathIdx: index("audit_logs_path_idx").on(table.path),
+    statusIdx: index("audit_logs_status_idx").on(table.statusCode),
+  })
+);
 
 export const customers = pgTable("customers", {
   id: uuid("id").defaultRandom().primaryKey(),

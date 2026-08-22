@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as adminService from "../services/admin.service";
 import * as customerService from "../services/customer.service";
-import { authMiddleware, superAdminOnly } from "../lib/middleware";
+import { authMiddleware, superAdminOnly, adminOrHigher } from "../lib/middleware";
 
 const usersRoute = new Hono();
 
@@ -14,7 +14,7 @@ const querySchema = z.object({
 });
 
 const roleQuerySchema = querySchema.extend({
-  role: z.enum(["super_admin", "gate_staff"]).optional(),
+  role: z.enum(["super_admin", "admin", "gate_staff"]).optional(),
 });
 
 const adminIdParamSchema = z.object({
@@ -25,18 +25,18 @@ const createAdminSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email format").max(150),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["super_admin", "gate_staff"]).optional(),
+  role: z.enum(["super_admin", "admin", "gate_staff"]).optional(),
 });
 
 const updateAdminSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).optional(),
   email: z.string().email("Invalid email format").max(150).optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
-  role: z.enum(["super_admin", "gate_staff"]).optional(),
+  role: z.enum(["super_admin", "admin", "gate_staff"]).optional(),
 });
 
-// GET /api/users/customers - List customers
-usersRoute.get("/customers", authMiddleware, superAdminOnly, zValidator("query", querySchema), async (c) => {
+// GET /api/users/customers - List customers (Super Admin & Admin can view)
+usersRoute.get("/customers", authMiddleware, adminOrHigher, zValidator("query", querySchema), async (c) => {
   const query = c.req.valid("query");
   const result = await customerService.listCustomers(query);
   return c.json({

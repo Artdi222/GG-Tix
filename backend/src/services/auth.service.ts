@@ -14,8 +14,8 @@ export async function adminLogin(email: string, password: string) {
     throw new AppError("Invalid email or password", 401);
   }
 
-  const token = await signToken({ sub: admin.id, role: "admin", adminRole: admin.role });
-  const refreshToken = await signRefreshToken({ sub: admin.id, role: "admin", adminRole: admin.role });
+  const token = await signToken({ sub: admin.id, role: "admin", adminRole: admin.role, email: admin.email, name: admin.name });
+  const refreshToken = await signRefreshToken({ sub: admin.id, role: "admin", adminRole: admin.role, email: admin.email, name: admin.name });
 
   return {
     token,
@@ -103,6 +103,66 @@ export async function getMe(userId: string, role: "admin" | "customer") {
       role: "customer" as const,
     };
   }
+}
+
+export async function updateProfile(userId: string, role: "admin" | "customer", data: { name?: string; email?: string }) {
+  if (role === "admin") {
+    const admin = await adminRepo.findAdminById(userId);
+    if (!admin) throw new AppError("Admin not found", 404);
+
+    if (data.email && data.email !== admin.email) {
+      const existing = await adminRepo.findAdminByEmail(data.email);
+      if (existing) {
+        throw new AppError("Email already in use", 409);
+      }
+    }
+
+    return await adminRepo.updateAdmin(userId, data);
+  } else {
+    const customer = await customerRepo.findCustomerById(userId);
+    if (!customer) throw new AppError("Customer not found", 404);
+
+    if (data.email && data.email !== customer.email) {
+      const existing = await customerRepo.findCustomerByEmail(data.email);
+      if (existing) {
+        throw new AppError("Email already in use", 409);
+      }
+    }
+
+    return await customerRepo.updateCustomer(userId, data);
+  }
+}
+
+export async function changePassword(
+  userId: string,
+  role: "admin" | "customer",
+  currentPassword: string,
+  newPassword: string
+) {
+  if (role === "admin") {
+    const admin = await adminRepo.findAdminById(userId);
+    if (!admin) throw new AppError("Admin not found", 404);
+
+    const isValid = await Bun.password.verify(currentPassword, admin.passwordHash);
+    if (!isValid) {
+      throw new AppError("Kata sandi saat ini salah.", 400);
+    }
+
+    const passwordHash = await Bun.password.hash(newPassword);
+    await adminRepo.updateAdmin(userId, { passwordHash });
+  } else {
+    const customer = await customerRepo.findCustomerById(userId);
+    if (!customer) throw new AppError("Customer not found", 404);
+
+    const isValid = await Bun.password.verify(currentPassword, customer.passwordHash);
+    if (!isValid) {
+      throw new AppError("Kata sandi saat ini salah.", 400);
+    }
+
+    const passwordHash = await Bun.password.hash(newPassword);
+    await customerRepo.updateCustomer(userId, { passwordHash });
+  }
+  return true;
 }
 
 export async function refreshAccessToken(refreshToken: string) {
