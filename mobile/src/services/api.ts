@@ -22,7 +22,7 @@ export const storage = {
         await SecureStore.setItemAsync(key, value);
       }
     } catch {
-      // Ignored
+      
     }
   },
   async removeItem(key: string): Promise<void> {
@@ -33,7 +33,7 @@ export const storage = {
         await SecureStore.deleteItemAsync(key);
       }
     } catch {
-      // Ignored
+      
     }
   },
 };
@@ -88,12 +88,10 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
       throw new Error(json.error || json.message || 'Terjadi kesalahan pada server.');
     }
 
-    // If response contains payment info alongside data (like in placeOrder), return the whole json
     if (json.payment) {
       return json as unknown as T;
     }
 
-    // Return data if wrapped, otherwise return whole payload
     if (json.data !== undefined) {
       return json.data as T;
     }

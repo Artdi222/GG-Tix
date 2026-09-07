@@ -1,35 +1,56 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, type ColorValue } from 'react-native';
 import { BRAND_COLORS } from '../../constants/config';
+
+function TabBarIcon({
+  name,
+  color,
+  focused,
+}: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  color: ColorValue;
+  focused: boolean;
+}) {
+  return (
+    <View style={styles.iconWrapper}>
+      {focused && <View style={styles.activeDot} />}
+      <Ionicons name={name} size={22} color={color as string} />
+    </View>
+  );
+}
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: BRAND_COLORS.accent,
-        tabBarInactiveTintColor: BRAND_COLORS.muted,
+        tabBarInactiveTintColor: '#71717A',
         tabBarStyle: {
-          backgroundColor: BRAND_COLORS.primary,
-          borderTopColor: 'rgba(255, 255, 255, 0.08)',
+          backgroundColor: '#111114',
+          borderTopColor: '#27272A',
           borderTopWidth: 1,
-          height: 60,
+          height: 64,
           paddingBottom: 8,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
+          letterSpacing: 0.2,
+          marginTop: 2,
         },
         headerStyle: {
-          backgroundColor: BRAND_COLORS.primary,
-          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+          backgroundColor: '#09090B',
+          borderBottomColor: '#27272A',
           borderBottomWidth: 1,
         },
-        headerTintColor: '#FFFFFF',
+        headerTintColor: '#FAFAFA',
         headerTitleStyle: {
-          fontWeight: 'bold',
-          fontSize: 18,
+          fontWeight: '800',
+          fontSize: 17,
+          letterSpacing: -0.2,
         },
       }}
     >
@@ -37,8 +58,10 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Beranda',
-          headerTitle: 'GG Tix Concerts',
-          tabBarIcon: ({ color, size }) => <Ionicons name="flame" size={size} color={color} />,
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'musical-notes' : 'musical-notes-outline'} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -46,7 +69,9 @@ export default function TabLayout() {
         options={{
           title: 'Tiket Saya',
           headerTitle: 'Tiket Digital Saya',
-          tabBarIcon: ({ color, size }) => <Ionicons name="ticket" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'ticket' : 'ticket-outline'} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -54,7 +79,9 @@ export default function TabLayout() {
         options={{
           title: 'Riwayat',
           headerTitle: 'Riwayat Transaksi',
-          tabBarIcon: ({ color, size }) => <Ionicons name="receipt" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'receipt' : 'receipt-outline'} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -62,9 +89,27 @@ export default function TabLayout() {
         options={{
           title: 'Profil',
           headerTitle: 'Akun Saya',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'person' : 'person-outline'} color={color} focused={focused} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrapper: {
+    alignItems: 'center',
+    position: 'relative',
+    paddingTop: 3,
+  },
+  activeDot: {
+    position: 'absolute',
+    top: -3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: BRAND_COLORS.accent,
+  },
+});

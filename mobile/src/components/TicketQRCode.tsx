@@ -1,9 +1,19 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, Platform } from 'react-native';
+import { StyleSheet, Text, View, Platform, Dimensions } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Brightness from 'expo-brightness';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import { BRAND_COLORS } from '../constants/config';
 import { StatusBadge } from './StatusBadge';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface TicketQRCodeProps {
   ticket: {
@@ -25,7 +35,18 @@ export function TicketQRCode({
   venueName,
   eventDate,
 }: TicketQRCodeProps) {
+  const shimmerTranslateX = useSharedValue(-SCREEN_WIDTH);
+
   useEffect(() => {
+    shimmerTranslateX.value = withRepeat(
+      withTiming(SCREEN_WIDTH * 1.5, {
+        duration: 3500,
+        easing: Easing.bezier(0.25, 1, 0.5, 1),
+      }),
+      -1,
+      false
+    );
+
     let originalBrightness: number | null = null;
 
     async function setMaxBrightness() {
@@ -37,7 +58,6 @@ export function TicketQRCode({
           await Brightness.setBrightnessAsync(1.0);
         }
       } catch {
-        // Ignored
       }
     }
 
@@ -48,7 +68,11 @@ export function TicketQRCode({
         Brightness.setBrightnessAsync(originalBrightness).catch(() => {});
       }
     };
-  }, []);
+  }, [shimmerTranslateX]);
+
+  const shimmerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerTranslateX.value }, { rotate: '25deg' }],
+  }));
 
   const formatDate = (iso?: string) => {
     if (!iso) return '';
@@ -68,12 +92,20 @@ export function TicketQRCode({
   return (
     <View style={styles.container}>
       <View style={styles.ticketCard}>
-        {/* Top Section */}
         <View style={styles.topSection}>
+          <Animated.View style={[styles.shimmerBeam, shimmerAnimatedStyle]} pointerEvents="none" />
+
+          <View style={styles.securityWatermarkRow}>
+            <Ionicons name="shield-checkmark" size={13} color={BRAND_COLORS.accent} />
+            <Text style={styles.securityWatermarkText}>
+              E-TIKET RESMI GG-TIX
+            </Text>
+          </View>
+
           <Text style={styles.eventTitle} numberOfLines={2}>
             {eventTitle}
           </Text>
-          {eventDate && <Text style={styles.eventDate}>📅 {formatDate(eventDate)}</Text>}
+          {eventDate && <Text style={styles.eventDate}>📅 {formatDate(eventDate)} WIB</Text>}
           {venueName && <Text style={styles.venueName}>📍 {venueName}</Text>}
 
           <View style={styles.badgeRow}>
@@ -84,24 +116,22 @@ export function TicketQRCode({
           </View>
         </View>
 
-        {/* Tear line divider */}
         <View style={styles.tearLineContainer}>
           <View style={styles.cutoutLeft} />
           <View style={styles.dashedLine} />
           <View style={styles.cutoutRight} />
         </View>
 
-        {/* QR Code Section */}
         <View style={styles.qrSection}>
           <Text style={styles.scanInstruction}>
-            Tunjukkan QR ini ke petugas gate di pintu masuk venue
+            Tunjukkan kode QR ini kepada petugas di pintu masuk venue
           </Text>
 
           <View style={styles.qrWrapper}>
             <QRCode
               value={ticket.qrCodeValue}
               size={220}
-              color="#1B1330"
+              color="#09090B"
               backgroundColor="#FFFFFF"
             />
           </View>
@@ -110,11 +140,19 @@ export function TicketQRCode({
 
           {ticket.checkedIn && (
             <View style={styles.checkedInBox}>
+              <Ionicons name="checkmark-circle" size={14} color="#065F46" />
               <Text style={styles.checkedInText}>
-                ✓ Telah masuk venue: {formatDate(ticket.checkedInAt || undefined)}
+                Telah masuk venue: {formatDate(ticket.checkedInAt || undefined)}
               </Text>
             </View>
           )}
+
+          <View style={styles.brightnessHintRow}>
+            <Ionicons name="sunny-outline" size={12} color="#9CA3AF" />
+            <Text style={styles.brightnessHintText}>
+              Kecerahan layar otomatis dinaikkan untuk scan QR
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -135,29 +173,59 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
-    shadowRadius: 16,
+    shadowRadius: 18,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: '#27272A',
   },
   topSection: {
-    backgroundColor: BRAND_COLORS.secondary,
+    backgroundColor: '#16161A',
     padding: 20,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  shimmerBeam: {
+    position: 'absolute',
+    top: -80,
+    width: 60,
+    height: 300,
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    shadowColor: BRAND_COLORS.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+  },
+  securityWatermarkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  securityWatermarkText: {
+    color: BRAND_COLORS.accent,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   eventTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: '#FAFAFA',
+    lineHeight: 24,
     marginBottom: 6,
+    letterSpacing: -0.2,
   },
   eventDate: {
     fontSize: 13,
     color: BRAND_COLORS.accent,
     marginBottom: 4,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   venueName: {
     fontSize: 13,
-    color: BRAND_COLORS.textMuted,
+    color: '#A1A1AA',
     marginBottom: 12,
+    fontWeight: '500',
   },
   badgeRow: {
     flexDirection: 'row',
@@ -166,20 +234,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   catBadge: {
-    backgroundColor: 'rgba(242, 169, 59, 0.15)',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.accent,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   catBadgeText: {
     color: BRAND_COLORS.accent,
-    fontWeight: '700',
-    fontSize: 12,
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   tearLineContainer: {
-    height: 24,
+    height: 22,
     backgroundColor: '#FFFFFF',
     position: 'relative',
     justifyContent: 'center',
@@ -187,19 +256,23 @@ const styles = StyleSheet.create({
   },
   cutoutLeft: {
     position: 'absolute',
-    left: -12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: BRAND_COLORS.primary,
+    left: -11,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#09090B',
+    borderRightWidth: 1,
+    borderRightColor: '#27272A',
   },
   cutoutRight: {
     position: 'absolute',
-    right: -12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: BRAND_COLORS.primary,
+    right: -11,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#09090B',
+    borderLeftWidth: 1,
+    borderLeftColor: '#27272A',
   },
   dashedLine: {
     width: '80%',
@@ -209,7 +282,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   qrSection: {
-    padding: 24,
+    padding: 22,
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
@@ -217,34 +290,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   qrWrapper: {
     padding: 12,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   ticketCode: {
-    marginTop: 14,
+    marginTop: 12,
     fontSize: 13,
     fontWeight: '700',
-    color: '#374151',
-    letterSpacing: 1,
+    color: '#1F2937',
+    letterSpacing: 1.2,
+    fontVariant: ['tabular-nums'],
   },
   checkedInBox: {
-    marginTop: 16,
-    backgroundColor: 'rgba(76, 217, 100, 0.15)',
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.success,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   checkedInText: {
-    color: '#15803D',
+    color: '#065F46',
     fontSize: 12,
     fontWeight: '700',
+  },
+  brightnessHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+  },
+  brightnessHintText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });

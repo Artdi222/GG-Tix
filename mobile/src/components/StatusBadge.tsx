@@ -10,52 +10,61 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
   let label = status;
-  let bgStyle = styles.badgeGray;
-  let textStyle = styles.textWhite;
+  let dotColor = '#9CA3AF';
+  let badgeStyle = styles.badgeGray;
+  let textColor = '#E5E7EB';
 
   switch (status) {
     case 'verified':
-      label = 'Tiket Aktif ✓';
-      bgStyle = styles.badgeGreen;
-      textStyle = styles.textDark;
+      label = 'Berhasil ✓';
+      dotColor = '#10B981';
+      badgeStyle = styles.badgeGreen;
+      textColor = '#34D399';
       break;
     case 'pending':
-      label = 'Menunggu Verifikasi';
-      bgStyle = styles.badgeYellow;
-      textStyle = styles.textDark;
+      label = 'Menunggu Pembayaran';
+      dotColor = '#F59E0B';
+      badgeStyle = styles.badgeYellow;
+      textColor = '#FBBF24';
       break;
     case 'rejected':
       label = 'Pembayaran Ditolak';
-      bgStyle = styles.badgeRed;
-      textStyle = styles.textWhite;
+      dotColor = '#EF4444';
+      badgeStyle = styles.badgeRed;
+      textColor = '#F87171';
       break;
     case 'expired':
       label = 'Kadaluwarsa';
-      bgStyle = styles.badgeGray;
-      textStyle = styles.textWhite;
+      dotColor = '#9CA3AF';
+      badgeStyle = styles.badgeGray;
+      textColor = '#D1D5DB';
       break;
     case 'checked_in':
-      label = 'Sudah Check-In';
-      bgStyle = styles.badgeBlue;
-      textStyle = styles.textWhite;
+      label = 'Sudah Masuk Venue';
+      dotColor = '#38BDF8';
+      badgeStyle = styles.badgeBlue;
+      textColor = '#7DD3FC';
       break;
     case 'open':
-      label = 'Buka';
-      bgStyle = styles.badgeGreen;
-      textStyle = styles.textDark;
+      label = 'Tiket Tersedia';
+      dotColor = '#10B981';
+      badgeStyle = styles.badgeGreen;
+      textColor = '#34D399';
       break;
     case 'closed':
-      label = 'Tutup';
-      bgStyle = styles.badgeRed;
-      textStyle = styles.textWhite;
+      label = 'Penjualan Ditutup';
+      dotColor = '#EF4444';
+      badgeStyle = styles.badgeRed;
+      textColor = '#F87171';
       break;
     default:
       label = status;
   }
 
   return (
-    <View style={[styles.badge, bgStyle, size === 'md' && styles.badgeMd]}>
-      <Text style={[styles.badgeText, textStyle, size === 'md' && styles.badgeTextMd]}>
+    <View style={[styles.badge, badgeStyle, size === 'md' && styles.badgeMd]}>
+      <View style={[styles.dot, { backgroundColor: dotColor }, size === 'md' && styles.dotMd]} />
+      <Text style={[styles.badgeText, { color: textColor }, size === 'md' && styles.badgeTextMd]}>
         {label}
       </Text>
     </View>
@@ -64,43 +73,58 @@ export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
     alignSelf: 'flex-start',
   },
   badgeMd: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 24,
+    gap: 8,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotMd: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
   badgeTextMd: {
     fontSize: 13,
+    letterSpacing: 0.4,
   },
   badgeGreen: {
-    backgroundColor: '#4CD964',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   badgeYellow: {
-    backgroundColor: '#F2A93B',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   badgeRed: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.35)',
   },
   badgeBlue: {
-    backgroundColor: '#5AC8FA',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderColor: 'rgba(56, 189, 248, 0.35)',
   },
   badgeGray: {
-    backgroundColor: '#555266',
-  },
-  textDark: {
-    color: '#1B1330',
-  },
-  textWhite: {
-    color: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
 });
