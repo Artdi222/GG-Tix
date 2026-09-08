@@ -77,7 +77,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (token) {
         set({ token, refreshToken, user, isInitialized: true });
-        // Refresh profile in background
         get().fetchProfile();
       } else {
         set({ isInitialized: true, token: null, user: null });

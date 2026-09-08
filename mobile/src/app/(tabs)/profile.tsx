@@ -1,259 +1,590 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../store/auth-store';
 import { BRAND_COLORS } from '../../constants/config';
+import { apiFetch } from '../../services/api';
 
 export default function ProfileScreen() {
   const { user, token, logout } = useAuthStore();
+  const [stats, setStats] = useState<{ activeTickets: number; totalOrders: number }>({
+    activeTickets: 0,
+    totalOrders: 0,
+  });
+
+  const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const handleLogout = () => {
-    Alert.alert('Keluar dari Akun', 'Yakin ingin keluar dari akun ini?', [
-      { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Keluar',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/auth/login');
+  useEffect(() => {
+    let isMounted = true;
+    if (token) {
+      apiFetch<any>('/orders/me')
+        .then((res) => {
+          if (!isMounted) return;
+          const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
+          const active = items.filter((i: any) => i.status === 'verified').length;
+          setStats({
+            activeTickets: active,
+            totalOrders: items.length,
+          });
+        })
+        .catch(() => {
+          
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  const handleLogout = async () => {
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Yakin ingin keluar dari akun ini?') : true;
+      if (confirmed) {
+        await logout();
+        router.replace('/auth/login');
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Keluar dari Akun',
+      'Sesi Anda akan diakhiri. Anda perlu masuk kembali untuk mengakses e-tiket.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Keluar',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth/login');
+          },
         },
-      },
-    ]);
+      ]
+    );
+  };
+
+  const handleMenuPress = (title: string, message: string) => {
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
+    Alert.alert(title, message);
   };
 
   if (!token) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="person-circle-outline" size={70} color={BRAND_COLORS.accent} />
-        <Text style={styles.promptTitle}>Akun Pengguna</Text>
+      <View style={[styles.container, styles.centerContainer, { paddingTop: Math.max(insets.top, 20) }]}>
+        <View style={styles.guestIconWrap}>
+          <Ionicons name="person-outline" size={40} color={BRAND_COLORS.accent} />
+        </View>
+        <Text style={styles.promptTitle}>Profil Akun Saya</Text>
         <Text style={styles.promptSub}>
-          Masuk atau daftar untuk mengakses fitur lengkap GG Tix Concerts.
+          Masuk ke akun GG-Tix Anda untuk mengakses tiket konser, riwayat transaksi, dan pengaturan keamanan.
         </Text>
-        <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/auth/login')}>
-          <Text style={styles.loginBtnText}>Masuk / Daftar</Text>
+        <TouchableOpacity
+          style={styles.loginBtn}
+          onPress={() => router.push('/auth/login')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Masuk ke Akun"
+        >
+          <Text style={styles.loginBtnText}>Masuk ke Akun</Text>
+          <Ionicons name="arrow-forward" size={16} color="#09090B" />
         </TouchableOpacity>
       </View>
     );
   }
 
+  const initials = (user?.name || 'Customer').charAt(0).toUpperCase();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Profile Card */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(user?.name || 'Customer').charAt(0).toUpperCase()}
-          </Text>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
+        <View>
+          <Text style={styles.headerTitle}>Akun Saya</Text>
+          <Text style={styles.headerSub}>Profil, keamanan & preferensi aplikasi</Text>
         </View>
-
-        <Text style={styles.name}>{user?.name || 'Customer GG Tix'}</Text>
-        <Text style={styles.email}>{user?.email || 'customer@ggtix.com'}</Text>
-
-        <View style={styles.accountBadge}>
-          <Text style={styles.accountBadgeText}>AKUN CUSTOMER RESMI</Text>
+        <View style={styles.securityBadge}>
+          <Ionicons name="shield-checkmark" size={11} color={BRAND_COLORS.success} />
+          <Text style={styles.securityBadgeText}>ENCRYPTED</Text>
         </View>
       </View>
 
-      {/* Menu Options */}
-      <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>Pengaturan & Info</Text>
-
-        <View style={styles.menuCard}>
-
-          <View style={styles.menuItem}>
-            <View style={styles.menuIconWrapper}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={BRAND_COLORS.accent} />
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 16) + 36 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.profileCard}>
+          <View style={styles.profileHeaderRow}>
+            <View style={styles.avatarWrap}>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuTitle}>Kebijakan Privasi</Text>
-              <Text style={styles.menuSub}>Perlindungan data dan tiket</Text>
+            <View style={styles.profileInfoCol}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {user?.name || 'Customer GG-Tix'}
+              </Text>
+              <Text style={styles.userEmail} numberOfLines={1}>
+                {user?.email || 'customer@ggtix.com'}
+              </Text>
+              <View style={styles.memberPill}>
+                <Ionicons name="star" size={11} color={BRAND_COLORS.accent} />
+                <Text style={styles.memberPillText}>MEMBER RESMI GG-TIX</Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={BRAND_COLORS.muted} />
           </View>
 
-          <View style={styles.menuDivider} />
+          <View style={styles.divider} />
 
-          <View style={styles.menuItem}>
-            <View style={styles.menuIconWrapper}>
-              <Ionicons name="help-circle-outline" size={18} color={BRAND_COLORS.accent} />
+          <View style={styles.summaryBar}>
+            <TouchableOpacity
+              style={styles.summaryItem}
+              onPress={() => router.push('/(tabs)/tickets')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.summaryValue}>{stats.activeTickets}</Text>
+              <Text style={styles.summaryLabel}>Tiket Aktif</Text>
+            </TouchableOpacity>
+
+            <View style={styles.summaryDivider} />
+
+            <TouchableOpacity
+              style={styles.summaryItem}
+              onPress={() => router.push('/(tabs)/history')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.summaryValue}>{stats.totalOrders}</Text>
+              <Text style={styles.summaryLabel}>Riwayat Order</Text>
+            </TouchableOpacity>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: BRAND_COLORS.success }]}>Aktif</Text>
+              <Text style={styles.summaryLabel}>Status Akun</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuTitle}>Bantuan & FAQ</Text>
-              <Text style={styles.menuSub}>Panduan scan dan pembayaran</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={BRAND_COLORS.muted} />
           </View>
         </View>
-      </View>
 
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
-        <Ionicons name="log-out-outline" size={20} color="#FF453A" />
-        <Text style={styles.logoutText}>Keluar dari Akun</Text>
-      </TouchableOpacity>
+        <View style={styles.menuSection}>
+          <Text style={styles.sectionHeader}>PENGATURAN & KEAMANAN</Text>
+          <View style={styles.menuCard}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() =>
+                handleMenuPress(
+                  'Ubah Kata Sandi',
+                  'Fitur pergantian kata sandi dapat dilakukan secara mandiri atau melalui tautan reset password yang dikirim ke email terdaftar Anda.'
+                )
+              }
+              activeOpacity={0.75}
+            >
+              <View style={styles.menuIconBox}>
+                <Ionicons name="key-outline" size={18} color={BRAND_COLORS.accent} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle}>Ubah Kata Sandi</Text>
+                <Text style={styles.menuDesc}>Perbarui kata sandi akun secara berkala</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+            </TouchableOpacity>
 
-      <Text style={styles.versionText}>GG Tix Mobile v1.0.0 (Expo SDK 57)</Text>
-    </ScrollView>
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() =>
+                handleMenuPress(
+                  'Privasi & Keamanan',
+                  'Seluruh data transaksi dan barcode e-tiket dilindungi enkripsi standar industri dan tersimpan aman di perangkat Anda.'
+                )
+              }
+              activeOpacity={0.75}
+            >
+              <View style={styles.menuIconBox}>
+                <Ionicons name="lock-closed-outline" size={18} color={BRAND_COLORS.accent} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle}>Privasi & Keamanan Data</Text>
+                <Text style={styles.menuDesc}>Enkripsi data dan proteksi e-tiket resmi</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.menuSection}>
+          <Text style={styles.sectionHeader}>PUSAT BANTUAN & LEGAL</Text>
+          <View style={styles.menuCard}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() =>
+                handleMenuPress(
+                  'Bantuan & FAQ Check-in Gate',
+                  'Tunjukkan QR Code di layar e-tiket kepada petugas gate saat memasuki konser. Kecerahan layar akan otomatis disesuaikan secara maksimal.'
+                )
+              }
+              activeOpacity={0.75}
+            >
+              <View style={styles.menuIconBox}>
+                <Ionicons name="help-circle-outline" size={18} color={BRAND_COLORS.accent} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle}>Bantuan & FAQ Check-in</Text>
+                <Text style={styles.menuDesc}>Panduan pemindaian tiket di pintu masuk venue</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+            </TouchableOpacity>
+
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() =>
+                handleMenuPress(
+                  'Syarat & Ketentuan Konser',
+                  'Tiket yang telah dibeli tidak dapat ditukar atau dikembalikan kecuali terjadi pembatalan resmi oleh pihak promotor acara.'
+                )
+              }
+              activeOpacity={0.75}
+            >
+              <View style={styles.menuIconBox}>
+                <Ionicons name="document-text-outline" size={18} color={BRAND_COLORS.accent} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle}>Syarat & Ketentuan</Text>
+                <Text style={styles.menuDesc}>Aturan pembelian dan regulasi venue acara</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+            </TouchableOpacity>
+
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() =>
+                handleMenuPress(
+                  'Tentang GG-Tix',
+                  'GG-Tix adalah platform pemesanan tiket resmi untuk konser gaming, anime, dan pop culture di Indonesia.'
+                )
+              }
+              activeOpacity={0.75}
+            >
+              <View style={styles.menuIconBox}>
+                <Ionicons name="information-circle-outline" size={18} color={BRAND_COLORS.accent} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle}>Tentang GG-Tix</Text>
+                <Text style={styles.menuDesc}>Platform tiket konser game & pop culture</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Keluar dari Akun"
+        >
+          <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+          <Text style={styles.logoutBtnText}>Keluar dari Akun</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.versionText}>GG-Tix Mobile v1.0.0 • Stage Edition</Text>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BRAND_COLORS.bgDark,
+    backgroundColor: '#09090B',
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  centerContainer: {
-    flex: 1,
-    backgroundColor: BRAND_COLORS.bgDark,
-    justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 32,
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: '#09090B',
+    borderBottomWidth: 1,
+    borderBottomColor: '#16161A',
   },
-  promptTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FAFAFA',
+    letterSpacing: -0.3,
   },
-  promptSub: {
-    color: BRAND_COLORS.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
+  headerSub: {
+    fontSize: 11,
+    color: '#71717A',
+    marginTop: 2,
   },
-  loginBtn: {
-    backgroundColor: BRAND_COLORS.accent,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 8,
-  },
-  loginBtnText: {
-    color: BRAND_COLORS.primary,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  profileCard: {
-    backgroundColor: BRAND_COLORS.cardBg,
-    padding: 24,
-    borderRadius: 16,
+  securityBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: BRAND_COLORS.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: BRAND_COLORS.primary,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: 14,
-    color: BRAND_COLORS.textMuted,
-    marginBottom: 12,
-  },
-  accountBadge: {
-    backgroundColor: 'rgba(242, 169, 59, 0.15)',
-    paddingHorizontal: 12,
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.accent,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
   },
-  accountBadgeText: {
-    color: BRAND_COLORS.accent,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  menuSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: BRAND_COLORS.textMuted,
-    marginBottom: 10,
-    textTransform: 'uppercase',
+  securityBadgeText: {
+    color: BRAND_COLORS.success,
+    fontSize: 9,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
+
+  scrollContent: {
+    padding: 16,
+  },
+
+  profileCard: {
+    backgroundColor: '#16161A',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    marginBottom: 20,
+  },
+  profileHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatarWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#1F1F24',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: BRAND_COLORS.accent,
+  },
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: BRAND_COLORS.accent,
+  },
+  profileInfoCol: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FAFAFA',
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 12,
+    color: '#71717A',
+    marginBottom: 6,
+  },
+  memberPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  memberPillText: {
+    color: BRAND_COLORS.accent,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#27272A',
+    marginVertical: 14,
+  },
+
+  summaryBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FAFAFA',
+    fontVariant: ['tabular-nums'],
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: '#71717A',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#27272A',
+  },
+
+  menuSection: {
+    marginBottom: 18,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#71717A',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    paddingLeft: 4,
+  },
   menuCard: {
-    backgroundColor: BRAND_COLORS.cardBg,
+    backgroundColor: '#16161A',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#27272A',
     overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
     gap: 12,
+    minHeight: 52,
   },
-  menuIconWrapper: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(242, 169, 59, 0.12)',
+  menuIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#1F1F24',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  menuTextCol: {
+    flex: 1,
   },
   menuTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#FAFAFA',
   },
-  menuSub: {
-    fontSize: 12,
-    color: BRAND_COLORS.textMuted,
-    marginTop: 2,
+  menuDesc: {
+    fontSize: 11,
+    color: '#71717A',
+    marginTop: 1,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#27272A',
     marginLeft: 62,
   },
-  logoutButton: {
+
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255, 59, 48, 0.12)',
-    padding: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.3)',
-    marginBottom: 20,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    marginTop: 4,
+    marginBottom: 16,
+    minHeight: 48,
   },
-  logoutText: {
-    color: '#FF453A',
-    fontSize: 15,
-    fontWeight: 'bold',
+  logoutBtnText: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '700',
   },
   versionText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
+    color: '#52525B',
+    fontSize: 11,
     textAlign: 'center',
+  },
+
+  centerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  guestIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    marginBottom: 4,
+  },
+  promptTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FAFAFA',
+  },
+  promptSub: {
+    color: '#71717A',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  loginBtn: {
+    backgroundColor: BRAND_COLORS.accent,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    minHeight: 44,
+  },
+  loginBtnText: {
+    color: '#09090B',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
