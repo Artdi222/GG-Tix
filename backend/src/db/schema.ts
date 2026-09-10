@@ -30,6 +30,7 @@ export const orderStatusEnum = pgEnum("order_status", [
   "rejected",
   "expired",
 ]);
+export const discountTypeEnum = pgEnum("discount_type", ["fixed", "percentage"]);
 
 export const admins = pgTable("admins", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -167,7 +168,11 @@ export const orders = pgTable(
       .notNull()
       .references(() => ticketCategories.id),
     quantity: integer("quantity").notNull(),
+    subtotalPrice: numeric("subtotal_price", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).notNull().default("0.00"),
     totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
+    voucherId: uuid("voucher_id").references(() => vouchers.id, { onDelete: "set null" }),
+    voucherCode: varchar("voucher_code", { length: 50 }),
     status: orderStatusEnum("status").notNull().default("pending"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     verifiedBy: uuid("verified_by").references(() => admins.id),
@@ -177,6 +182,61 @@ export const orders = pgTable(
     statusIdx: index("orders_status_idx").on(table.status),
     eventIdx: index("orders_event_id_idx").on(table.eventId),
     customerIdx: index("orders_customer_id_idx").on(table.customerId),
+    voucherIdx: index("orders_voucher_id_idx").on(table.voucherId),
+  })
+);
+
+export const vouchers = pgTable(
+  "vouchers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 50 }).notNull().unique(),
+    name: varchar("name", { length: 150 }).notNull(),
+    description: text("description"),
+    discountType: discountTypeEnum("discount_type").notNull(),
+    discountValue: numeric("discount_value", { precision: 12, scale: 2 }).notNull(),
+    maxDiscountAmount: numeric("max_discount_amount", { precision: 12, scale: 2 }),
+    minOrderAmount: numeric("min_order_amount", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    quotaTotal: integer("quota_total").notNull(),
+    quotaRemaining: integer("quota_remaining").notNull(),
+    maxUsagePerCustomer: integer("max_usage_per_customer").notNull().default(1),
+    eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+    startDate: timestamp("start_date").notNull().defaultNow(),
+    endDate: timestamp("end_date").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => admins.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    codeIdx: index("vouchers_code_idx").on(table.code),
+    eventIdIdx: index("vouchers_event_id_idx").on(table.eventId),
+    activeDateIdx: index("vouchers_active_date_idx").on(table.isActive, table.startDate, table.endDate),
+  })
+);
+
+export const voucherUsages = pgTable(
+  "voucher_usages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    voucherId: uuid("voucher_id")
+      .notNull()
+      .references(() => vouchers.id, { onDelete: "restrict" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "restrict" }),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    discountApplied: numeric("discount_applied", { precision: 12, scale: 2 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    customerVoucherIdx: index("voucher_usages_customer_voucher_idx").on(table.customerId, table.voucherId),
+    orderIdIdx: index("voucher_usages_order_id_idx").on(table.orderId),
   })
 );
 
@@ -232,8 +292,23 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   event: one(events, { fields: [orders.eventId], references: [events.id] }),
   category: one(ticketCategories, { fields: [orders.categoryId], references: [ticketCategories.id] }),
   verifiedByAdmin: one(admins, { fields: [orders.verifiedBy], references: [admins.id] }),
+  voucher: one(vouchers, { fields: [orders.voucherId], references: [vouchers.id] }),
   paymentProofs: many(paymentProofs),
   tickets: many(tickets),
+  voucherUsages: many(voucherUsages),
+}));
+
+export const vouchersRelations = relations(vouchers, ({ one, many }) => ({
+  event: one(events, { fields: [vouchers.eventId], references: [events.id] }),
+  createdByAdmin: one(admins, { fields: [vouchers.createdBy], references: [admins.id] }),
+  usages: many(voucherUsages),
+  orders: many(orders),
+}));
+
+export const voucherUsagesRelations = relations(voucherUsages, ({ one }) => ({
+  voucher: one(vouchers, { fields: [voucherUsages.voucherId], references: [vouchers.id] }),
+  customer: one(customers, { fields: [voucherUsages.customerId], references: [customers.id] }),
+  order: one(orders, { fields: [voucherUsages.orderId], references: [orders.id] }),
 }));
 
 export const paymentProofsRelations = relations(paymentProofs, ({ one }) => ({
@@ -246,5 +321,6 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
 
 export const customersRelations = relations(customers, ({ many }) => ({
   orders: many(orders),
+  voucherUsages: many(voucherUsages),
 }));
 

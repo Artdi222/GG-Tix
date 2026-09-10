@@ -7,6 +7,7 @@ export interface PlaceOrderDTO {
   eventId: string;
   categoryId: string;
   quantity: number;
+  voucherCode?: string;
 }
 
 export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
@@ -15,6 +16,7 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
     eventId: data.eventId,
     categoryId: data.categoryId,
     quantity: data.quantity,
+    voucherCode: data.voucherCode,
   });
 
   // Handle transaction-level errors
@@ -30,6 +32,20 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
         throw new AppError("Not enough tickets remaining", 409, {
           available: String(result.available),
         });
+      case "VOUCHER_NOT_FOUND":
+        throw new AppError("Kode promo tidak ditemukan atau sudah tidak aktif.", 404);
+      case "VOUCHER_NOT_STARTED":
+        throw new AppError("Masa berlaku kode promo ini belum dimulai.", 400);
+      case "VOUCHER_EXPIRED":
+        throw new AppError("Masa berlaku kode promo ini telah berakhir.", 400);
+      case "VOUCHER_QUOTA_EXCEEDED":
+        throw new AppError("Yah, kuota promo ini sudah habis terpakai.", 409);
+      case "VOUCHER_EVENT_MISMATCH":
+        throw new AppError("Kode promo ini tidak berlaku untuk konser yang dipilih.", 400);
+      case "VOUCHER_MIN_SPEND_NOT_MET":
+        throw new AppError("Total belanja belum mencapai batas minimum penggunaan promo.", 400);
+      case "VOUCHER_CUSTOMER_LIMIT_REACHED":
+        throw new AppError("Anda telah mencapai batas pemakaian untuk kode promo ini.", 400);
     }
   }
 

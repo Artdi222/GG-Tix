@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,6 +60,26 @@ export default function CheckoutScreen() {
   const unitPrice = parseFloat(price || '0');
   const totalPrice = unitPrice * quantity;
 
+  // Promo code & voucher discount state
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    valid: boolean;
+    voucher: {
+      id: string;
+      code: string;
+      name: string;
+      discountType: string;
+      discountValue: string;
+    };
+    discountAmount: number;
+    finalAmount: number;
+  } | null>(null);
+  const [promoError, setPromoError] = useState('');
+
+  const discountAmount = appliedPromo?.discountAmount || 0;
+  const finalTotalPrice = Math.max(0, totalPrice - discountAmount);
+
   useEffect(() => {
     let isMounted = true;
     if (id) {
@@ -89,6 +110,18 @@ export default function CheckoutScreen() {
     maximumFractionDigits: 0,
   }).format(totalPrice);
 
+  const formattedDiscount = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(discountAmount);
+
+  const formattedFinalPrice = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(finalTotalPrice);
+
   const formatDate = (isoString?: string) => {
     if (!isoString) return '';
     try {
@@ -116,6 +149,56 @@ export default function CheckoutScreen() {
     setSelectedMethod(methodId);
   };
 
+  const handleApplyPromo = async () => {
+    const code = promoCodeInput.trim().toUpperCase();
+    if (!code) {
+      setPromoError('Masukkan kode promo terlebih dahulu');
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
+
+    setPromoError('');
+    setIsApplyingPromo(true);
+
+    try {
+      const res = await apiFetch<any>('/promo/validate', {
+        method: 'POST',
+        body: JSON.stringify({
+          code,
+          orderAmount: totalPrice,
+          eventId: id,
+        }),
+      });
+
+      const promoData = res.data || res;
+      if (promoData.valid) {
+        setAppliedPromo(promoData);
+        setPromoCodeInput('');
+      } else {
+        setPromoError(promoData.message || 'Kode promo tidak dapat digunakan');
+      }
+    } catch (err: any) {
+      setPromoError(err.message || 'Gagal menerapkan kode promo');
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
+    setAppliedPromo(null);
+    setPromoError('');
+  };
+
   const handlePay = async () => {
     if (loading) return;
 
@@ -135,6 +218,7 @@ export default function CheckoutScreen() {
           eventId: id,
           categoryId,
           quantity,
+          voucherCode: appliedPromo?.voucher?.code || undefined,
         }),
       });
 
@@ -252,6 +336,74 @@ export default function CheckoutScreen() {
           </View>
         </View>
 
+        {/* PROMO VOUCHER CARD */}
+        <View style={styles.sectionCard}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.headerIconWrap}>
+              <Ionicons name="ticket-outline" size={15} color={BRAND_COLORS.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardHeaderTitle}>Promo & Voucher Diskon</Text>
+              <Text style={styles.cardHeaderSub}>Gunakan kupon potongan harga resmi</Text>
+            </View>
+          </View>
+
+          {appliedPromo ? (
+            <View style={styles.promoAppliedBox}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="checkmark-circle" size={15} color={BRAND_COLORS.success} />
+                  <Text style={styles.promoAppliedCode}>{appliedPromo.voucher.code}</Text>
+                  <View style={styles.promoAppliedBadge}>
+                    <Text style={styles.promoAppliedBadgeText}>HEMAT {formattedDiscount}</Text>
+                  </View>
+                </View>
+                <Text style={styles.promoAppliedName}>{appliedPromo.voucher.name}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.promoRemoveBtn}
+                onPress={handleRemovePromo}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Hapus voucher promo"
+              >
+                <Ionicons name="close" size={16} color="#A1A1AA" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View>
+              <View style={styles.promoInputRow}>
+                <TextInput
+                  style={styles.promoInput}
+                  placeholder="KODE PROMO (Misal: EARLYBIRD)"
+                  placeholderTextColor="#71717A"
+                  value={promoCodeInput}
+                  onChangeText={(val) => setPromoCodeInput(val.toUpperCase())}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={[styles.promoApplyBtn, isApplyingPromo && { opacity: 0.6 }]}
+                  disabled={isApplyingPromo || !promoCodeInput.trim()}
+                  onPress={handleApplyPromo}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Terapkan kode promo"
+                >
+                  {isApplyingPromo ? (
+                    <ActivityIndicator size="small" color="#09090B" />
+                  ) : (
+                    <Text style={styles.promoApplyBtnText}>Terapkan</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {promoError ? (
+                <Text style={styles.promoErrorText}>{promoError}</Text>
+              ) : null}
+            </View>
+          )}
+        </View>
+
         <View style={styles.sectionCard}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.headerIconWrap}>
@@ -271,6 +423,19 @@ export default function CheckoutScreen() {
             </Text>
             <Text style={styles.priceValue}>{formattedTotalPrice}</Text>
           </View>
+
+          {appliedPromo ? (
+            <View style={styles.priceRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.priceLabel, { color: BRAND_COLORS.success }]}>
+                  Diskon Voucher ({appliedPromo.voucher.code})
+                </Text>
+              </View>
+              <Text style={[styles.priceValue, { color: BRAND_COLORS.success }]}>
+                - {formattedDiscount}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Harga Satuan</Text>
@@ -294,7 +459,7 @@ export default function CheckoutScreen() {
               <Text style={styles.totalLabel}>Total Tagihan</Text>
               <Text style={styles.totalSub}>Termasuk pajak & biaya sistem</Text>
             </View>
-            <Text style={styles.totalAmount}>{formattedTotalPrice}</Text>
+            <Text style={styles.totalAmount}>{formattedFinalPrice}</Text>
           </View>
         </View>
 
@@ -351,7 +516,7 @@ export default function CheckoutScreen() {
       >
         <View style={styles.footerPriceCol}>
           <Text style={styles.footerPriceLabel}>Total Pembayaran</Text>
-          <Text style={styles.footerPriceValue}>{formattedTotalPrice}</Text>
+          <Text style={styles.footerPriceValue}>{formattedFinalPrice}</Text>
         </View>
 
         <Animated.View style={payButtonAnimatedStyle}>
@@ -594,6 +759,83 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.success,
     fontSize: 10,
     fontWeight: '700',
+  },
+
+  promoInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  promoInput: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#111114',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    paddingHorizontal: 12,
+    color: '#FAFAFA',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  promoApplyBtn: {
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: BRAND_COLORS.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoApplyBtnText: {
+    color: '#09090B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  promoErrorText: {
+    color: BRAND_COLORS.danger,
+    fontSize: 11,
+    marginTop: 6,
+    marginLeft: 2,
+  },
+  promoAppliedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  promoAppliedCode: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: BRAND_COLORS.success,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  promoAppliedBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  promoAppliedBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: BRAND_COLORS.success,
+  },
+  promoAppliedName: {
+    fontSize: 11,
+    color: '#A1A1AA',
+    marginTop: 3,
+  },
+  promoRemoveBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#27272A',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   divider: {

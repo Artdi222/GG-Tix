@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch } from '../../services/api';
 import { BRAND_COLORS } from '../../constants/config';
 import { MOTION_TOKENS } from '../../constants/motion';
@@ -177,12 +178,15 @@ function TicketCard({ item, onPress }: TicketCardProps) {
   );
 }
 
+const CACHE_KEY_ORDERS = '@ggtix_cached_orders_me';
+
 export default function TicketsScreen() {
   const token = useAuthStore((state) => state.token);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(Boolean(token));
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'all'>('active');
+  const [isOffline, setIsOffline] = useState(false);
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -196,7 +200,21 @@ export default function TicketsScreen() {
       const res = await apiFetch<any>('/orders/me');
       const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
       setOrders(items);
+      setIsOffline(false);
+      await AsyncStorage.setItem(CACHE_KEY_ORDERS, JSON.stringify(items)).catch(() => {});
     } catch {
+      // Offline fallback: load from AsyncStorage
+      const cached = await AsyncStorage.getItem(CACHE_KEY_ORDERS).catch(() => null);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrders(parsed);
+            setIsOffline(true);
+            return;
+          }
+        } catch {}
+      }
       setOrders([]);
     } finally {
       setLoading(false);
@@ -207,14 +225,43 @@ export default function TicketsScreen() {
   useEffect(() => {
     let isMounted = true;
     if (token) {
+      // 1. Immediately read cached orders for instantaneous display
+      AsyncStorage.getItem(CACHE_KEY_ORDERS)
+        .then((cached) => {
+          if (cached && isMounted) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setOrders(parsed);
+                setLoading(false);
+              }
+            } catch {}
+          }
+        })
+        .catch(() => {});
+
+      // 2. Fetch fresh orders from backend
       apiFetch<any>('/orders/me')
         .then((res) => {
           if (!isMounted) return;
           const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
           setOrders(items);
+          setIsOffline(false);
+          AsyncStorage.setItem(CACHE_KEY_ORDERS, JSON.stringify(items)).catch(() => {});
         })
-        .catch(() => {
+        .catch(async () => {
           if (!isMounted) return;
+          const cached = await AsyncStorage.getItem(CACHE_KEY_ORDERS).catch(() => null);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setOrders(parsed);
+                setIsOffline(true);
+                return;
+              }
+            } catch {}
+          }
           setOrders([]);
         })
         .finally(() => {
@@ -280,6 +327,13 @@ export default function TicketsScreen() {
           <Text style={styles.activeCountText}>{activeTicketsCount} Tiket Aktif</Text>
         </View>
       </View>
+
+      {isOffline ? (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline" size={13} color={BRAND_COLORS.accent} />
+          <Text style={styles.offlineBannerText}>Mode Offline: Tiket dimuat dari penyimpanan lokal</Text>
+        </View>
+      ) : null}
 
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -785,5 +839,20 @@ const styles = StyleSheet.create({
     color: '#09090B',
     fontWeight: '700',
     fontSize: 13,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(245, 158, 11, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+  },
+  offlineBannerText: {
+    color: BRAND_COLORS.accent,
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

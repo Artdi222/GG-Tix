@@ -24,6 +24,7 @@ const navigationGroups = computed(() => {
         { label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/' },
         { label: 'Event Konser', icon: 'i-lucide-calendar-range', to: '/events'},
         { label: 'Transaksi & Orders', icon: 'i-lucide-receipt', to: '/orders' },
+        { label: 'Promo & Voucher', icon: 'i-lucide-ticket-percent', to: '/vouchers' },
         { label: 'Scan QR Check-In', icon: 'i-lucide-qr-code', to: '/scanner' }
       ]
     },

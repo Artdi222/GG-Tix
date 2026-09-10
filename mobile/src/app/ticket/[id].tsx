@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch } from '../../services/api';
 import { BRAND_COLORS } from '../../constants/config';
 import { TicketQRCode } from '../../components/TicketQRCode';
@@ -42,28 +43,58 @@ export default function TicketDetailScreen() {
   const [data, setData] = useState<OrderDetailResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   useEffect(() => {
     let isMounted = true;
-    if (id) {
-      apiFetch<any>(`/tickets/order/${id}`)
-        .then((res) => {
-          if (!isMounted) return;
-          const orderData = res.data || res;
-          setData(orderData);
-        })
-        .catch((err: any) => {
-          if (!isMounted) return;
-          Alert.alert('Gagal Memuat Tiket', err.message || 'Tiket tidak ditemukan atau belum diverifikasi.');
-        })
-        .finally(() => {
-          if (!isMounted) return;
-          setLoading(false);
-        });
-    }
+    if (!id) return;
+
+    // 1. Immediately read cached ticket data if available
+    AsyncStorage.getItem(`@ggtix_cached_ticket_${id}`)
+      .then((cached) => {
+        if (cached && isMounted) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.tickets) {
+              setData(parsed);
+              setLoading(false);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch fresh ticket from server
+    apiFetch<any>(`/tickets/order/${id}`)
+      .then((res) => {
+        if (!isMounted) return;
+        const orderData = res.data || res;
+        setData(orderData);
+        setIsOffline(false);
+        AsyncStorage.setItem(`@ggtix_cached_ticket_${id}`, JSON.stringify(orderData)).catch(() => {});
+      })
+      .catch(async (err: any) => {
+        if (!isMounted) return;
+        const cached = await AsyncStorage.getItem(`@ggtix_cached_ticket_${id}`).catch(() => null);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.tickets) {
+              setData(parsed);
+              setIsOffline(true);
+              return;
+            }
+          } catch {}
+        }
+        Alert.alert('Gagal Memuat Tiket', err.message || 'Tiket tidak ditemukan atau belum diverifikasi.');
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
 
     return () => {
       isMounted = false;
@@ -119,6 +150,13 @@ export default function TicketDetailScreen() {
             <Text style={styles.sslBadgeText}>RESMI</Text>
           </View>
         </View>
+
+        {isOffline ? (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline" size={13} color={BRAND_COLORS.accent} />
+            <Text style={styles.offlineBannerText}>Mode Offline: Tiket & QR dimuat dari cache lokal</Text>
+          </View>
+        ) : null}
 
         {totalTickets > 1 && (
           <View style={styles.switcherContainer}>
@@ -324,5 +362,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#71717A',
     lineHeight: 16,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    maxWidth: 360,
+    width: '100%',
+  },
+  offlineBannerText: {
+    color: BRAND_COLORS.accent,
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

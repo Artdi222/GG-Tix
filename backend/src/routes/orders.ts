@@ -11,7 +11,7 @@ import {
 
 const orderRoute = new Hono();
 
-// ponytail: support both flat { eventId, categoryId, quantity } and { eventId, items: [...] } payloads
+// ponytail: support both flat { eventId, categoryId, quantity, voucherCode } and { eventId, items: [...], voucherCode } payloads
 const placeOrderSchema = z.preprocess(
   (val: any) => {
     if (val && Array.isArray(val.items) && val.items.length > 0) {
@@ -19,6 +19,7 @@ const placeOrderSchema = z.preprocess(
         eventId: val.eventId,
         categoryId: val.items[0].categoryId,
         quantity: val.items[0].quantity,
+        voucherCode: val.voucherCode,
       };
     }
     return val;
@@ -30,6 +31,7 @@ const placeOrderSchema = z.preprocess(
       .number()
       .int("Quantity must be a whole number")
       .min(1, "Quantity must be at least 1"),
+    voucherCode: z.string().trim().min(1).optional(),
   })
 );
 

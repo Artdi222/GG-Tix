@@ -8,6 +8,8 @@ import {
   paymentProofs,
   ticketCategories,
   tickets,
+  vouchers,
+  voucherUsages,
 } from "../db/schema";
 import { AppError } from "../lib/errors";
 import {
@@ -204,6 +206,27 @@ export async function handleMidtransWebhook(payload: MidtransWebhookPayload) {
           })
           .where(eq(ticketCategories.id, order.categoryId));
       }
+
+      // Refund voucher quota if used
+      if (order.voucherId) {
+        await tx
+          .update(vouchers)
+          .set({
+            quotaRemaining: sql`${vouchers.quotaRemaining} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(vouchers.id, order.voucherId));
+
+        await tx
+          .update(voucherUsages)
+          .set({ status: "refunded" })
+          .where(
+            and(
+              eq(voucherUsages.orderId, order.id),
+              eq(voucherUsages.voucherId, order.voucherId)
+            )
+          );
+      }
     }
 
     // 3. Upsert payment_proofs record for audit trail
@@ -280,6 +303,27 @@ export async function expireOverduePendingOrders(): Promise<{
           quotaRemaining: sql`${ticketCategories.quotaRemaining} + ${order.quantity}`,
         })
         .where(eq(ticketCategories.id, order.categoryId));
+
+      // 2b. Refund voucher quota if used
+      if (order.voucherId) {
+        await tx
+          .update(vouchers)
+          .set({
+            quotaRemaining: sql`${vouchers.quotaRemaining} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(vouchers.id, order.voucherId));
+
+        await tx
+          .update(voucherUsages)
+          .set({ status: "refunded" })
+          .where(
+            and(
+              eq(voucherUsages.orderId, order.id),
+              eq(voucherUsages.voucherId, order.voucherId)
+            )
+          );
+      }
 
       // 3. Update payment proofs
       const [existingProof] = await tx

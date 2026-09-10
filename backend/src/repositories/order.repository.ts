@@ -1,12 +1,13 @@
 import { eq, and, desc, count, SQL, sql } from "drizzle-orm";
 import { db } from "../db";
-import { orders, ticketCategories, events, customers, tickets } from "../db/schema";
+import { orders, ticketCategories, events, customers, tickets, vouchers, voucherUsages } from "../db/schema";
 
 export interface CreateOrderInput {
   customerId: string;
   eventId: string;
   categoryId: string;
   quantity: number;
+  voucherCode?: string;
 }
 
 export interface OrderQueryFilters {
@@ -19,10 +20,11 @@ export interface OrderQueryFilters {
 /**
  * Place an order inside a transaction:
  * 1. Verify event is open
- * 2. Verify category exists and belongs to event
- * 3. Check + deduct quotaRemaining atomically
- * 4. Compute totalPrice server-side
- * 5. Insert order row
+ * 2. Verify category exists and belongs to event (SELECT FOR UPDATE)
+ * 3. If voucherCode provided, verify & lock voucher (SELECT FOR UPDATE)
+ * 4. Deduct ticket quota and voucher quota atomically
+ * 5. Compute subtotal, discount, and net totalPrice server-side
+ * 6. Insert order row and voucher_usages row
  */
 export async function createOrder(data: CreateOrderInput) {
   return await db.transaction(async (tx) => {
@@ -57,7 +59,7 @@ export async function createOrder(data: CreateOrderInput) {
       return { error: "CATEGORY_NOT_FOUND" as const };
     }
 
-    // 3. Check quota
+    // 3. Check category quota
     if (category.quotaRemaining < data.quantity) {
       return {
         error: "INSUFFICIENT_QUOTA" as const,
@@ -65,7 +67,82 @@ export async function createOrder(data: CreateOrderInput) {
       };
     }
 
-    // 4. Deduct quota atomically (decrement in single SQL statement)
+    const subtotal = parseFloat(category.price) * data.quantity;
+    let discount = 0;
+    let lockedVoucher: typeof vouchers.$inferSelect | null = null;
+
+    // 4. If voucher code provided, lock and validate voucher
+    if (data.voucherCode && data.voucherCode.trim()) {
+      const normalizedCode = data.voucherCode.trim().toUpperCase();
+      const [v] = await tx
+        .select()
+        .from(vouchers)
+        .where(eq(sql`UPPER(${vouchers.code})`, normalizedCode))
+        .for("update")
+        .limit(1);
+
+      if (!v || !v.isActive) {
+        return { error: "VOUCHER_NOT_FOUND" as const };
+      }
+
+      const now = new Date();
+      if (v.startDate && now < new Date(v.startDate)) {
+        return { error: "VOUCHER_NOT_STARTED" as const };
+      }
+      if (now > new Date(v.endDate)) {
+        return { error: "VOUCHER_EXPIRED" as const };
+      }
+      if (v.quotaRemaining <= 0) {
+        return { error: "VOUCHER_QUOTA_EXCEEDED" as const };
+      }
+      if (v.eventId && v.eventId !== data.eventId) {
+        return { error: "VOUCHER_EVENT_MISMATCH" as const };
+      }
+
+      const minOrder = parseFloat(v.minOrderAmount || "0");
+      if (subtotal < minOrder) {
+        return { error: "VOUCHER_MIN_SPEND_NOT_MET" as const, minOrder: v.minOrderAmount };
+      }
+
+      // Check customer usage limit
+      const [usageRes] = await tx
+        .select({ count: count() })
+        .from(voucherUsages)
+        .where(
+          and(
+            eq(voucherUsages.customerId, data.customerId),
+            eq(voucherUsages.voucherId, v.id),
+            eq(voucherUsages.status, "active")
+          )
+        );
+
+      if (Number(usageRes?.count || 0) >= v.maxUsagePerCustomer) {
+        return { error: "VOUCHER_CUSTOMER_LIMIT_REACHED" as const };
+      }
+
+      // Calculate discount
+      if (v.discountType === "fixed") {
+        discount = Math.min(parseFloat(v.discountValue), subtotal);
+      } else if (v.discountType === "percentage") {
+        const raw = (subtotal * parseFloat(v.discountValue)) / 100;
+        discount = v.maxDiscountAmount && parseFloat(v.maxDiscountAmount) > 0
+          ? Math.min(raw, parseFloat(v.maxDiscountAmount))
+          : raw;
+      }
+      discount = Math.round(discount * 100) / 100;
+      lockedVoucher = v;
+
+      // Deduct voucher quota
+      await tx
+        .update(vouchers)
+        .set({
+          quotaRemaining: sql`${vouchers.quotaRemaining} - 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(vouchers.id, v.id));
+    }
+
+    // 5. Deduct ticket quota atomically
     await tx
       .update(ticketCategories)
       .set({
@@ -73,10 +150,8 @@ export async function createOrder(data: CreateOrderInput) {
       })
       .where(eq(ticketCategories.id, data.categoryId));
 
-    // 5. Compute total price and insert order
-    const totalPrice = (
-      parseFloat(category.price) * data.quantity
-    ).toFixed(2);
+    // 6. Compute final net total
+    const totalPrice = Math.max(0, subtotal - discount).toFixed(2);
 
     const [newOrder] = await tx
       .insert(orders)
@@ -85,10 +160,25 @@ export async function createOrder(data: CreateOrderInput) {
         eventId: data.eventId,
         categoryId: data.categoryId,
         quantity: data.quantity,
+        subtotalPrice: subtotal.toFixed(2),
+        discountAmount: discount.toFixed(2),
         totalPrice,
+        voucherId: lockedVoucher ? lockedVoucher.id : null,
+        voucherCode: lockedVoucher ? lockedVoucher.code : null,
         status: "pending",
       })
       .returning();
+
+    // 7. If voucher applied, record usage
+    if (lockedVoucher) {
+      await tx.insert(voucherUsages).values({
+        voucherId: lockedVoucher.id,
+        customerId: data.customerId,
+        orderId: newOrder.id,
+        discountApplied: discount.toFixed(2),
+        status: "active",
+      });
+    }
 
     return newOrder;
   });
@@ -206,7 +296,7 @@ export async function verifyOrder(
       return { error: "ORDER_ALREADY_PROCESSED" as const, currentStatus: order.status };
     }
 
-    // If rejecting, refund quota
+    // If rejecting, refund ticket and voucher quota
     if (decision === "rejected") {
       const [category] = await tx
         .select()
@@ -219,6 +309,26 @@ export async function verifyOrder(
           .update(ticketCategories)
           .set({ quotaRemaining: category.quotaRemaining + order.quantity })
           .where(eq(ticketCategories.id, order.categoryId));
+      }
+
+      if (order.voucherId) {
+        await tx
+          .update(vouchers)
+          .set({
+            quotaRemaining: sql`${vouchers.quotaRemaining} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(vouchers.id, order.voucherId));
+
+        await tx
+          .update(voucherUsages)
+          .set({ status: "refunded" })
+          .where(
+            and(
+              eq(voucherUsages.orderId, order.id),
+              eq(voucherUsages.voucherId, order.voucherId)
+            )
+          );
       }
     }
 

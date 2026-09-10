@@ -7,6 +7,9 @@ import {
   Alert,
   ScrollView,
   Platform,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +28,74 @@ export default function ProfileScreen() {
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  // Change password modal state
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  const openPasswordModal = () => {
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setPasswordSuccess('');
+    setIsPasswordModalVisible(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Semua kolom kata sandi wajib diisi');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('Kata sandi baru minimal 6 karakter');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Konfirmasi kata sandi tidak cocok');
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+    }
+
+    setPasswordLoading(true);
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    try {
+      await apiFetch<any>('/auth/change-password', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          confirmNewPassword: confirmPassword,
+        }),
+      });
+
+      setPasswordSuccess('Kata sandi berhasil diubah!');
+      setTimeout(() => {
+        setIsPasswordModalVisible(false);
+      }, 1200);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Gagal mengubah kata sandi');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -193,12 +264,7 @@ export default function ProfileScreen() {
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() =>
-                handleMenuPress(
-                  'Ubah Kata Sandi',
-                  'Fitur pergantian kata sandi dapat dilakukan secara mandiri atau melalui tautan reset password yang dikirim ke email terdaftar Anda.'
-                )
-              }
+              onPress={openPasswordModal}
               activeOpacity={0.75}
             >
               <View style={styles.menuIconBox}>
@@ -317,6 +383,105 @@ export default function ProfileScreen() {
 
         <Text style={styles.versionText}>GG-Tix Mobile v1.0.0 • Stage Edition</Text>
       </ScrollView>
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={isPasswordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPasswordModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.modalHeaderIcon}>
+                  <Ionicons name="key" size={16} color={BRAND_COLORS.accent} />
+                </View>
+                <Text style={styles.modalTitle}>Ubah Kata Sandi</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsPasswordModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#A1A1AA" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Perbarui kata sandi akun GG-Tix Anda demi keamanan akses e-tiket.
+            </Text>
+
+            {passwordError ? (
+              <View style={styles.modalAlertError}>
+                <Ionicons name="alert-circle" size={14} color={BRAND_COLORS.danger} />
+                <Text style={styles.modalAlertErrorText}>{passwordError}</Text>
+              </View>
+            ) : null}
+
+            {passwordSuccess ? (
+              <View style={styles.modalAlertSuccess}>
+                <Ionicons name="checkmark-circle" size={14} color={BRAND_COLORS.success} />
+                <Text style={styles.modalAlertSuccessText}>{passwordSuccess}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.modalForm}>
+              <Text style={styles.inputLabel}>Kata Sandi Saat Ini</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Masukkan kata sandi saat ini"
+                placeholderTextColor="#71717A"
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+              />
+
+              <Text style={styles.inputLabel}>Kata Sandi Baru</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Minimal 6 karakter"
+                placeholderTextColor="#71717A"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+              />
+
+              <Text style={styles.inputLabel}>Konfirmasi Kata Sandi Baru</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Ulangi kata sandi baru"
+                placeholderTextColor="#71717A"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsPasswordModalVisible(false)}
+                disabled={passwordLoading}
+              >
+                <Text style={styles.modalCancelText}>Batal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, passwordLoading && { opacity: 0.6 }]}
+                onPress={handleChangePassword}
+                disabled={passwordLoading}
+              >
+                {passwordLoading ? (
+                  <ActivityIndicator size="small" color="#09090B" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Simpan Sandi</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -586,5 +751,131 @@ const styles = StyleSheet.create({
     color: '#09090B',
     fontWeight: '700',
     fontSize: 14,
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#16161A',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modalHeaderIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FAFAFA',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#A1A1AA',
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  modalAlertError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    marginBottom: 12,
+  },
+  modalAlertErrorText: {
+    color: BRAND_COLORS.danger,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  modalAlertSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+    marginBottom: 12,
+  },
+  modalAlertSuccessText: {
+    color: BRAND_COLORS.success,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  modalForm: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#A1A1AA',
+    marginBottom: 2,
+  },
+  modalInput: {
+    height: 42,
+    backgroundColor: '#111114',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    paddingHorizontal: 12,
+    color: '#FAFAFA',
+    fontSize: 13,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#27272A',
+  },
+  modalCancelText: {
+    color: '#A1A1AA',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalSubmitBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: BRAND_COLORS.accent,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubmitText: {
+    color: '#09090B',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
