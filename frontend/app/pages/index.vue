@@ -75,58 +75,6 @@ const eventDetails = ref<EventDetailItem[]>([])
 const activeHoverRevenue = ref<TrendItem | null>(null)
 const activeHoverTicket = ref<TrendItem | null>(null)
 
-// Fallback Mock Data for UI demonstration if BE returns empty / offline
-const mockSummary: DashboardSummaryResponse = {
-  overview: {
-    totalEvents: 6,
-    totalTicketsSold: 3420,
-    totalRevenue: 485500000,
-    pendingVerifications: 14,
-    upcomingShows: 4,
-    openCount: 4,
-    closedCount: 2
-  },
-  overallStats: {
-    verified: { tickets: 3420, revenue: 485500000 },
-    pending: { tickets: 210, revenue: 35000000 },
-    rejected: { tickets: 45, revenue: 6500000 }
-  },
-  eventActivity: {
-    openCount: 4,
-    closedCount: 2,
-    upcoming: [
-      { id: '1', title: 'Coldplay Live in Jakarta', city: 'Jakarta', venue: 'GBK Stadium', dateTime: '2026-11-15T20:00:00Z' },
-      { id: '2', title: 'Wuthering Waves Live 2026', city: 'Jakarta', venue: 'JIExpo Kemayoran', dateTime: '2026-10-12T19:00:00Z' }
-    ],
-    recentClosed: []
-  },
-  byEvent: [
-    { eventId: '1', title: 'Coldplay Live in Jakarta', ticketsSold: 2800, revenue: 380000000, capacity: 3000, occupancyPct: 93 },
-    { eventId: '2', title: 'Wuthering Waves Live 2026', ticketsSold: 420, revenue: 75500000, capacity: 1000, occupancyPct: 42 },
-    { eventId: '3', title: 'NIKI World Tour', ticketsSold: 200, revenue: 30000000, capacity: 500, occupancyPct: 40 }
-  ],
-  byCategory: [
-    { categoryId: 'c1', name: 'VIP Category A', ticketsSold: 450, revenue: 225000000, revenueShare: 46.3 },
-    { categoryId: 'c2', name: 'CAT 1 Festival', ticketsSold: 1200, revenue: 160000000, revenueShare: 33.0 },
-    { categoryId: 'c3', name: 'CAT 2 Seated', ticketsSold: 1770, revenue: 100500000, revenueShare: 20.7 }
-  ]
-}
-
-const mockTrend: TrendItem[] = [
-  { date: '2026-08-01', tickets: 45, revenue: 6750000 },
-  { date: '2026-08-02', tickets: 80, revenue: 12000000 },
-  { date: '2026-08-03', tickets: 120, revenue: 19500000 },
-  { date: '2026-08-04', tickets: 210, revenue: 34000000 },
-  { date: '2026-08-05', tickets: 340, revenue: 58000000 },
-  { date: '2026-08-06', tickets: 290, revenue: 49000000 },
-  { date: '2026-08-07', tickets: 410, revenue: 69500000 }
-]
-
-const mockEventDetails: EventDetailItem[] = [
-  { id: '1', title: 'Coldplay Live in Jakarta', city: 'Jakarta', venue: 'GBK Stadium', dateTime: '2026-11-15T20:00:00Z', status: 'open', capacity: 3000, sold: 2800, occupancyPct: 93, checkedIn: 2450, attendancePct: 88 },
-  { id: '2', title: 'Wuthering Waves Live 2026', city: 'Jakarta', venue: 'JIExpo Kemayoran', dateTime: '2026-10-12T19:00:00Z', status: 'open', capacity: 1000, sold: 420, occupancyPct: 42, checkedIn: 380, attendancePct: 90 }
-]
-
 const categoryColors = ['#F2A93B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899']
 
 function buildQueryParams() {
@@ -139,6 +87,9 @@ function buildQueryParams() {
 
 async function fetchDashboardData() {
   errorMessage.value = ''
+  summary.value = null
+  trendData.value = []
+  eventDetails.value = []
   isLoading.value = true
 
   const query = buildQueryParams()
@@ -155,9 +106,9 @@ async function fetchDashboardData() {
       request<{ data: EventDetailItem[] }>(`/dashboard/events`)
     ])
 
-    summary.value = summaryRes || mockSummary
-    trendData.value = Array.isArray(trendRes) ? trendRes : mockTrend
-    eventDetails.value = eventsRes?.data || mockEventDetails
+    summary.value = summaryRes
+    trendData.value = trendRes || []
+    eventDetails.value = eventsRes?.data || []
   } catch (err: any) {
     if (err.status === 400 || err.response?.status === 400) {
       errorMessage.value = 'Rentang tanggal tidak valid. Silakan periksa tanggal awal dan akhir.'
@@ -166,9 +117,7 @@ async function fetchDashboardData() {
     } else if (err.status === 403 || err.response?.status === 403) {
       errorMessage.value = 'Anda tidak memiliki akses ke dashboard ini.'
     } else {
-      summary.value = mockSummary
-      trendData.value = mockTrend
-      eventDetails.value = mockEventDetails
+      errorMessage.value = 'Dashboard gagal dimuat. Periksa koneksi lalu coba lagi.'
     }
   } finally {
     isLoading.value = false
@@ -313,8 +262,18 @@ const categorySegments = computed(() => {
       class="rounded-xl shadow-xs text-xs"
     />
 
+    <UButton
+      v-if="errorMessage"
+      label="Coba lagi"
+      :loading="isLoading"
+      @click="fetchDashboardData"
+    />
+
     <!-- KPI STATS CARDS GRID (DASH-02) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+    <div
+      v-if="!errorMessage"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5"
+    >
       <!-- Total Revenue -->
       <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex items-center justify-between">
         <div>
@@ -385,7 +344,10 @@ const categorySegments = computed(() => {
     <!-- 3 SEPARATE & DISTINCT CHARTS -->
 
     <!-- CHART 1: TREN PENDAPATAN HARIAN (LINE CHART) -->
-    <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4">
+    <div
+      v-if="!errorMessage"
+      class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4"
+    >
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -449,7 +411,10 @@ const categorySegments = computed(() => {
     </div>
 
     <!-- CHART 2: TREN KUANTITAS TIKET TERJUAL (BAR CHART) -->
-    <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4">
+    <div
+      v-if="!errorMessage"
+      class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4"
+    >
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -498,7 +463,10 @@ const categorySegments = computed(() => {
     </div>
 
     <!-- CHART 3: DISTRIBUSI REVENUE PER KATEGORI TIKET (DONUT & SHARE CHART) -->
-    <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-6">
+    <div
+      v-if="!errorMessage"
+      class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-6"
+    >
       <div class="flex items-center justify-between">
         <div>
           <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -562,7 +530,10 @@ const categorySegments = computed(() => {
     </div>
 
     <!-- EVENT OCCUPANCY RATES (DASH-03) -->
-    <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4">
+    <div
+      v-if="!errorMessage"
+      class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4"
+    >
       <div class="flex items-center justify-between">
         <div>
           <h3 class="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">
@@ -600,7 +571,10 @@ const categorySegments = computed(() => {
     </div>
 
     <!-- EVENT DETAIL & CHECK-IN ATTENDANCE STATS (DASH-05 & DASH-07) -->
-    <div class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4">
+    <div
+      v-if="!errorMessage"
+      class="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm space-y-4"
+    >
       <div class="flex items-center justify-between">
         <div>
           <h3 class="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">

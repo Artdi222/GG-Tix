@@ -61,6 +61,7 @@ export async function checkInTicket(qrCodeValue: string, eventId: string) {
       .select()
       .from(tickets)
       .where(eq(tickets.qrCodeValue, qrCodeValue))
+      .for("update")
       .limit(1);
 
     if (!ticket) {

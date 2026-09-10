@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,7 +15,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { apiFetch } from '../../services/api';
+import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { BRAND_COLORS } from '../../constants/config';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
@@ -59,11 +59,11 @@ function OrderCardItem({ item, onPress }: OrderCardProps) {
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.98, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(0.98, MOTION_TOKENS.springSnappy));
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
   };
 
   const handlePress = () => {
@@ -186,82 +186,19 @@ function OrderCardItem({ item, onPress }: OrderCardProps) {
 
 export default function HistoryScreen() {
   const token = useAuthStore((state) => state.token);
-  const [history, setHistory] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(Boolean(token));
-  const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
-
+  const data = useCustomerOrders(activeFilter);
+  const { items: filteredHistory, loading, error } = data;
+  const refreshing = loading && filteredHistory.length > 0;
+  const onRefresh = data.reload;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  const loadHistory = useCallback(async () => {
-    if (!token) {
-      setRefreshing(false);
-      return;
-    }
-    try {
-      const res = await apiFetch<any>('/orders/me');
-      const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
-      setHistory(items);
-    } catch {
-      setHistory([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (token) {
-      apiFetch<any>(`/orders/me`)
-        .then((res) => {
-          if (!isMounted) return;
-          const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
-          setHistory(items);
-        })
-        .catch(() => {
-          if (!isMounted) return;
-          setHistory([]);
-        })
-        .finally(() => {
-          if (!isMounted) return;
-          setLoading(false);
-        });
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [token]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadHistory();
-  }, [loadHistory]);
-
-  const filterTabs = useMemo(() => {
-    const verifiedCount = history.filter((i) => i.status === 'verified').length;
-    const pendingCount = history.filter((i) => i.status === 'pending').length;
-    const failedCount = history.filter((i) => i.status === 'rejected' || i.status === 'expired').length;
-
-    return [
-      { label: 'Semua', key: 'all' as const, count: history.length },
-      { label: 'Berhasil', key: 'verified' as const, count: verifiedCount },
-      { label: 'Menunggu', key: 'pending' as const, count: pendingCount },
-      { label: 'Batal', key: 'failed' as const, count: failedCount },
-    ];
-  }, [history]);
-
-  const filteredHistory = useMemo(() => {
-    return history.filter((item) => {
-      if (activeFilter === 'all') return true;
-      if (activeFilter === 'verified') return item.status === 'verified';
-      if (activeFilter === 'pending') return item.status === 'pending';
-      if (activeFilter === 'failed') return item.status === 'rejected' || item.status === 'expired';
-      return true;
-    });
-  }, [history, activeFilter]);
+  const filterTabs = [
+    { label: 'Semua', key: 'all' as const, count: data.summary.totalOrders },
+    { label: 'Berhasil', key: 'verified' as const, count: data.summary.verified },
+    { label: 'Menunggu', key: 'pending' as const, count: data.summary.pending },
+    { label: 'Batal', key: 'failed' as const, count: data.summary.rejected + data.summary.expired },
+  ];
 
   if (!token) {
     return (
@@ -295,7 +232,7 @@ export default function HistoryScreen() {
           <Text style={styles.headerSub}>Catatan transaksi tiket konser akun Anda</Text>
         </View>
         <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{history.length} Transaksi</Text>
+          <Text style={styles.countBadgeText}>{data.summary.totalOrders} Transaksi</Text>
         </View>
       </View>
 
@@ -331,6 +268,8 @@ export default function HistoryScreen() {
         })}
       </View>
 
+      {data.offline ? <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}><Text style={{ color: BRAND_COLORS.accent }}>Mode offline: menampilkan status pesanan terakhir yang tersimpan.</Text></View> : null}
+      {error ? <TouchableOpacity onPress={data.reload} style={{ padding: 16 }} accessibilityRole="button"><Text style={{ color: '#FCA5A5' }}>{error} Ketuk untuk coba lagi.</Text></TouchableOpacity> : null}
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={BRAND_COLORS.accent} />
@@ -338,6 +277,7 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <FlatList
+          ListFooterComponent={data.page < data.totalPages ? <TouchableOpacity onPress={data.loadMore} disabled={loading} style={{ padding: 20, alignItems: 'center' }} accessibilityRole="button"><Text style={{ color: BRAND_COLORS.accent }}>{loading ? 'Memuat...' : 'Muat lebih banyak'}</Text></TouchableOpacity> : null}
           data={filteredHistory}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
@@ -357,9 +297,7 @@ export default function HistoryScreen() {
             <OrderCardItem
               item={item}
               onPress={() => {
-                if (item.status === 'verified') {
-                  router.push(`/ticket/${item.id}`);
-                }
+                router.push(item.status === 'verified' ? `/ticket/${item.id}` : `/payment/${item.id}`);
               }}
             />
           )}

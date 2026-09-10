@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,14 +10,17 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../store/auth-store';
 import { BRAND_COLORS } from '../../constants/config';
 import { apiFetch } from '../../services/api';
+import { session, type SessionUser } from '../../services/session';
+import { registerForPushNotificationsAsync, disablePushNotifications, isPushEnabled } from '../../services/notifications';
 
 export default function ProfileScreen() {
   const { user, token, logout } = useAuthStore();
@@ -97,28 +100,49 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => {
-    let isMounted = true;
+  const [support, setSupport] = useState<{ supportEmail: string; supportWhatsapp: string } | null>(null);
+  const [notice, setNotice] = useState('');
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [editProfile, setEditProfile] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [saving, setSaving] = useState(false);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setStats({ activeTickets: 0, totalOrders: 0 });
+    setNotice('');
     if (token) {
-      apiFetch<any>('/orders/me')
-        .then((res) => {
-          if (!isMounted) return;
-          const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
-          const active = items.filter((i: any) => i.status === 'verified').length;
-          setStats({
-            activeTickets: active,
-            totalOrders: items.length,
-          });
-        })
-        .catch(() => {
-          
-        });
+      void apiFetch<{ activeTickets: number; totalOrders: number }>('/orders/me/summary').then(value => { if (active) setStats(value); }).catch(() => { if (active) setNotice('Statistik belum tersedia. Buka kembali halaman untuk mencoba lagi.'); });
+      void isPushEnabled().then(value => { if (active) setPushEnabled(value); });
     }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [token]);
+    void apiFetch<{ supportEmail: string; supportWhatsapp: string }>('/settings/public').then(value => { if (active) setSupport(value); }).catch(() => {});
+    return () => { active = false; };
+  }, [token]));
+  const saveProfile = async () => {
+    if (name.trim().length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setProfileError('Isi nama dan email yang valid.'); return; }
+    setSaving(true); setProfileError('');
+    const revision = session.snapshot().revision;
+    try {
+      const profile = await apiFetch<SessionUser>('/auth/profile', { method: 'PATCH', body: JSON.stringify({ name: name.trim(), email: email.trim() }) });
+      await session.updateUser(profile, revision);
+      setEditProfile(false); setNotice('Profil berhasil diperbarui.');
+    } catch (err) { setProfileError(err instanceof Error ? err.message : 'Profil gagal disimpan.'); }
+    finally { setSaving(false); }
+  };
+  const togglePush = async () => {
+    setPushLoading(true); setNotice('');
+    try {
+      if (pushEnabled) await disablePushNotifications(); else await registerForPushNotificationsAsync();
+      setPushEnabled(!pushEnabled); setNotice(pushEnabled ? 'Notifikasi dinonaktifkan.' : 'Notifikasi pembayaran, pengingat acara, dan konser baru aktif.');
+    } catch (err) { setNotice(err instanceof Error ? err.message : 'Pengaturan notifikasi gagal.'); }
+    finally { setPushLoading(false); }
+  };
+  const exitAccount = async () => {
+    try { if (await isPushEnabled()) await disablePushNotifications(); await logout(); router.replace('/auth/login'); }
+    catch { setNotice('Gagal menutup sesi perangkat. Periksa koneksi dan coba keluar lagi.'); }
+  };
 
   const handleLogout = async () => {
     if (Platform.OS !== 'web') {
@@ -130,8 +154,7 @@ export default function ProfileScreen() {
     if (Platform.OS === 'web') {
       const confirmed = typeof window !== 'undefined' ? window.confirm('Yakin ingin keluar dari akun ini?') : true;
       if (confirmed) {
-        await logout();
-        router.replace('/auth/login');
+        await exitAccount();
       }
       return;
     }
@@ -145,8 +168,7 @@ export default function ProfileScreen() {
           text: 'Keluar',
           style: 'destructive',
           onPress: async () => {
-            await logout();
-            router.replace('/auth/login');
+            await exitAccount();
           },
         },
       ]
@@ -159,7 +181,7 @@ export default function ProfileScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
     }
-    Alert.alert(title, message);
+    if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`); else Alert.alert(title, message);
   };
 
   if (!token) {
@@ -257,6 +279,20 @@ export default function ProfileScreen() {
               <Text style={styles.summaryLabel}>Status Akun</Text>
             </View>
           </View>
+        </View>
+
+        {notice ? <Text style={{ color: '#F2A93B', padding: 16 }}>{notice}</Text> : null}
+        <View style={styles.menuCard}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => { setName(user?.name || ''); setEmail(user?.email || ''); setProfileError(''); setEditProfile(true); }} accessibilityRole="button">
+            <Ionicons name="person-outline" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>Edit Profil</Text><Text style={styles.menuDesc}>Perbarui nama dan email akun</Text></View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={togglePush} disabled={pushLoading} accessibilityRole="switch" accessibilityState={{ checked: pushEnabled, disabled: pushLoading }}>
+            <Ionicons name="notifications-outline" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>Notifikasi {pushEnabled ? 'Aktif' : 'Nonaktif'}</Text><Text style={styles.menuDesc}>{pushLoading ? 'Memproses...' : 'Pembayaran, pengingat H-1, dan konser baru'}</Text></View>
+          </TouchableOpacity>
+          {support ? <>
+            <TouchableOpacity style={styles.menuItem} onPress={() => void Linking.openURL(`mailto:${support.supportEmail}`).catch(() => setNotice('Aplikasi email tidak tersedia.'))}><Text style={styles.menuTitle}>{support.supportEmail}</Text></TouchableOpacity>
+            {support.supportWhatsapp ? <TouchableOpacity style={styles.menuItem} onPress={() => void Linking.openURL(`https://wa.me/${support.supportWhatsapp.replace(/\D/g, '')}`).catch(() => setNotice('WhatsApp tidak dapat dibuka.'))}><Text style={styles.menuTitle}>Hubungi Bantuan WhatsApp</Text></TouchableOpacity> : null}
+          </> : null}
         </View>
 
         <View style={styles.menuSection}>
@@ -383,6 +419,21 @@ export default function ProfileScreen() {
 
         <Text style={styles.versionText}>GG-Tix Mobile v1.0.0 • Stage Edition</Text>
       </ScrollView>
+
+      <Modal visible={editProfile} transparent animationType="fade" onRequestClose={() => setEditProfile(false)}>
+        <View style={styles.modalBackdrop}><View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Edit Profil</Text>
+          <View style={styles.modalForm}>
+            <Text style={styles.inputLabel}>Nama</Text><TextInput accessibilityLabel="Nama profil" style={styles.modalInput} value={name} onChangeText={setName} maxLength={100} />
+            <Text style={styles.inputLabel}>Email</Text><TextInput accessibilityLabel="Email profil" style={styles.modalInput} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            {profileError ? <Text style={styles.modalAlertErrorText}>{profileError}</Text> : null}
+          </View>
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditProfile(false)} disabled={saving}><Text style={styles.modalCancelText}>Batal</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.modalSubmitBtn} onPress={saveProfile} disabled={saving}><Text style={styles.modalSubmitText}>{saving ? 'Menyimpan...' : 'Simpan Profil'}</Text></TouchableOpacity>
+          </View>
+        </View></View>
+      </Modal>
 
       {/* Change Password Modal */}
       <Modal

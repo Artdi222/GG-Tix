@@ -23,7 +23,7 @@ export interface EventItem {
   dateTime: string
   endDateTime?: string | null
   description?: string | null
-  maxTicketsPerOrder?: number
+  maxTicketsPerOrder?: number | null
   tags?: string[]
   seatmapUrl?: string | null
   sortOrder?: number
@@ -69,7 +69,7 @@ function defaultState() {
     dateTime: new Date().toISOString().slice(0, 16),
     endDateTime: '',
     description: '',
-    maxTicketsPerOrder: 4,
+    maxTicketsPerOrder: null as number | null,
     tagInput: '',
     tags: [] as string[],
     seatmapUrl: '',
@@ -103,7 +103,7 @@ watch(open, (isOpen) => {
     state.dateTime = props.eventData.dateTime ? new Date(props.eventData.dateTime).toISOString().slice(0, 16) : ''
     state.endDateTime = props.eventData.endDateTime ? new Date(props.eventData.endDateTime).toISOString().slice(0, 16) : ''
     state.description = props.eventData.description || ''
-    state.maxTicketsPerOrder = props.eventData.maxTicketsPerOrder || 4
+    state.maxTicketsPerOrder = props.eventData.maxTicketsPerOrder ?? null
     state.tags = props.eventData.tags ? [...props.eventData.tags] : []
     state.seatmapUrl = props.eventData.seatmapUrl || ''
     state.sortOrder = props.eventData.sortOrder || 0
@@ -203,7 +203,7 @@ async function onSave() {
       dateTime: state.dateTime ? new Date(state.dateTime).toISOString() : new Date().toISOString(),
       endDateTime: state.endDateTime ? new Date(state.endDateTime).toISOString() : null,
       description: state.description.trim() || null,
-      maxTicketsPerOrder: Number(state.maxTicketsPerOrder) || 4,
+      maxTicketsPerOrder: state.maxTicketsPerOrder ? Number(state.maxTicketsPerOrder) : null,
       tags: state.tags,
       seatmapUrl: state.seatmapUrl || null,
       sortOrder: Number(state.sortOrder) || 0,
@@ -261,7 +261,11 @@ async function onSave() {
             />
           </UFormField>
 
-          <UFormField label="Batas Pembelian per Order" name="maxTicketsPerOrder">
+          <UFormField
+            label="Batas Pembelian per Order"
+            description="Kosongkan untuk mengikuti pengaturan sistem."
+            name="maxTicketsPerOrder"
+          >
             <UInput v-model.number="state.maxTicketsPerOrder" type="number" min="1" max="10" class="w-full" />
           </UFormField>
         </div>

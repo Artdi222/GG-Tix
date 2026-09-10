@@ -19,6 +19,7 @@ export interface SnapItemDetails {
 }
 
 export interface SnapExpiry {
+  start_time?: string;
   unit: "minutes" | "hours" | "days";
   duration: number;
 }
@@ -29,6 +30,9 @@ export interface SnapTransactionParams {
   item_details?: SnapItemDetails[];
   expiry?: SnapExpiry;
   enabled_payments?: string[];
+  callbacks?: { finish: string; error: string };
+  gopay?: { enable_callback: boolean; callback_url: string };
+  shopeepay?: { callback_url: string };
 }
 
 export interface SnapResponse {
@@ -84,6 +88,7 @@ export async function createSnapTransaction(params: SnapTransactionParams): Prom
       Authorization: authHeader,
     },
     body: JSON.stringify(params),
+    signal: AbortSignal.timeout(15000),
   });
 
   const data = (await response.json()) as SnapResponse;
@@ -93,6 +98,24 @@ export async function createSnapTransaction(params: SnapTransactionParams): Prom
     throw new Error(errorMsg);
   }
 
+  return data;
+}
+
+/** Authenticated server-to-server lookup. A missing transaction is not a gateway outage. */
+export async function getTransactionStatus(orderId: string): Promise<MidtransWebhookPayload | null> {
+  const key = process.env.MIDTRANS_SERVER_KEY;
+  if (!key) throw new Error('Payment gateway is not configured');
+  const base = process.env.MIDTRANS_IS_PRODUCTION === 'true'
+    ? 'https://api.midtrans.com/v2' : 'https://api.sandbox.midtrans.com/v2';
+  const response = await fetch(`${base}/${encodeURIComponent(orderId)}/status`, {
+    headers: { Accept: 'application/json', Authorization: `Basic ${Buffer.from(key + ':').toString('base64')}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  const data = await response.json() as MidtransWebhookPayload;
+  if (response.status === 404 && data.status_code === '404') return null;
+  if (!response.ok || !data.transaction_status || !data.order_id) {
+    throw new Error(`Gagal memeriksa pembayaran di Midtrans (HTTP ${response.status}). Coba lagi.`);
+  }
   return data;
 }
 

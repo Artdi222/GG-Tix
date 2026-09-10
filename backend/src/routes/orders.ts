@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as orderService from "../services/order.service";
+import { paymentReturnUrlSchema } from '../lib/payment-return';
 import {
   authMiddleware,
   adminOrHigher,
@@ -20,6 +21,7 @@ const placeOrderSchema = z.preprocess(
         categoryId: val.items[0].categoryId,
         quantity: val.items[0].quantity,
         voucherCode: val.voucherCode,
+        paymentReturnUrl: val.paymentReturnUrl,
       };
     }
     return val;
@@ -32,6 +34,7 @@ const placeOrderSchema = z.preprocess(
       .int("Quantity must be a whole number")
       .min(1, "Quantity must be at least 1"),
     voucherCode: z.string().trim().min(1).optional(),
+    paymentReturnUrl: paymentReturnUrlSchema,
   })
 );
 
@@ -61,16 +64,9 @@ const adminQuerySchema = z.object({
 });
 
 const customerQuerySchema = z.object({
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) =>
-      val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10
-    ),
+  status: z.enum(['pending', 'verified', 'failed', 'active']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 // POST /api/orders — (customer places order)
@@ -104,10 +100,14 @@ orderRoute.get(
   async (c) => {
     const user = c.get("user");
     const query = c.req.valid("query");
-    const result = await orderService.getCustomerOrders(user.sub, query.page, query.limit);
+    const result = await orderService.getCustomerOrders(user.sub, query.page, query.limit, query.status);
     return c.json({ data: result.items, pagination: result.pagination });
   }
 );
+
+orderRoute.get('/me/summary', authMiddleware, customerOnly, async c => {
+  return c.json({ data: await orderService.customerOrderSummary(c.get('user').sub) });
+});
 
 // GET /api/orders — (admin sees all orders)
 orderRoute.get(

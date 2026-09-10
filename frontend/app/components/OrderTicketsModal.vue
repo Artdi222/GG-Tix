@@ -31,28 +31,12 @@ const order = ref<OrderInfo | null>(null)
 const tickets = ref<TicketItem[]>([])
 const errorMsg = ref('')
 
-// Fallback dummy tickets if offline
-const DUMMY_TICKETS: TicketItem[] = [
-  {
-    id: 'tix-001',
-    qrCodeValue: 'tix_d3f41a03-f6c7-47c0-a5ba-ee4a17851db3',
-    qrCodeDataUrl: '',
-    checkedIn: false,
-    checkedInAt: null
-  },
-  {
-    id: 'tix-002',
-    qrCodeValue: 'tix_e988ae75-3cd8-458d-b2ef-3814072cf5ed',
-    qrCodeDataUrl: '',
-    checkedIn: true,
-    checkedInAt: '2026-10-12T18:45:00.000Z'
-  }
-]
-
 async function fetchTickets() {
   if (!props.orderId) return
   isLoading.value = true
   errorMsg.value = ''
+  order.value = null
+  tickets.value = []
   try {
     const res = await request<{ data: { order: OrderInfo; tickets: TicketItem[] } }>(`/tickets/order/${props.orderId}`)
     if (res?.data) {
@@ -60,18 +44,7 @@ async function fetchTickets() {
       tickets.value = res.data.tickets || []
     }
   } catch (err: any) {
-    // Fallback if offline
-    order.value = {
-      id: props.orderId,
-      eventTitle: props.orderData?.event?.title || 'Konser Musik GGTIX',
-      eventDate: props.orderData?.event?.dateTime || '2026-10-12T19:00:00.000Z',
-      venueName: 'Gelora Bung Karno, Jakarta',
-      categoryName: props.orderData?.category?.name || 'VIP',
-      quantity: props.orderData?.quantity || 2,
-      status: 'verified',
-      customerName: props.orderData?.customer?.name || 'Customer'
-    }
-    tickets.value = DUMMY_TICKETS
+    errorMsg.value = err.data?.error || err.message || 'Tiket gagal dimuat. Coba lagi.'
   } finally {
     isLoading.value = false
   }
@@ -106,7 +79,7 @@ function printTicket() {
 // Generate fallback SVG QR representation if qrCodeDataUrl is not present
 function getQrImageSrc(ticket: TicketItem) {
   if (ticket.qrCodeDataUrl) return ticket.qrCodeDataUrl
-  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(ticket.qrCodeValue)}`
+  return ''
 }
 </script>
 
@@ -126,6 +99,11 @@ function getQrImageSrc(ticket: TicketItem) {
 
         <div v-else-if="errorMsg" class="p-4 bg-red-50 text-red-700 rounded-xl">
           {{ errorMsg }}
+          <UButton
+            class="mt-3"
+            label="Coba lagi"
+            @click="fetchTickets"
+          />
         </div>
 
         <div v-else class="space-y-4">
@@ -176,6 +154,7 @@ function getQrImageSrc(ticket: TicketItem) {
               <!-- QR Code Preview -->
               <div class="w-40 h-40 bg-white p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xs flex items-center justify-center mb-3">
                 <img
+                  v-if="ticket.qrCodeDataUrl"
                   :src="getQrImageSrc(ticket)"
                   :alt="ticket.qrCodeValue"
                   class="w-full h-full object-contain"

@@ -13,7 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
+import { paymentReturnBase } from '../../services/payment';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -22,17 +22,6 @@ import { BRAND_COLORS } from '../../constants/config';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
 import { getPosterImage } from '../../components/EventCard';
-
-const PAYMENT_METHODS = [
-  { id: 'qris', name: 'QRIS Instant', icon: 'qr-code-outline' },
-  { id: 'gopay', name: 'GoPay / GoPay Later', icon: 'wallet-outline' },
-  { id: 'shopeepay', name: 'ShopeePay', icon: 'phone-portrait-outline' },
-  { id: 'bca', name: 'BCA Virtual Account', icon: 'card-outline' },
-  { id: 'mandiri', name: 'Mandiri Livin VA', icon: 'card-outline' },
-  { id: 'bni', name: 'BNI Virtual Account', icon: 'card-outline' },
-  { id: 'bri', name: 'BRI Virtual Account', icon: 'card-outline' },
-  { id: 'cc', name: 'Kartu Kredit / Debit', icon: 'card' },
-];
 
 export default function CheckoutScreen() {
   const { id, categoryId, qty, price, categoryName } = useLocalSearchParams<{
@@ -45,7 +34,6 @@ export default function CheckoutScreen() {
 
   const [loading, setLoading] = useState(false);
   const [eventData, setEventData] = useState<any>(null);
-  const [selectedMethod, setSelectedMethod] = useState<string>('qris');
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -57,28 +45,20 @@ export default function CheckoutScreen() {
   }));
 
   const quantity = parseInt(qty || '1', 10);
-  const unitPrice = parseFloat(price || '0');
+  const unitPrice = Number(eventData?.ticketCategories?.find((category: { id: string }) => category.id === categoryId)?.price ?? price ?? 0);
   const totalPrice = unitPrice * quantity;
 
   // Promo code & voucher discount state
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<{
-    valid: boolean;
-    voucher: {
-      id: string;
-      code: string;
-      name: string;
-      discountType: string;
-      discountValue: string;
-    };
-    discountAmount: number;
-    finalAmount: number;
+    valid: boolean; code: string; name: string;
+    subtotalPrice: string; discountAmount: string; totalPrice: string;
   } | null>(null);
   const [promoError, setPromoError] = useState('');
 
-  const discountAmount = appliedPromo?.discountAmount || 0;
-  const finalTotalPrice = Math.max(0, totalPrice - discountAmount);
+  const discountAmount = Number(appliedPromo?.discountAmount || 0);
+  const finalTotalPrice = appliedPromo ? Number(appliedPromo.totalPrice) : totalPrice;
 
   useEffect(() => {
     let isMounted = true;
@@ -108,7 +88,7 @@ export default function CheckoutScreen() {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0,
-  }).format(totalPrice);
+  }).format(Number(appliedPromo?.subtotalPrice ?? totalPrice));
 
   const formattedDiscount = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -138,17 +118,6 @@ export default function CheckoutScreen() {
     }
   };
 
-  const handleSelectMethod = (methodId: string) => {
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        
-      }
-    }
-    setSelectedMethod(methodId);
-  };
-
   const handleApplyPromo = async () => {
     const code = promoCodeInput.trim().toUpperCase();
     if (!code) {
@@ -170,7 +139,8 @@ export default function CheckoutScreen() {
         method: 'POST',
         body: JSON.stringify({
           code,
-          orderAmount: totalPrice,
+          categoryId,
+          quantity,
           eventId: id,
         }),
       });
@@ -201,6 +171,7 @@ export default function CheckoutScreen() {
 
   const handlePay = async () => {
     if (loading) return;
+    if (eventData?.maintenanceMode) { setPromoError('Pemesanan sementara ditutup untuk pemeliharaan.'); return; }
 
     if (Platform.OS !== 'web') {
       try {
@@ -218,22 +189,14 @@ export default function CheckoutScreen() {
           eventId: id,
           categoryId,
           quantity,
-          voucherCode: appliedPromo?.voucher?.code || undefined,
+          voucherCode: appliedPromo?.code || undefined,
+          paymentReturnUrl: paymentReturnBase(),
         }),
       });
 
-      const snapUrl = res.payment?.redirectUrl || res.data?.payment?.redirectUrl;
-
-      if (snapUrl) {
-        if (Platform.OS === 'web') {
-          window.location.href = snapUrl;
-        } else {
-          await WebBrowser.openBrowserAsync(snapUrl);
-          router.replace('/(tabs)/tickets');
-        }
-      } else {
-        router.replace('/(tabs)/tickets');
-      }
+      const orderId = res.data?.id || res.id;
+      if (!orderId) throw new Error('ID pesanan tidak tersedia. Periksa riwayat sebelum mencoba lagi.');
+      router.replace({ pathname: '/payment/[id]', params: { id: orderId, autoPay: '1' } });
     } catch (error: any) {
       if (Platform.OS === 'web') {
         alert(error.message || 'Terjadi kesalahan saat memproses checkout.');
@@ -353,12 +316,12 @@ export default function CheckoutScreen() {
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="checkmark-circle" size={15} color={BRAND_COLORS.success} />
-                  <Text style={styles.promoAppliedCode}>{appliedPromo.voucher.code}</Text>
+                  <Text style={styles.promoAppliedCode}>{appliedPromo.code}</Text>
                   <View style={styles.promoAppliedBadge}>
                     <Text style={styles.promoAppliedBadgeText}>HEMAT {formattedDiscount}</Text>
                   </View>
                 </View>
-                <Text style={styles.promoAppliedName}>{appliedPromo.voucher.name}</Text>
+                <Text style={styles.promoAppliedName}>{appliedPromo.name}</Text>
               </View>
               <TouchableOpacity
                 style={styles.promoRemoveBtn}
@@ -428,7 +391,7 @@ export default function CheckoutScreen() {
             <View style={styles.priceRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={[styles.priceLabel, { color: BRAND_COLORS.success }]}>
-                  Diskon Voucher ({appliedPromo.voucher.code})
+                  Diskon Voucher ({appliedPromo.code})
                 </Text>
               </View>
               <Text style={[styles.priceValue, { color: BRAND_COLORS.success }]}>
@@ -470,34 +433,11 @@ export default function CheckoutScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardHeaderTitle}>Midtrans Secure Gateway</Text>
-              <Text style={styles.cardHeaderSub}>Pilih preferensi kanal bayar resmi</Text>
+              <Text style={styles.cardHeaderSub}>Pilih metode pembayaran di halaman Midtrans</Text>
             </View>
           </View>
 
-          <View style={styles.channelGrid}>
-            {PAYMENT_METHODS.map((m) => {
-              const isSelected = selectedMethod === m.id;
-              return (
-                <TouchableOpacity
-                  key={m.id}
-                  style={[styles.channelChip, isSelected && styles.channelChipActive]}
-                  onPress={() => handleSelectMethod(m.id)}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Pilih metode pembayaran ${m.name}`}
-                >
-                  <Ionicons
-                    name={m.icon as any}
-                    size={13}
-                    color={isSelected ? BRAND_COLORS.accent : '#A1A1AA'}
-                  />
-                  <Text style={[styles.channelChipText, isSelected && styles.channelChipTextActive]}>
-                    {m.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <Text style={styles.cardHeaderSub}>Virtual account, QRIS, GoPay, dan ShopeePay tersedia sesuai pilihan di Midtrans.</Text>
         </View>
 
         <View style={styles.policyCard}>
@@ -525,11 +465,11 @@ export default function CheckoutScreen() {
             disabled={loading}
             onPressIn={() => {
               if (!loading) {
-                payButtonScale.value = withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy);
+                payButtonScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
               }
             }}
             onPressOut={() => {
-              payButtonScale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+              payButtonScale.set(withSpring(1, MOTION_TOKENS.springSnappy));
             }}
             onPress={handlePay}
             activeOpacity={1}

@@ -10,26 +10,8 @@ interface Artist {
 const { request } = useApi()
 
 const search = ref('')
-const artists = ref<Artist[]>([
-  {
-    id: 'art-001',
-    name: 'Rover Ensemble',
-    bio: 'Official orchestra ensemble performing Wuthering Waves live concert soundtracks.',
-    photoUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'
-  },
-  {
-    id: 'art-002',
-    name: 'Coldplay',
-    bio: 'British rock band formed in London in 1997.',
-    photoUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300'
-  },
-  {
-    id: 'art-003',
-    name: 'NIKI',
-    bio: 'Indonesian singer, songwriter, and record producer based in the US.',
-    photoUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300'
-  }
-])
+const artists = ref<Artist[]>([])
+const loadError = ref('')
 
 const isLoading = ref(false)
 const isModalOpen = ref(false)
@@ -46,13 +28,15 @@ const formState = reactive({
 
 async function fetchArtists() {
   isLoading.value = true
+  loadError.value = ''
   try {
     const res = await request<{ data: Artist[] }>('/artists')
     if (res?.data) {
       artists.value = res.data
     }
   } catch {
-    // Keep mock data if BE offline
+    artists.value = []
+    loadError.value = 'Daftar artis gagal dimuat. Coba lagi.'
   } finally {
     isLoading.value = false
   }
@@ -157,6 +141,18 @@ async function deleteArtist(id: string) {
 
 <template>
   <div class="space-y-5">
+    <UAlert
+      v-if="loadError"
+      color="error"
+      :title="loadError"
+      class="mb-4"
+    />
+    <UButton
+      v-if="loadError"
+      label="Coba lagi"
+      class="mb-4"
+      @click="fetchArtists"
+    />
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>

@@ -27,6 +27,10 @@ import paymentRoute from "./routes/payments";
 import settingsRoute from "./routes/settings";
 import promoRoute, { vouchersRoute } from "./routes/promo";
 
+import notificationsRoute from './routes/notifications';
+import { runNotificationWorker } from './services/notification.service';
+setInterval(() => { void runNotificationWorker().catch(() => console.error('[Notifications] Worker temporarily unavailable')); }, 60000);
+
 assertB2Configured();
 assertMidtransConfigured();
 
@@ -98,6 +102,7 @@ api.route("/users", usersRoute);
 api.route("/tickets", ticketRoute);
 api.route("/payments", paymentRoute);
 api.route("/settings", settingsRoute);
+api.route("/notifications", notificationsRoute);
 api.route("/promo", promoRoute);
 api.route("/vouchers", vouchersRoute);
 

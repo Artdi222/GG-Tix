@@ -34,6 +34,7 @@ export interface EventDetailData {
   seatmapUrl?: string | null;
   imageUrl?: string | null;
   maxTicketsPerOrder?: number;
+  maintenanceMode?: boolean;
   tags?: string[];
   status: 'open' | 'closed';
   artist?: {
@@ -125,9 +126,9 @@ export default function EventDetailScreen() {
         
       }
     }
-    minusScale.value = withSpring(MOTION_TOKENS.pressScale.iconButton, MOTION_TOKENS.springBrisk, () => {
-      minusScale.value = withSpring(1, MOTION_TOKENS.springBrisk);
-    });
+    minusScale.set(withSpring(MOTION_TOKENS.pressScale.iconButton, MOTION_TOKENS.springBrisk, () => {
+      minusScale.set(withSpring(1, MOTION_TOKENS.springBrisk));
+    }));
     setQuantity((q) => Math.max(1, q - 1));
   };
 
@@ -149,9 +150,9 @@ export default function EventDetailScreen() {
         
       }
     }
-    plusScale.value = withSpring(MOTION_TOKENS.pressScale.iconButton, MOTION_TOKENS.springBrisk, () => {
-      plusScale.value = withSpring(1, MOTION_TOKENS.springBrisk);
-    });
+    plusScale.set(withSpring(MOTION_TOKENS.pressScale.iconButton, MOTION_TOKENS.springBrisk, () => {
+      plusScale.set(withSpring(1, MOTION_TOKENS.springBrisk));
+    }));
     setQuantity((q) => Math.min(maxAllowed, q + 1));
   };
 
@@ -168,6 +169,7 @@ export default function EventDetailScreen() {
   };
 
   const handleCheckout = () => {
+    if (event?.maintenanceMode) return;
     if (!selectedCategory) {
       Alert.alert('Peringatan', 'Silakan pilih kategori tiket terlebih dahulu.');
       return;
@@ -464,24 +466,24 @@ export default function EventDetailScreen() {
           <TouchableOpacity
             style={[
               styles.checkoutBtn,
-              (!selectedCategory || Number(selectedCategory.quotaRemaining) <= 0) &&
+              (event?.maintenanceMode || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0) &&
                 styles.checkoutBtnDisabled,
             ]}
-            disabled={!selectedCategory || Number(selectedCategory.quotaRemaining) <= 0}
+            disabled={event?.maintenanceMode || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0}
             onPressIn={() => {
               if (selectedCategory && Number(selectedCategory.quotaRemaining) > 0) {
-                checkoutScale.value = withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy);
+                checkoutScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
               }
             }}
             onPressOut={() => {
-              checkoutScale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+              checkoutScale.set(withSpring(1, MOTION_TOKENS.springSnappy));
             }}
             onPress={handleCheckout}
             activeOpacity={1}
             accessibilityRole="button"
-            accessibilityLabel="Beli Tiket Sekarang"
+            accessibilityLabel={event?.maintenanceMode ? "Pemesanan ditutup sementara" : "Beli Tiket Sekarang"}
           >
-            <Text style={styles.checkoutBtnText}>Lanjut Checkout</Text>
+            <Text style={styles.checkoutBtnText}>{event?.maintenanceMode ? 'Pemesanan Ditutup' : 'Lanjut Checkout'}</Text>
             <Ionicons name="arrow-forward" size={16} color="#09090B" />
           </TouchableOpacity>
         </Animated.View>

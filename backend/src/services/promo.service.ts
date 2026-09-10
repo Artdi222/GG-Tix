@@ -31,7 +31,7 @@ export function calculateDiscount(
   }
 
   // Ensure precision
-  return Math.round(discount * 100) / 100;
+  return Math.min(subtotal, Math.round(discount * 100) / 100);
 }
 
 export async function validatePromo(input: ValidatePromoInput) {

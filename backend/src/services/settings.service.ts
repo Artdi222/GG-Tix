@@ -142,11 +142,11 @@ export async function getDiagnostics() {
       latencyMs: dbLatency,
     },
     storage: {
-      status: (process.env.B2_KEY_ID || process.env.B2_APPLICATION_KEY_ID) && process.env.B2_APPLICATION_KEY && process.env.B2_BUCKET ? "healthy" : "not_configured",
+      status: (process.env.B2_KEY_ID || process.env.B2_APPLICATION_KEY_ID) && process.env.B2_APPLICATION_KEY && process.env.B2_BUCKET ? "configured" : "not_configured",
       provider: "Backblaze B2",
     },
     paymentGateway: {
-      status: process.env.MIDTRANS_SERVER_KEY ? "healthy" : "not_configured",
+      status: process.env.MIDTRANS_SERVER_KEY ? "configured" : "not_configured",
       environment: process.env.MIDTRANS_IS_PRODUCTION === "true" ? "production" : "sandbox",
     },
     runtime: {

@@ -543,7 +543,7 @@ async function changePassword() {
             </div>
           </div>
           <div class="text-xl font-bold tracking-tight text-gray-900 dark:text-white capitalize">
-            {{ diagnostics?.storage?.status === 'healthy' ? 'Siap Digunakan' : 'Belum di Konfigurasi' }}
+            {{ diagnostics?.storage?.status === 'configured' ? 'Dikonfigurasi (koneksi belum diuji)' : 'Belum dikonfigurasi' }}
           </div>
         </div>
         <p class="text-[11px] text-gray-400 mt-2">{{ diagnostics?.storage?.provider || 'Backblaze B2' }}</p>
@@ -558,7 +558,7 @@ async function changePassword() {
             </div>
           </div>
           <div class="text-xl font-bold tracking-tight text-gray-900 dark:text-white capitalize">
-            {{ diagnostics?.paymentGateway?.status === 'healthy' ? 'Aktif' : 'Nonaktif' }}
+            {{ diagnostics?.paymentGateway?.status === 'configured' ? 'Dikonfigurasi (koneksi belum diuji)' : 'Belum dikonfigurasi' }}
           </div>
         </div>
         <p class="text-[11px] text-gray-400 mt-2 capitalize">Mode: {{ diagnostics?.paymentGateway?.environment || 'Sandbox' }}</p>

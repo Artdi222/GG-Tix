@@ -9,13 +9,13 @@ import {
   RefreshControl,
   StatusBar,
   Platform,
-  Dimensions,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { apiFetch } from '../../services/api';
+import { apiEnvelope } from '../../services/api';
+import { collectPages } from '../../services/pagination';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { BRAND_COLORS } from '../../constants/config';
@@ -64,11 +64,11 @@ function CityCardItem({ item, isSelected, onSelect }: CityCardItemProps) {
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(0.95, MOTION_TOKENS.springSnappy));
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
   };
 
   const handlePress = () => {
@@ -128,10 +128,7 @@ export default function HomeScreen() {
   const loadEvents = useCallback(async () => {
     try {
       setErrorMessage(null);
-      const res = await apiFetch<any>('/events?status=open');
-      const items: EventItem[] = Array.isArray(res)
-        ? res
-        : res.data?.items || res.data || res.items || [];
+      const items = await collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`));
       setEvents(items);
     } catch (err: any) {
       setErrorMessage(err.message || 'Gagal memuat daftar konser');
@@ -143,12 +140,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    apiFetch<any>('/events?status=open')
-      .then((res) => {
+    const controller = new AbortController();
+    collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`, { signal: controller.signal }))
+      .then((items) => {
         if (!isMounted) return;
-        const items: EventItem[] = Array.isArray(res)
-          ? res
-          : res.data?.items || res.data || res.items || [];
         setEvents(items);
       })
       .catch((err: any) => {
@@ -162,6 +157,7 @@ export default function HomeScreen() {
 
     return () => {
       isMounted = false;
+      controller.abort();
     };
   }, []);
 

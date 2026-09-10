@@ -8,6 +8,7 @@ export interface PlaceOrderDTO {
   categoryId: string;
   quantity: number;
   voucherCode?: string;
+  paymentReturnUrl?: string;
 }
 
 export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
@@ -22,6 +23,8 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
   // Handle transaction-level errors
   if (result && typeof result === "object" && "error" in result) {
     switch (result.error) {
+      case 'MAINTENANCE': throw new AppError('Pemesanan sementara ditutup untuk pemeliharaan. Tiket yang sudah dibeli tetap dapat diakses.', 503);
+      case 'ORDER_LIMIT': throw new AppError(`Maksimal ${result.maxTickets} tiket per pesanan.`, 400);
       case "EVENT_NOT_FOUND":
         throw new AppError("Event not found", 404);
       case "EVENT_CLOSED":
@@ -53,9 +56,9 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
     | { snapToken: string; redirectUrl: string; expiresAt: string }
     | undefined;
 
-  if (isMidtransConfigured()) {
+  if (isMidtransConfigured() && result.status === "pending") {
     try {
-      const snapData = await createSnapToken(customerId, result.id);
+      const snapData = await createSnapToken(customerId, result.id, data.paymentReturnUrl);
       payment = {
         snapToken: snapData.snapToken,
         redirectUrl: snapData.redirectUrl,
@@ -75,9 +78,10 @@ export async function placeOrder(customerId: string, data: PlaceOrderDTO) {
 export async function getCustomerOrders(
   customerId: string,
   page?: number,
-  limit?: number
+  limit?: number,
+  status?: "pending" | "verified" | "failed" | "active"
 ) {
-  return await orderRepo.findOrdersByCustomerId(customerId, page ?? 1, limit ?? 10);
+  return await orderRepo.findOrdersByCustomerId(customerId, page ?? 1, limit ?? 10, status);
 }
 
 export async function listOrders(filters: orderRepo.OrderQueryFilters) {
@@ -105,3 +109,5 @@ export async function verifyOrder(
 
   return result;
 }
+
+export { customerOrderSummary } from "../repositories/order.repository";

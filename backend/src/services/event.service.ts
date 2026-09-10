@@ -11,7 +11,7 @@ export interface CreateEventParams {
   dateTime: string | Date;
   endDateTime?: string | Date | null;
   description?: string | null;
-  maxTicketsPerOrder?: number;
+  maxTicketsPerOrder?: number | null;
   tags?: string[];
   seatmapUrl?: string | null;
   sortOrder?: number;
@@ -28,7 +28,7 @@ export interface UpdateEventParams {
   dateTime?: string | Date;
   endDateTime?: string | Date | null;
   description?: string | null;
-  maxTicketsPerOrder?: number;
+  maxTicketsPerOrder?: number | null;
   tags?: string[];
   seatmapUrl?: string | null;
   sortOrder?: number;
@@ -67,7 +67,9 @@ export async function getEventById(id: string) {
   if (!event) {
     throw new AppError("Event not found", 404);
   }
-  return event;
+  const { getSystemSettings } = await import('./settings.service');
+  const settings = await getSystemSettings();
+  return { ...event, maxTicketsPerOrder: event.maxTicketsPerOrder ?? settings.defaultMaxTicketsPerOrder, maintenanceMode: settings.maintenanceMode };
 }
 
 export async function listEvents(filters: eventRepository.EventQueryFilters) {

@@ -22,6 +22,11 @@ const auditLogQuerySchema = z.object({
   limit: z.string().optional().transform((v) => (v ? Math.min(100, Math.max(1, parseInt(v, 10))) : 15)),
 });
 
+settingsRoute.get('/public', async c => {
+  const { defaultMaxTicketsPerOrder, maintenanceMode, supportEmail, supportWhatsapp } = await settingsService.getSystemSettings();
+  return c.json({ data: { defaultMaxTicketsPerOrder, maintenanceMode, supportEmail, supportWhatsapp } });
+});
+
 // GET /api/settings/system
 settingsRoute.get("/system", authMiddleware, superAdminOnly, async (c) => {
   const settings = await settingsService.getSystemSettings();

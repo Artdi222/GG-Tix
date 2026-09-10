@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,8 +15,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiFetch } from '../../services/api';
+import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { BRAND_COLORS } from '../../constants/config';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
@@ -57,11 +56,11 @@ function TicketCard({ item, onPress }: TicketCardProps) {
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.97, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(0.97, MOTION_TOKENS.springSnappy));
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
   };
 
   const handlePress = () => {
@@ -178,118 +177,18 @@ function TicketCard({ item, onPress }: TicketCardProps) {
   );
 }
 
-const CACHE_KEY_ORDERS = '@ggtix_cached_orders_me';
+
 
 export default function TicketsScreen() {
   const token = useAuthStore((state) => state.token);
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(Boolean(token));
-  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'all'>('active');
-  const [isOffline, setIsOffline] = useState(false);
-
+  const data = useCustomerOrders(activeTab === 'active' ? 'active' : 'all');
+  const { items: filteredOrders, loading, offline: isOffline, error } = data;
+  const refreshing = loading && filteredOrders.length > 0;
+  const onRefresh = data.reload;
+  const activeTicketsCount = data.summary.activeTickets;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  const loadOrders = useCallback(async () => {
-    if (!token) {
-      setRefreshing(false);
-      return;
-    }
-    try {
-      const res = await apiFetch<any>('/orders/me');
-      const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
-      setOrders(items);
-      setIsOffline(false);
-      await AsyncStorage.setItem(CACHE_KEY_ORDERS, JSON.stringify(items)).catch(() => {});
-    } catch {
-      // Offline fallback: load from AsyncStorage
-      const cached = await AsyncStorage.getItem(CACHE_KEY_ORDERS).catch(() => null);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setOrders(parsed);
-            setIsOffline(true);
-            return;
-          }
-        } catch {}
-      }
-      setOrders([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (token) {
-      // 1. Immediately read cached orders for instantaneous display
-      AsyncStorage.getItem(CACHE_KEY_ORDERS)
-        .then((cached) => {
-          if (cached && isMounted) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                setOrders(parsed);
-                setLoading(false);
-              }
-            } catch {}
-          }
-        })
-        .catch(() => {});
-
-      // 2. Fetch fresh orders from backend
-      apiFetch<any>('/orders/me')
-        .then((res) => {
-          if (!isMounted) return;
-          const items = Array.isArray(res) ? res : res.data?.items || res.items || res.data || [];
-          setOrders(items);
-          setIsOffline(false);
-          AsyncStorage.setItem(CACHE_KEY_ORDERS, JSON.stringify(items)).catch(() => {});
-        })
-        .catch(async () => {
-          if (!isMounted) return;
-          const cached = await AsyncStorage.getItem(CACHE_KEY_ORDERS).catch(() => null);
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                setOrders(parsed);
-                setIsOffline(true);
-                return;
-              }
-            } catch {}
-          }
-          setOrders([]);
-        })
-        .finally(() => {
-          if (!isMounted) return;
-          setLoading(false);
-        });
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [token]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadOrders();
-  }, [loadOrders]);
-
-  const filteredOrders = useMemo(() => {
-    if (activeTab === 'active') {
-      return orders.filter((o) => o.status === 'verified');
-    }
-    return orders;
-  }, [orders, activeTab]);
-
-  const activeTicketsCount = useMemo(() => {
-    return orders.filter((o) => o.status === 'verified').length;
-  }, [orders]);
 
   if (!token) {
     return (
@@ -370,11 +269,12 @@ export default function TicketsScreen() {
           accessibilityLabel="Filter Semua Riwayat"
         >
           <Text style={[styles.tabBtnText, activeTab === 'all' && styles.tabBtnTextActive]}>
-            Semua Riwayat ({orders.length})
+            Semua Riwayat ({data.summary.totalOrders})
           </Text>
         </TouchableOpacity>
       </View>
 
+      {error ? <TouchableOpacity onPress={data.reload} style={{ padding: 16 }} accessibilityRole="button"><Text style={{ color: '#FCA5A5' }}>{error} Ketuk untuk coba lagi.</Text></TouchableOpacity> : null}
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={BRAND_COLORS.accent} />
@@ -382,6 +282,7 @@ export default function TicketsScreen() {
         </View>
       ) : (
         <FlatList
+          ListFooterComponent={data.page < data.totalPages ? <TouchableOpacity onPress={data.loadMore} disabled={loading} style={{ padding: 20, alignItems: 'center' }} accessibilityRole="button"><Text style={{ color: BRAND_COLORS.accent }}>{loading ? 'Memuat...' : 'Muat lebih banyak'}</Text></TouchableOpacity> : null}
           data={filteredOrders}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
@@ -410,7 +311,7 @@ export default function TicketsScreen() {
           renderItem={({ item }) => (
             <TicketCard
               item={item}
-              onPress={() => router.push(`/ticket/${item.id}`)}
+              onPress={() => router.push(item.status === 'verified' ? `/ticket/${item.id}` : `/payment/${item.id}`)}
             />
           )}
           ListEmptyComponent={

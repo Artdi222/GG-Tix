@@ -1,6 +1,6 @@
-import { eq, and, desc, count, SQL, sql } from "drizzle-orm";
+import { eq, and, desc, count, SQL, sql, inArray } from "drizzle-orm";
 import { db } from "../db";
-import { orders, ticketCategories, events, customers, tickets, vouchers, voucherUsages } from "../db/schema";
+import { orders, ticketCategories, events, customers, tickets, vouchers, voucherUsages, systemSettings } from "../db/schema";
 
 export interface CreateOrderInput {
   customerId: string;
@@ -30,7 +30,7 @@ export async function createOrder(data: CreateOrderInput) {
   return await db.transaction(async (tx) => {
     // 1. Check event status
     const [event] = await tx
-      .select({ id: events.id, status: events.status })
+      .select({ id: events.id, status: events.status, maxTicketsPerOrder: events.maxTicketsPerOrder })
       .from(events)
       .where(eq(events.id, data.eventId))
       .limit(1);
@@ -40,6 +40,13 @@ export async function createOrder(data: CreateOrderInput) {
     }
     if (event.status === "closed") {
       return { error: "EVENT_CLOSED" as const };
+    }
+
+    const [settings] = await tx.select().from(systemSettings).where(eq(systemSettings.id, 'default')).limit(1);
+    if (settings?.maintenanceMode) return { error: 'MAINTENANCE' as const };
+    const maxTickets = event.maxTicketsPerOrder ?? settings?.defaultMaxTicketsPerOrder ?? 4;
+    if (!Number.isInteger(data.quantity) || data.quantity < 1 || data.quantity > maxTickets) {
+      return { error: 'ORDER_LIMIT' as const, maxTickets };
     }
 
     // 2. Check category exists and belongs to this event (with row-level lock)
@@ -129,7 +136,7 @@ export async function createOrder(data: CreateOrderInput) {
           ? Math.min(raw, parseFloat(v.maxDiscountAmount))
           : raw;
       }
-      discount = Math.round(discount * 100) / 100;
+      discount = Math.min(subtotal, Math.round(discount * 100) / 100);
       lockedVoucher = v;
 
       // Deduct voucher quota
@@ -165,7 +172,8 @@ export async function createOrder(data: CreateOrderInput) {
         totalPrice,
         voucherId: lockedVoucher ? lockedVoucher.id : null,
         voucherCode: lockedVoucher ? lockedVoucher.code : null,
-        status: "pending",
+        status: Number(totalPrice) === 0 ? "verified" : "pending",
+        verifiedAt: Number(totalPrice) === 0 ? new Date() : null,
       })
       .returning();
 
@@ -180,6 +188,9 @@ export async function createOrder(data: CreateOrderInput) {
       });
     }
 
+    if (Number(totalPrice) === 0) {
+      await tx.insert(tickets).values(Array.from({ length: data.quantity }, () => ({ orderId: newOrder.id, qrCodeValue: `tix_${crypto.randomUUID()}` })));
+    }
     return newOrder;
   });
 }
@@ -202,26 +213,29 @@ export async function findOrderById(id: string) {
 export async function findOrdersByCustomerId(
   customerId: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  status?: "pending" | "verified" | "failed" | "active"
 ) {
   const offset = (page - 1) * limit;
+  const where = and(eq(orders.customerId, customerId), status === 'active'
+    ? and(eq(orders.status, 'verified'), sql`exists (select 1 from tickets t join events e on e.id = ${orders.eventId} where t.order_id = ${orders.id} and not t.checked_in and e.date_time >= now())`) : status === 'failed'
+    ? inArray(orders.status, ['rejected', 'expired']) : status ? eq(orders.status, status) : undefined);
 
   const items = await db.query.orders.findMany({
-    where: eq(orders.customerId, customerId),
-    orderBy: [desc(orders.createdAt)],
+    where,
+    orderBy: [desc(orders.createdAt), desc(orders.id)],
     limit,
     offset,
     with: {
-      event: { columns: { title: true, dateTime: true } },
+      event: { columns: { id: true, title: true, dateTime: true, imageUrl: true }, with: { venue: { columns: { name: true, city: true } } } },
       category: { columns: { name: true } },
-      paymentProofs: true,
     },
   });
 
   const [{ total }] = await db
     .select({ total: count() })
     .from(orders)
-    .where(eq(orders.customerId, customerId));
+    .where(where);
 
   return {
     items,
@@ -288,6 +302,7 @@ export async function verifyOrder(
       .select()
       .from(orders)
       .where(eq(orders.id, orderId))
+      .for("update")
       .limit(1);
 
     if (!order) return { error: "ORDER_NOT_FOUND" as const };
@@ -307,7 +322,7 @@ export async function verifyOrder(
       if (category) {
         await tx
           .update(ticketCategories)
-          .set({ quotaRemaining: category.quotaRemaining + order.quantity })
+          .set({ quotaRemaining: sql`${ticketCategories.quotaRemaining} + ${order.quantity}` })
           .where(eq(ticketCategories.id, order.categoryId));
       }
 
@@ -363,4 +378,15 @@ export async function verifyOrder(
 
     return updated;
   });
+}
+
+export async function customerOrderSummary(customerId: string) {
+  const rows = await db.select({ status: orders.status, count: count() })
+    .from(orders).where(eq(orders.customerId, customerId)).groupBy(orders.status);
+  const counts = { pending: 0, verified: 0, rejected: 0, expired: 0 };
+  for (const row of rows) counts[row.status] = Number(row.count);
+  const [active] = await db.select({ count: count() }).from(tickets)
+    .innerJoin(orders, eq(tickets.orderId, orders.id)).innerJoin(events, eq(orders.eventId, events.id))
+    .where(and(eq(orders.customerId, customerId), eq(orders.status, 'verified'), eq(tickets.checkedIn, false), sql`${events.dateTime} >= now()`));
+  return { ...counts, totalOrders: rows.reduce((sum, r) => sum + Number(r.count), 0), activeTickets: Number(active.count) };
 }

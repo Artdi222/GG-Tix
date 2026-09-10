@@ -43,6 +43,13 @@
       "when": 1789013920668,
       "tag": "0005_freezing_vivisector",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789027627052,
+      "tag": "0006_equal_martin_li",
+      "breakpoints": true
     }
   ]
 }

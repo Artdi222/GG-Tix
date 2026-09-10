@@ -10,7 +10,7 @@ export interface CreateEventInput {
   dateTime: Date;
   endDateTime?: Date | null;
   description?: string | null;
-  maxTicketsPerOrder?: number;
+  maxTicketsPerOrder?: number | null;
   tags?: string[];
   seatmapUrl?: string | null;
   sortOrder?: number;
@@ -27,7 +27,7 @@ export interface UpdateEventInput {
   dateTime?: Date;
   endDateTime?: Date | null;
   description?: string | null;
-  maxTicketsPerOrder?: number;
+  maxTicketsPerOrder?: number | null;
   tags?: string[];
   seatmapUrl?: string | null;
   sortOrder?: number;
@@ -55,7 +55,7 @@ export async function createEvent(data: CreateEventInput) {
       dateTime: data.dateTime,
       endDateTime: data.endDateTime || null,
       description: data.description ? data.description.trim() : null,
-      maxTicketsPerOrder: data.maxTicketsPerOrder ?? 4,
+      maxTicketsPerOrder: data.maxTicketsPerOrder ?? null,
       tags: data.tags || [],
       seatmapUrl: data.seatmapUrl ? data.seatmapUrl.trim() : null,
       sortOrder: data.sortOrder ?? 0,

@@ -6,15 +6,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  Alert,
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiFetch } from '../../services/api';
+import { session } from '../../services/session';
+import { useAuthStore } from '../../store/auth-store';
+import { apiFetch, ApiError } from '../../services/api';
 import { BRAND_COLORS } from '../../constants/config';
 import { TicketQRCode } from '../../components/TicketQRCode';
 
@@ -40,6 +40,13 @@ interface OrderDetailResponse {
 
 export default function TicketDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const userId = useAuthStore(s => s.user?.id);
+  const router = useRouter();
+  if (!id || !userId) return <View style={styles.centerContainer}><Text style={styles.loadingText}>Masuk untuk melihat tiket milik akun Anda.</Text><TouchableOpacity onPress={() => router.replace('/auth/login')} style={{ padding: 20 }}><Text style={{ color: BRAND_COLORS.accent }}>Masuk</Text></TouchableOpacity></View>;
+  return <TicketContent key={`${userId}:${id}`} id={id} userId={userId} />;
+}
+
+function TicketContent({ id, userId }: { id: string; userId: string }) {
   const [data, setData] = useState<OrderDetailResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -48,58 +55,30 @@ export default function TicketDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    let isMounted = true;
-    if (!id) return;
-
-    // 1. Immediately read cached ticket data if available
-    AsyncStorage.getItem(`@ggtix_cached_ticket_${id}`)
-      .then((cached) => {
-        if (cached && isMounted) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed && parsed.tickets) {
-              setData(parsed);
-              setLoading(false);
-            }
-          } catch {}
+    const controller = new AbortController();
+    const revision = session.snapshot().revision;
+    const current = () => !controller.signal.aborted && session.snapshot().revision === revision;
+    void (async () => {
+      try {
+        const result = await apiFetch<OrderDetailResponse>(`/tickets/order/${id}`, { signal: controller.signal });
+        if (!current()) return;
+        setData(result);
+        await session.cacheWrite(`ticket:${id}`, result, revision).catch(() => {});
+      } catch (err) {
+        if (!current()) return;
+        if (err instanceof ApiError && err.offline) {
+          const cached = await session.cacheRead<OrderDetailResponse>(`ticket:${id}`, revision).catch(() => null);
+          if (!current()) return;
+          if (cached?.order.status === 'verified' && cached.tickets.length) { setData(cached); setIsOffline(true); return; }
         }
-      })
-      .catch(() => {});
-
-    // 2. Fetch fresh ticket from server
-    apiFetch<any>(`/tickets/order/${id}`)
-      .then((res) => {
-        if (!isMounted) return;
-        const orderData = res.data || res;
-        setData(orderData);
-        setIsOffline(false);
-        AsyncStorage.setItem(`@ggtix_cached_ticket_${id}`, JSON.stringify(orderData)).catch(() => {});
-      })
-      .catch(async (err: any) => {
-        if (!isMounted) return;
-        const cached = await AsyncStorage.getItem(`@ggtix_cached_ticket_${id}`).catch(() => null);
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed && parsed.tickets) {
-              setData(parsed);
-              setIsOffline(true);
-              return;
-            }
-          } catch {}
-        }
-        Alert.alert('Gagal Memuat Tiket', err.message || 'Tiket tidak ditemukan atau belum diverifikasi.');
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [id]);
+        setError(err instanceof Error ? err.message : 'Tiket gagal dimuat.');
+      } finally { if (current()) setLoading(false); }
+    })();
+    return () => controller.abort();
+  }, [id, userId, attempt]);
 
   const handleTabSwitch = (idx: number) => {
     if (Platform.OS !== 'web') {
@@ -110,6 +89,13 @@ export default function TicketDetailScreen() {
     setCurrentIndex(idx);
   };
 
+  if (!loading && (!data || !data.tickets.length)) {
+    return <View style={styles.centerContainer}>
+      <Text style={styles.loadingText}>{error || 'Tiket belum tersedia.'}</Text>
+      <TouchableOpacity onPress={() => { setData(null); setLoading(true); setError(''); setIsOffline(false); setAttempt(n => n + 1); }} style={{ padding: 16 }}><Text style={{ color: BRAND_COLORS.accent }}>Coba lagi</Text></TouchableOpacity>
+      <TouchableOpacity onPress={() => router.replace('/(tabs)/tickets')} style={{ padding: 16 }}><Text style={{ color: '#FAFAFA' }}>Kembali ke tiket saya</Text></TouchableOpacity>
+    </View>;
+  }
   if (loading || !data) {
     return (
       <View style={styles.centerContainer}>

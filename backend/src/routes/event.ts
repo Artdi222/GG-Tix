@@ -18,7 +18,7 @@ const createEventSchema = z.object({
   dateTime: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid ISO date string"),
   endDateTime: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid ISO date string").optional().nullable(),
   description: z.string().optional().nullable(),
-  maxTicketsPerOrder: z.number().int().min(1).max(10).optional(),
+  maxTicketsPerOrder: z.number().int().min(1).max(10).nullable().optional(),
   tags: z.array(z.string().max(50)).optional(),
   seatmapUrl: z.string().url("Invalid seatmap URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),

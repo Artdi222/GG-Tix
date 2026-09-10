@@ -23,12 +23,7 @@ function openCategoryManager(event: EventItem) {
 }
 
 // Artists list for select dropdown
-const artists = ref<ArtistOption[]>([
-  { id: 'art-001', name: 'Rover Ensemble' },
-  { id: 'art-002', name: 'Coldplay' },
-  { id: 'art-003', name: 'NIKI' },
-  { id: 'art-004', name: 'Sheila on 7' }
-])
+const artists = ref<ArtistOption[]>([])
 
 function getArtistName(id: string) {
   return artists.value.find(a => a.id === id)?.name || id
@@ -67,57 +62,26 @@ async function fetchArtists() {
       artists.value = res.data
     }
   } catch {
-    // Keep mock
+    loadError.value = 'Pilihan artis atau venue gagal dimuat. Muat ulang halaman untuk mencoba lagi.'
   }
 }
 
 // Events list matching BE contract
-const events = ref<EventItem[]>([
-  {
-    id: 'evt-001',
-    title: 'Wuthering Waves Live 2026',
-    artistId: 'art-001',
-    publisherName: 'Kuro Games',
-    venueId: '',
-    venue: { id: 'v-1', name: 'Gelora Bung Karno', city: 'Jakarta' },
-    city: 'Jakarta',
-    dateTime: '2026-10-12T19:00:00.000Z',
-    status: 'open'
-  },
-  {
-    id: 'evt-002',
-    title: 'Coldplay Music of the Spheres',
-    artistId: 'art-002',
-    publisherName: 'PK Entertainment',
-    venueId: '',
-    venue: { id: 'v-2', name: 'Stadion Utama GBK', city: 'Jakarta' },
-    city: 'Jakarta',
-    dateTime: '2026-11-15T20:00:00.000Z',
-    status: 'open'
-  },
-  {
-    id: 'evt-003',
-    title: 'NIKI Nicole World Tour',
-    artistId: 'art-003',
-    publisherName: '88rising',
-    venueId: '',
-    venue: { id: 'v-3', name: 'Beach City International Stadium', city: 'Jakarta' },
-    city: 'Jakarta',
-    dateTime: '2026-12-20T19:30:00.000Z',
-    status: 'closed'
-  }
-])
+const events = ref<EventItem[]>([])
+const loadError = ref('')
 
 // Fetch real events from BE
 async function fetchEvents() {
   isLoading.value = true
+  loadError.value = ''
   try {
     const res = await request<{ data: EventItem[] }>('/events')
     if (res?.data) {
       events.value = res.data
     }
   } catch {
-    // Keep mock data
+    events.value = []
+    loadError.value = 'Daftar konser gagal dimuat. Coba lagi.'
   } finally {
     isLoading.value = false
   }
@@ -132,7 +96,7 @@ async function fetchVenues() {
       venues.value = res.data
     }
   } catch {
-    // Keep mock
+    loadError.value = 'Pilihan artis atau venue gagal dimuat. Muat ulang halaman untuk mencoba lagi.'
   }
 }
 
@@ -252,6 +216,18 @@ function formatDate(iso: string) {
 
 <template>
   <div class="space-y-5">
+    <UAlert
+      v-if="loadError"
+      color="error"
+      :title="loadError"
+      class="mb-4"
+    />
+    <UButton
+      v-if="loadError"
+      label="Coba lagi"
+      class="mb-4"
+      @click="fetchEvents"
+    />
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>

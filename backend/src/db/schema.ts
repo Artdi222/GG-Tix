@@ -122,7 +122,7 @@ export const events = pgTable(
     dateTime: timestamp("date_time").notNull(),
     endDateTime: timestamp("end_date_time"),
     description: text("description"),
-    maxTicketsPerOrder: integer("max_tickets_per_order").notNull().default(4),
+    maxTicketsPerOrder: integer("max_tickets_per_order"),
     tags: text("tags").array().notNull().default([]),
     seatmapUrl: text("seatmap_url"),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -324,3 +324,23 @@ export const customersRelations = relations(customers, ({ many }) => ({
   voucherUsages: many(voucherUsages),
 }));
 
+
+// Opt-in devices and durable Expo delivery jobs. Credentials never enter payloads.
+export const pushDevices = pgTable('push_devices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  customerId: uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  enabled: boolean('enabled').notNull().default(true),
+  activatedAt: timestamp('activated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ customerIdx: index('push_devices_customer_idx').on(table.customerId) }));
+export const notificationJobs = pgTable('notification_jobs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  dedupeKey: text('dedupe_key').notNull().unique(),
+  deviceId: uuid('device_id').notNull().references(() => pushDevices.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(), body: text('body').notNull(), data: jsonb('data').notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  receiptId: text('receipt_id'), lastError: text('last_error'),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ pendingIdx: index('notification_jobs_pending_idx').on(table.status, table.availableAt) }));

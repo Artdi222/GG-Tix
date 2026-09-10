@@ -117,7 +117,8 @@ export async function updateProfile(userId: string, role: "admin" | "customer", 
       }
     }
 
-    return await adminRepo.updateAdmin(userId, data);
+    await adminRepo.updateAdmin(userId, data);
+    return getMe(userId, role);
   } else {
     const customer = await customerRepo.findCustomerById(userId);
     if (!customer) throw new AppError("Customer not found", 404);
@@ -129,7 +130,8 @@ export async function updateProfile(userId: string, role: "admin" | "customer", 
       }
     }
 
-    return await customerRepo.updateCustomer(userId, data);
+    await customerRepo.updateCustomer(userId, data);
+    return getMe(userId, role);
   }
 }
 
