@@ -34,7 +34,7 @@ export function LinearGradient({
       <View
         style={[
           styles.container,
-          { backgroundImage: gradientCss },
+          { backgroundImage: gradientCss } as any,
           style,
         ]}
         {...props}

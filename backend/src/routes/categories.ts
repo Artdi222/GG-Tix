@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as categoryService from "../services/category.service";
-import { authMiddleware, superAdminOnly } from "../lib/middleware";
+import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
 const categoryRoute = new Hono();
 
@@ -64,7 +64,7 @@ categoryRoute.get(
 categoryRoute.post(
   "/events/:eventId/categories",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", eventIdParamSchema),
   zValidator("json", createCategorySchema),
   async (c) => {
@@ -85,7 +85,7 @@ categoryRoute.post(
 categoryRoute.put(
   "/categories/:id",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", categoryIdParamSchema),
   zValidator("json", updateCategorySchema),
   async (c) => {
@@ -103,7 +103,7 @@ categoryRoute.put(
 categoryRoute.delete(
   "/categories/:id",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", categoryIdParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");

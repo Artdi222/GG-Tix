@@ -133,7 +133,8 @@ export default function CheckoutScreen() {
         method: 'POST',
         body: JSON.stringify({
           eventId: id,
-          items: [{ categoryId, quantity }],
+          categoryId,
+          quantity,
         }),
       });
 

@@ -4,21 +4,34 @@ import { z } from "zod";
 import * as orderService from "../services/order.service";
 import {
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   customerOnly,
   orderRateLimiter,
 } from "../lib/middleware";
 
 const orderRoute = new Hono();
 
-const placeOrderSchema = z.object({
-  eventId: z.string().uuid("Invalid event ID format"),
-  categoryId: z.string().uuid("Invalid category ID format"),
-  quantity: z
-    .number()
-    .int("Quantity must be a whole number")
-    .min(1, "Quantity must be at least 1"),
-});
+// ponytail: support both flat { eventId, categoryId, quantity } and { eventId, items: [...] } payloads
+const placeOrderSchema = z.preprocess(
+  (val: any) => {
+    if (val && Array.isArray(val.items) && val.items.length > 0) {
+      return {
+        eventId: val.eventId,
+        categoryId: val.items[0].categoryId,
+        quantity: val.items[0].quantity,
+      };
+    }
+    return val;
+  },
+  z.object({
+    eventId: z.string().uuid("Invalid event ID format"),
+    categoryId: z.string().uuid("Invalid category ID format"),
+    quantity: z
+      .number()
+      .int("Quantity must be a whole number")
+      .min(1, "Quantity must be at least 1"),
+  })
+);
 
 const verifyOrderSchema = z.object({
   decision: z.enum(["verified", "rejected"], {
@@ -98,7 +111,7 @@ orderRoute.get(
 orderRoute.get(
   "/",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("query", adminQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -114,7 +127,7 @@ orderRoute.get(
 orderRoute.patch(
   "/:id/verify",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", orderIdParamSchema),
   zValidator("json", verifyOrderSchema),
   async (c) => {

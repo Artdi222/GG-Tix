@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as venueService from "../services/venue.service";
-import { authMiddleware, superAdminOnly } from "../lib/middleware";
+import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
 const venueRoute = new Hono();
 
@@ -46,7 +46,7 @@ const updateVenueSchema = z.object({
 });
 
 // GET /api/venues — admin list (admin + staff read)
-venueRoute.get("/", authMiddleware, superAdminOnly, zValidator("query", listQuerySchema), async (c) => {
+venueRoute.get("/", authMiddleware, adminOrHigher, zValidator("query", listQuerySchema), async (c) => {
   const query = c.req.valid("query");
   const result = await venueService.getAllVenues(query.q, query.page, query.limit);
   return c.json({
@@ -56,17 +56,17 @@ venueRoute.get("/", authMiddleware, superAdminOnly, zValidator("query", listQuer
 });
 
 // GET /api/venues/:id — admin detail
-venueRoute.get("/:id", authMiddleware, superAdminOnly, zValidator("param", venueIdParamSchema), async (c) => {
+venueRoute.get("/:id", authMiddleware, adminOrHigher, zValidator("param", venueIdParamSchema), async (c) => {
   const { id } = c.req.valid("param");
   const data = await venueService.getVenueById(id);
   return c.json({ data });
 });
 
-// POST /api/venues — super admin only
+// POST /api/venues — admin or higher
 venueRoute.post(
   "/",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("json", createVenueSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -81,11 +81,11 @@ venueRoute.post(
   }
 );
 
-// PUT /api/venues/:id — super admin only
+// PUT /api/venues/:id — admin or higher
 venueRoute.put(
   "/:id",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", venueIdParamSchema),
   zValidator("json", updateVenueSchema),
   async (c) => {
@@ -99,11 +99,11 @@ venueRoute.put(
   }
 );
 
-// DELETE /api/venues/:id — super admin only (+ B2 cleanup)
+// DELETE /api/venues/:id — admin or higher (+ B2 cleanup)
 venueRoute.delete(
   "/:id",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", venueIdParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");

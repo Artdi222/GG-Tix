@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import * as eventService from "../services/event.service";
-import { authMiddleware, superAdminOnly } from "../lib/middleware";
+import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
 const eventRoute = new Hono();
 
@@ -64,7 +64,7 @@ eventRoute.get("/:id", zValidator("param", uuidParamSchema), async (c) => {
 eventRoute.post(
   "/",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("json", createEventSchema),
   async (c) => {
     const user = c.get("user");
@@ -87,7 +87,7 @@ eventRoute.post(
 eventRoute.put(
   "/:id",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", uuidParamSchema),
   zValidator("json", updateEventSchema),
   async (c) => {
@@ -105,7 +105,7 @@ eventRoute.put(
 eventRoute.patch(
   "/:id/status",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", uuidParamSchema),
   zValidator("json", updateStatusSchema),
   async (c) => {
@@ -123,7 +123,7 @@ eventRoute.patch(
 eventRoute.delete(
   "/:id",
   authMiddleware,
-  superAdminOnly,
+  adminOrHigher,
   zValidator("param", uuidParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");

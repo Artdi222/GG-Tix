@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { authMiddleware, superAdminOnly, rateLimit } from "../lib/middleware";
+import { authMiddleware, adminOrHigher, rateLimit } from "../lib/middleware";
 import { uploadImage } from "../services/upload.service";
 import { IMAGE_MAX_BYTES } from "../lib/storage";
 
@@ -11,7 +11,7 @@ const uploadLimiter = rateLimit({
 });
 
 // POST /api/uploads — multipart: file + form `kind` (profile|banner|venue)
-uploadRoute.post("/", authMiddleware, superAdminOnly, uploadLimiter, async (c) => {
+uploadRoute.post("/", authMiddleware, adminOrHigher, uploadLimiter, async (c) => {
   const contentType = c.req.header("content-type") || "";
   if (!contentType.includes("multipart/form-data")) {
     return c.json({ error: "File gambar wajib dikirim dengan format multipart/form-data." }, 400);
