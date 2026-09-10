@@ -19,6 +19,8 @@ import {
   orders,
   tickets,
   paymentProofs,
+  vouchers,
+  voucherUsages,
 } from "./schema";
 
 async function seed() {
@@ -38,7 +40,7 @@ async function seed() {
 
   // Truncate in correct order (respecting FK constraints)
   await db.execute(
-    sql`TRUNCATE orders, ticket_categories, events, venues, artists, customers, admins CASCADE`
+    sql`TRUNCATE voucher_usages, vouchers, payment_proofs, tickets, orders, ticket_categories, events, venues, artists, customers, admins CASCADE`
   );
   console.log("  Truncated existing data");
 
@@ -449,6 +451,62 @@ async function seed() {
     await db.insert(tickets).values(ticketsToInsert);
     console.log(`  ${ticketsToInsert.length} digital tickets created for verified orders`);
   }
+
+  // 8. Sample Vouchers
+  const sampleVouchers = await db
+    .insert(vouchers)
+    .values([
+      {
+        code: "GGTIX2026",
+        name: "Promo Grand Launching GG-Tix",
+        description: "Diskon 20% maksimal Rp 100.000 untuk seluruh konser game GG-Tix",
+        discountType: "percentage",
+        discountValue: "20.00",
+        maxDiscountAmount: "100000.00",
+        minOrderAmount: "150000.00",
+        quotaTotal: 100,
+        quotaRemaining: 98,
+        maxUsagePerCustomer: 1,
+        createdBy: adminBudi.id,
+        startDate: new Date("2026-01-01T00:00:00Z"),
+        endDate: new Date("2026-12-31T23:59:59Z"),
+        isActive: true,
+      },
+      {
+        code: "EARLYBIRD",
+        name: "Potongan Langsung Early Bird",
+        description: "Potongan flat Rp 50.000 tanpa batas maksimal untuk semua kategori tiket",
+        discountType: "fixed",
+        discountValue: "50000.00",
+        maxDiscountAmount: null,
+        minOrderAmount: "100000.00",
+        quotaTotal: 50,
+        quotaRemaining: 50,
+        maxUsagePerCustomer: 2,
+        createdBy: adminBudi.id,
+        startDate: new Date("2026-01-01T00:00:00Z"),
+        endDate: new Date("2026-12-31T23:59:59Z"),
+        isActive: true,
+      },
+      {
+        code: "GAMERPASS",
+        name: "Diskon Komunitas Gamer",
+        description: "Diskon 10% khusus para member komunitas game",
+        discountType: "percentage",
+        discountValue: "10.00",
+        maxDiscountAmount: "50000.00",
+        minOrderAmount: "50000.00",
+        quotaTotal: 200,
+        quotaRemaining: 200,
+        maxUsagePerCustomer: 1,
+        createdBy: adminBudi.id,
+        startDate: new Date("2026-01-01T00:00:00Z"),
+        endDate: new Date("2026-12-31T23:59:59Z"),
+        isActive: true,
+      },
+    ])
+    .returning();
+  console.log(`  ${sampleVouchers.length} sample vouchers created`);
 
   // Done
   console.log("\nSeed complete!");
