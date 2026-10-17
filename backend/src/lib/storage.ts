@@ -17,7 +17,6 @@ interface AuthData {
   authToken: string;
   downloadUrl: string;
   bucketId: string;
-  downloadAuthToken?: string;
 }
 
 let auth: AuthData | null = null;
@@ -69,44 +68,35 @@ async function ensureAuth(): Promise<AuthData> {
     throw new AppError(`B2: bucket '${B2_BUCKET}' not found or not allowed for this key`, 500);
   }
 
-  let downloadAuthToken: string | undefined = undefined;
-  try {
-    const dlRes = await fetch(`${apiUrl}/b2api/v3/b2_get_download_authorization`, {
-      method: "POST",
-      headers: {
-        Authorization: body.authorizationToken,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        bucketId,
-        fileNamePrefix: "",
-        validDurationInSeconds: 604800, // 7 days
-      }),
-    });
-    if (dlRes.ok) {
-      const dlBody: any = await dlRes.json();
-      downloadAuthToken = dlBody.authorizationToken;
-    }
-  } catch {
-    // Fall back to unauthenticated URL if token generation is restricted
-  }
-
   auth = {
     apiUrl,
     authToken: body.authorizationToken,
     downloadUrl,
     bucketId,
-    downloadAuthToken,
   };
   return auth;
 }
 
-function publicUrl(key: string): string {
-  const base = `${auth!.downloadUrl}/file/${B2_BUCKET}/${key}`;
-  if (auth?.downloadAuthToken) {
-    return `${base}?Authorization=${encodeURIComponent(auth.downloadAuthToken)}`;
+// Bucket is public: stored URLs must not embed expiring download tokens.
+function publicUrl(downloadUrl: string, key: string): string {
+  return `${downloadUrl}/file/${B2_BUCKET}/${key}`;
+}
+
+// B2 account tokens expire after 24h; drop the cache and retry once on 401.
+async function withAuth<T>(fn: (a: AuthData) => Promise<T>): Promise<T> {
+  try {
+    return await fn(await ensureAuth());
+  } catch (err) {
+    if (!(err instanceof B2AuthExpired)) throw err;
+    auth = null;
+    return await fn(await ensureAuth());
   }
-  return base;
+}
+
+class B2AuthExpired extends Error {}
+
+function assertAuthorized(res: Response) {
+  if (res.status === 401) throw new B2AuthExpired();
 }
 
 // Extract the object key from a stored public URL (ours only, else null)
@@ -124,7 +114,7 @@ export async function uploadObject(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  const a = await ensureAuth();
+  return withAuth(async (a) => {
   // Bucket is public: we store the "main" object's read URL.
   // B2 upload requires an "upload URL" token — get it per bucket.
   const urlRes = await fetch(
@@ -133,6 +123,7 @@ export async function uploadObject(
       headers: { Authorization: a.authToken },
     }
   );
+  assertAuthorized(urlRes);
   const urlBody: any = await urlRes.json();
   if (!urlRes.ok) {
     throw new AppError(`B2 upload-url failed: ${urlBody.message || "unknown"}`, 500);
@@ -154,16 +145,18 @@ export async function uploadObject(
   if (!upRes.ok) {
     throw new AppError(`B2 upload failed: ${upBody.message || "unknown"}`, 500);
   }
-  return publicUrl(key);
+  return publicUrl(a.downloadUrl, key);
+  });
 }
 
 export async function deleteObject(key: string): Promise<void> {
-  const a = await ensureAuth();
+  return withAuth(async (a) => {
   // fileId required by B2; look it up by exact fileName via list.
   const listRes = await fetch(
     `${a.apiUrl}/b2api/v3/b2_list_file_names?bucketId=${a.bucketId}&prefix=${encodeURIComponent(key)}&maxFileCount=1`,
     { headers: { Authorization: a.authToken } }
   );
+  assertAuthorized(listRes);
   const listBody: any = await listRes.json();
   if (!listRes.ok) {
     throw new AppError(`B2 list failed: ${listBody.message || "unknown"}`, 500);
@@ -175,10 +168,12 @@ export async function deleteObject(key: string): Promise<void> {
     `${a.apiUrl}/b2api/v3/b2_delete_file_version?fileName=${encodeURIComponent(file.fileName)}&fileId=${file.fileId}`,
     { headers: { Authorization: a.authToken } }
   );
+  assertAuthorized(delRes);
   if (!delRes.ok) {
     const body: any = await delRes.json();
     throw new AppError(`B2 delete failed: ${body.message || "unknown"}`, 500);
   }
+  });
 }
 
 // UPL-09: remove main + thumb objects for a stored URL (only if ours).

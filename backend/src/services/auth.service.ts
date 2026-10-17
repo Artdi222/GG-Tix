@@ -170,11 +170,21 @@ export async function changePassword(
 export async function refreshAccessToken(refreshToken: string) {
   const payload = await verifyRefreshToken(refreshToken);
 
-  const newToken = await signToken({
-    sub: payload.sub,
-    role: payload.role,
-    ...(payload.adminRole ? { adminRole: payload.adminRole } : {}),
-  });
+  // Re-read the account so deleted users, demotions and password changes take effect.
+  // JWT iat has second precision; compare at the same granularity.
+  const isRevoked = (user: { credentialsChangedAt: Date } | null) =>
+    !user || !payload.iat || payload.iat < Math.floor(user.credentialsChangedAt.getTime() / 1000);
+
+  let newToken: string;
+  if (payload.role === "admin") {
+    const admin = await adminRepo.findAdminById(payload.sub);
+    if (!admin || isRevoked(admin)) throw new AppError("Session expired, please log in again", 401);
+    newToken = await signToken({ sub: admin.id, role: "admin", adminRole: admin.role, email: admin.email, name: admin.name });
+  } else {
+    const customer = await customerRepo.findCustomerById(payload.sub);
+    if (!customer || isRevoked(customer)) throw new AppError("Session expired, please log in again", 401);
+    newToken = await signToken({ sub: customer.id, role: "customer" });
+  }
 
   return { token: newToken };
 }

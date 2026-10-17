@@ -37,6 +37,7 @@ export const admins = pgTable("admins", {
   name: varchar("name", { length: 100 }).notNull(),
   email: varchar("email", { length: 150 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  credentialsChangedAt: timestamp("credentials_changed_at").notNull().defaultNow(),
   role: adminRoleEnum("role").notNull().default("admin"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -81,6 +82,7 @@ export const customers = pgTable("customers", {
   name: varchar("name", { length: 100 }).notNull(),
   email: varchar("email", { length: 150 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  credentialsChangedAt: timestamp("credentials_changed_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -152,7 +154,9 @@ export const ticketCategories = pgTable("ticket_categories", {
   quotaRemaining: integer("quota_remaining").notNull(),
   benefits: text("benefits").array().notNull().default([]),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (table) => ({
+  eventIdx: index("ticket_categories_event_id_idx").on(table.eventId),
+}));
 
 export const orders = pgTable(
   "orders",
@@ -252,7 +256,9 @@ export const paymentProofs = pgTable("payment_proofs", {
   midtransResponse: jsonb("midtrans_response"),
   paidAt: timestamp("paid_at"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  orderIdx: index("payment_proofs_order_id_idx").on(table.orderId),
+}));
 
 export const tickets = pgTable("tickets", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -262,7 +268,9 @@ export const tickets = pgTable("tickets", {
   qrCodeValue: varchar("qr_code_value", { length: 255 }).notNull().unique(),
   checkedIn: boolean("checked_in").notNull().default(false),
   checkedInAt: timestamp("checked_in_at"),
-});
+}, (table) => ({
+  orderIdx: index("tickets_order_id_idx").on(table.orderId),
+}));
 
 // relations
 

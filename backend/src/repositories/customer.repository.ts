@@ -47,7 +47,11 @@ export async function updateCustomer(
   const updateData: Record<string, any> = {};
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.email !== undefined) updateData.email = data.email.toLowerCase().trim();
-  if (data.passwordHash !== undefined) updateData.passwordHash = data.passwordHash;
+  if (data.passwordHash !== undefined) {
+    updateData.passwordHash = data.passwordHash;
+    // Revokes outstanding refresh tokens
+    updateData.credentialsChangedAt = new Date();
+  }
 
   const [updated] = await db
     .update(customers)

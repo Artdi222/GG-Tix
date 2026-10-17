@@ -2,7 +2,7 @@
 // Midtrans Snap token generation, webhook processing & auto-expiry
 
 import { eq, and, sql, lte } from "drizzle-orm";
-import { db } from "../db";
+import { db, client } from "../db";
 import {
   orders,
   paymentProofs,
@@ -30,106 +30,127 @@ export function extractOrderId(midtransOrderId: string): string {
   return midtransOrderId.replace(/^GGTIX-/, "");
 }
 
+type SnapMetadata = { snap?: { token: string; redirectUrl: string; expiresAt: string } };
+type SnapResult = { orderId: string; snapToken: string; redirectUrl: string; expiresAt: string };
+
+// Concurrent requests for the same order share one gateway call (per instance).
+const inflightSnap = new Map<string, Promise<SnapResult>>();
+
 /**
- * Generate a Midtrans Snap Token for a pending order
+ * Generate a Midtrans Snap Token for a pending order.
+ * The gateway call runs outside any DB transaction so no row lock or pool
+ * connection is held while waiting on Midtrans.
  */
-export async function createSnapToken(customerId: string, orderId: string, paymentReturnUrl?: string) {
+export function createSnapToken(customerId: string, orderId: string, paymentReturnUrl?: string): Promise<SnapResult> {
+  const key = `${customerId}:${orderId}`;
+  const pending = inflightSnap.get(key);
+  if (pending) return pending;
+  const promise = createSnapTokenUncached(customerId, orderId, paymentReturnUrl)
+    .finally(() => inflightSnap.delete(key));
+  inflightSnap.set(key, promise);
+  return promise;
+}
+
+function snapResult(orderId: string, snap: NonNullable<SnapMetadata["snap"]>): SnapResult {
+  if (Date.parse(snap.expiresAt) <= Date.now()) throw new AppError('Waktu pembayaran habis. Periksa status pesanan.', 409);
+  return { orderId, snapToken: snap.token, redirectUrl: snap.redirectUrl, expiresAt: snap.expiresAt };
+}
+
+async function findSavedSnap(orderId: string) {
+  const [proof] = await db.select().from(paymentProofs).where(eq(paymentProofs.orderId, orderId)).limit(1);
+  return { proof, snap: (proof?.midtransResponse as SnapMetadata | null)?.snap };
+}
+
+async function createSnapTokenUncached(customerId: string, orderId: string, paymentReturnUrl?: string): Promise<SnapResult> {
   if (!isMidtransConfigured()) {
     throw new AppError("Payment gateway is not configured", 503);
   }
 
+  const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId), with: { customer: true, category: true, event: true, paymentProofs: true } });
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+
+  if (order.customerId !== customerId) {
+    throw new AppError("Forbidden: You do not own this order", 403);
+  }
+
+  if (order.status !== "pending") {
+    throw new AppError(
+      `Cannot initiate payment for order with status '${order.status}'`,
+      409
+    );
+  }
+
+  const existingSnap = (order.paymentProofs?.[0]?.midtransResponse as SnapMetadata | null)?.snap;
+  if (existingSnap) return snapResult(order.id, existingSnap);
+
+  const settings = await getSystemSettings();
+  const expiresAt = new Date(order.createdAt.getTime() + settings.pendingOrderExpiryMinutes * 60000).toISOString();
+  if (Date.parse(expiresAt) <= Date.now()) throw new AppError('Waktu pembayaran habis. Periksa status pesanan.', 409);
+  const finishUrl = paymentReturnUrl ? `${paymentReturnUrl}/${order.id}` : undefined;
+  const amount = Math.round(Number(order.totalPrice));
+  if (amount <= 0) throw new AppError('Pembayaran tanpa biaya belum didukung.', 409);
+  const snapParams: SnapTransactionParams = {
+    transaction_details: {
+      order_id: `GGTIX-${order.id}`,
+      gross_amount: amount,
+    },
+    customer_details: {
+      first_name: order.customer.name,
+      email: order.customer.email,
+    },
+    // Snap requires the item sum to match gross_amount, including voucher discounts.
+    item_details: [{ id: order.categoryId, price: amount, quantity: 1,
+      name: `${order.quantity}x ${order.category.name} - ${order.event.title}`.slice(0, 50) }],
+    expiry: {
+      start_time: order.createdAt.toISOString().replace('T', ' ').slice(0, 19) + ' +0000',
+      unit: "minutes", duration: settings.pendingOrderExpiryMinutes,
+    },
+    ...(finishUrl ? {
+      callbacks: { finish: finishUrl, error: finishUrl },
+      gopay: { enable_callback: true, callback_url: finishUrl },
+      shopeepay: { callback_url: finishUrl },
+    } : {}),
+    enabled_payments: [
+      "bank_transfer",
+      "echannel",
+      "bca_va",
+      "bni_va",
+      "bri_va",
+      "permata_va",
+      "qris",
+      "gopay",
+      "shopeepay",
+    ],
+  };
+
+  let snapRes;
+  try {
+    snapRes = await createSnapTransaction(snapParams);
+  } catch (err) {
+    // Another instance may have won the race (Midtrans rejects a reused order_id).
+    const { snap } = await findSavedSnap(order.id);
+    if (snap) return snapResult(order.id, snap);
+    throw err;
+  }
+  const snap = { token: snapRes.token, redirectUrl: snapRes.redirect_url, expiresAt };
+
+  // Short transaction: re-check under lock, keep whichever snap was saved first.
   return db.transaction(async tx => {
-    await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
-    const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { customer: true, category: true, event: true, paymentProofs: true } });
-    if (!order) {
-      throw new AppError("Order not found", 404);
+    const [locked] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, order.id)).for("update");
+    if (locked?.status !== "pending") {
+      throw new AppError(`Cannot initiate payment for order with status '${locked?.status}'`, 409);
     }
+    const [proof] = await tx.select().from(paymentProofs).where(eq(paymentProofs.orderId, order.id)).limit(1);
+    const saved = (proof?.midtransResponse as SnapMetadata | null)?.snap;
+    if (saved) return snapResult(order.id, saved);
 
-    if (order.customerId !== customerId) {
-      throw new AppError("Forbidden: You do not own this order", 403);
-    }
+    const values = { midtransTransactionId: snapRes.token, transactionStatus: "pending", midtransResponse: { snap } };
+    if (proof) await tx.update(paymentProofs).set(values).where(eq(paymentProofs.id, proof.id));
+    else await tx.insert(paymentProofs).values({ orderId: order.id, ...values });
 
-    if (order.status !== "pending") {
-      throw new AppError(
-        `Cannot initiate payment for order with status '${order.status}'`,
-        409
-      );
-    }
-
-    const existingProof = order.paymentProofs?.[0];
-    const metadata = (existingProof?.midtransResponse ?? {}) as { snap?: { token: string; redirectUrl: string; expiresAt: string } };
-    if (metadata.snap) {
-      if (Date.parse(metadata.snap.expiresAt) <= Date.now()) throw new AppError('Waktu pembayaran habis. Periksa status pesanan.', 409);
-      return { orderId: order.id, snapToken: metadata.snap.token, redirectUrl: metadata.snap.redirectUrl, expiresAt: metadata.snap.expiresAt };
-    }
-    const settings = await getSystemSettings();
-    const expiresAt = new Date(order.createdAt.getTime() + settings.pendingOrderExpiryMinutes * 60000).toISOString();
-    if (Date.parse(expiresAt) <= Date.now()) throw new AppError('Waktu pembayaran habis. Periksa status pesanan.', 409);
-    const finishUrl = paymentReturnUrl ? `${paymentReturnUrl}/${order.id}` : undefined;
-    const amount = Math.round(Number(order.totalPrice));
-    if (amount <= 0) throw new AppError('Pembayaran tanpa biaya belum didukung.', 409);
-    const snapParams: SnapTransactionParams = {
-      transaction_details: {
-        order_id: `GGTIX-${order.id}`,
-        gross_amount: Math.round(parseFloat(order.totalPrice)),
-      },
-      customer_details: {
-        first_name: order.customer.name,
-        email: order.customer.email,
-      },
-      // Snap requires the item sum to match gross_amount, including voucher discounts.
-      item_details: [{ id: order.categoryId, price: amount, quantity: 1,
-        name: `${order.quantity}x ${order.category.name} - ${order.event.title}`.slice(0, 50) }],
-      expiry: {
-        start_time: order.createdAt.toISOString().replace('T', ' ').slice(0, 19) + ' +0000',
-        unit: "minutes", duration: settings.pendingOrderExpiryMinutes,
-      },
-      ...(finishUrl ? {
-        callbacks: { finish: finishUrl, error: finishUrl },
-        gopay: { enable_callback: true, callback_url: finishUrl },
-        shopeepay: { callback_url: finishUrl },
-      } : {}),
-      enabled_payments: [
-        "bank_transfer",
-        "echannel",
-        "bca_va",
-        "bni_va",
-        "bri_va",
-        "permata_va",
-        "qris",
-        "gopay",
-        "shopeepay",
-      ],
-    };
-
-    const snapRes = await createSnapTransaction(snapParams);
-    const snap = { token: snapRes.token, redirectUrl: snapRes.redirect_url, expiresAt };
-
-    // Save/update initial payment proof record
-    if (existingProof) {
-      await tx
-        .update(paymentProofs)
-        .set({
-          midtransTransactionId: snapRes.token,
-          transactionStatus: "pending",
-          midtransResponse: { snap },
-        })
-        .where(eq(paymentProofs.id, existingProof.id));
-    } else {
-      await tx.insert(paymentProofs).values({
-        orderId: order.id,
-        midtransTransactionId: snapRes.token,
-        transactionStatus: "pending",
-        midtransResponse: { snap },
-      });
-    }
-
-    return {
-      orderId: order.id,
-      snapToken: snapRes.token,
-      redirectUrl: snapRes.redirect_url,
-      expiresAt,
-    };
+    return { orderId: order.id, snapToken: snapRes.token, redirectUrl: snapRes.redirect_url, expiresAt };
   });
 }
 
@@ -235,7 +256,32 @@ export async function syncCustomerPayment(customerId: string, orderId: string) {
 }
 
 /** Never release a gateway reservation based only on the laptop's clock. */
+// Sweeps can outlast the 5-minute interval (sequential gateway lookups); never overlap,
+// within this process or across instances.
+let sweeping = false;
 export async function expireOverduePendingOrders(): Promise<{ expiredCount: number; orderIds: string[] }> {
+  if (sweeping) return { expiredCount: 0, orderIds: [] };
+  sweeping = true;
+  try {
+    // Session-level lock: lock and unlock must run on the same reserved connection.
+    const conn = await client.reserve();
+    try {
+      const [{ locked }] = await conn<{ locked: boolean }[]>`select pg_try_advisory_lock(hashtext('ggtix:expire-pending')) as locked`;
+      if (!locked) return { expiredCount: 0, orderIds: [] };
+      try {
+        return await sweepOverduePendingOrders();
+      } finally {
+        await conn`select pg_advisory_unlock(hashtext('ggtix:expire-pending'))`;
+      }
+    } finally {
+      conn.release();
+    }
+  } finally {
+    sweeping = false;
+  }
+}
+
+async function sweepOverduePendingOrders(): Promise<{ expiredCount: number; orderIds: string[] }> {
   const settings = await getSystemSettings();
   const cutoff = new Date(Date.now() - settings.pendingOrderExpiryMinutes * 60000);
   const overdue = await db.select().from(orders).where(and(eq(orders.status, "pending"), lte(orders.createdAt, cutoff))).limit(100);

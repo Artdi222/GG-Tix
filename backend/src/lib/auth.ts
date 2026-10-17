@@ -19,6 +19,7 @@ export interface TokenPayload {
   adminRole?: "super_admin" | "admin" | "gate_staff";
   email?: string;
   name?: string;
+  iat?: number;
 }
 
 type TokenType = "access" | "refresh";
@@ -63,6 +64,7 @@ async function verifyTokenInternal(token: string, expectedType: TokenType): Prom
       ...(payload.adminRole ? { adminRole: payload.adminRole as "super_admin" | "admin" | "gate_staff" } : {}),
       ...(payload.email ? { email: payload.email as string } : {}),
       ...(payload.name ? { name: payload.name as string } : {}),
+      ...(typeof payload.iat === "number" ? { iat: payload.iat } : {}),
     };
   } catch (error) {
     if (error instanceof AppError) throw error;

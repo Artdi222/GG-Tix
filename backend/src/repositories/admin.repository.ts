@@ -112,6 +112,8 @@ export async function updateAdmin(
   if (data.email !== undefined) updateData.email = data.email.toLowerCase().trim();
   if (data.passwordHash !== undefined) updateData.passwordHash = data.passwordHash;
   if (data.role !== undefined) updateData.role = data.role;
+  // Password/role changes revoke outstanding refresh tokens
+  if (data.passwordHash !== undefined || data.role !== undefined) updateData.credentialsChangedAt = new Date();
 
   const [updated] = await db
     .update(admins)
