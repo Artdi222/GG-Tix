@@ -12,6 +12,8 @@ import {
 import { assertB2Configured } from "./lib/storage";
 import { assertMidtransConfigured } from "./lib/midtrans";
 import { expireOverduePendingOrders } from "./services/payment.service";
+import { pruneAuditLogs } from "./services/settings.service";
+import { IMAGE_MAX_BYTES } from "./lib/storage";
 import healthRoute from "./routes/health";
 import authRoute from "./routes/auth";
 import eventRoute from "./routes/event";
@@ -45,6 +47,13 @@ setInterval(async () => {
     console.error("[Auto-Expire] Error sweeping overdue orders:", err);
   }
 }, 5 * 60 * 1000);
+
+// Audit log retention (AUDIT_LOG_RETENTION_DAYS, default 90), checked every 6 hours
+setInterval(() => {
+  pruneAuditLogs()
+    .then((rows) => rows.length && console.log(`[Audit] Pruned ${rows.length} old audit log entries`))
+    .catch((err) => console.error("[Audit] Retention cleanup failed:", err));
+}, 6 * 60 * 60 * 1000);
 
 const app = new Hono();
 
@@ -118,4 +127,6 @@ export { app };
 export default {
   port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
   fetch: app.fetch,
+  // Hard cap for every body, including chunked uploads without Content-Length.
+  maxRequestBodySize: Math.max(IMAGE_MAX_BYTES, parseInt(process.env.BODY_SIZE_LIMIT || "10485760", 10)) + 1024 * 1024,
 };

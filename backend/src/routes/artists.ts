@@ -6,6 +6,8 @@ import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
 const artistsRoute = new Hono();
 
+const idParamSchema = z.object({ id: z.string().uuid("Invalid ID format") });
+
 const listQuerySchema = z.object({
   q: z.string().optional(),
   page: z
@@ -56,7 +58,7 @@ artistsRoute.get("/", zValidator("query", listQuerySchema), async (c) => {
 });
 
 // GET /api/artists/:id - Public detail view
-artistsRoute.get("/:id", async (c) => {
+artistsRoute.get("/:id", zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id");
   const data = await artistService.getArtistById(id);
   return c.json({
@@ -88,6 +90,7 @@ artistsRoute.put(
   "/:id",
   authMiddleware,
   adminOrHigher,
+  zValidator("param", idParamSchema),
   zValidator("json", updateArtistSchema),
   async (c) => {
     const id = c.req.param("id")!;
@@ -101,7 +104,7 @@ artistsRoute.put(
 );
 
 // DELETE /api/artists/:id - Admin only delete
-artistsRoute.delete("/:id", authMiddleware, adminOrHigher, async (c) => {
+artistsRoute.delete("/:id", authMiddleware, adminOrHigher, zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id")!;
   const data = await artistService.deleteArtist(id);
   return c.json({

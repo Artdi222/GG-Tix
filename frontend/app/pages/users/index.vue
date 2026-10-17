@@ -117,6 +117,10 @@ async function saveAdmin() {
     errorMsg.value = 'Password wajib diisi untuk admin baru.'
     return
   }
+  if (adminForm.password && adminForm.password.length < 8) {
+    errorMsg.value = 'Password minimal 8 karakter.'
+    return
+  }
 
   isSaving.value = true
   errorMsg.value = ''

@@ -1,4 +1,4 @@
-import { eq, count, desc, and, SQL, ilike, or, sql } from "drizzle-orm";
+import { eq, count, desc, and, SQL, ilike, or, sql, lt } from "drizzle-orm";
 import { db } from "../db";
 import { systemSettings, auditLogs, admins } from "../db/schema";
 import { AppError } from "../lib/errors";
@@ -123,6 +123,13 @@ export async function createAuditLog(data: typeof auditLogs.$inferInsert) {
   } catch (err) {
     console.error("Failed to insert audit log to database:", err);
   }
+}
+
+const AUDIT_LOG_RETENTION_DAYS = parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || "90", 10);
+
+export async function pruneAuditLogs() {
+  const cutoff = new Date(Date.now() - AUDIT_LOG_RETENTION_DAYS * 86400000);
+  return db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff)).returning({ id: auditLogs.id });
 }
 
 export async function getDiagnostics() {

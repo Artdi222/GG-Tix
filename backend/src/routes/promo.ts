@@ -82,6 +82,8 @@ promoRoute.post(
 export const vouchersRoute = new Hono();
 
 // GET /api/vouchers/stats - KPI statistics
+const idParamSchema = z.object({ id: z.string().uuid("Invalid ID format") });
+
 vouchersRoute.get("/stats", authMiddleware, adminOrHigher, async (c) => {
   const stats = await promoService.getVoucherStats();
   return c.json({ data: stats });
@@ -98,7 +100,7 @@ vouchersRoute.get("/", authMiddleware, adminOrHigher, zValidator("query", vouche
 });
 
 // GET /api/vouchers/:id - Detail voucher
-vouchersRoute.get("/:id", authMiddleware, adminOrHigher, async (c) => {
+vouchersRoute.get("/:id", authMiddleware, adminOrHigher, zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id")!;
   const voucher = await promoService.getVoucherById(id);
   return c.json({ data: voucher });
@@ -119,7 +121,7 @@ vouchersRoute.post("/", authMiddleware, adminOrHigher, zValidator("json", create
 });
 
 // PUT /api/vouchers/:id - Update voucher
-vouchersRoute.put("/:id", authMiddleware, adminOrHigher, zValidator("json", updateVoucherSchema), async (c) => {
+vouchersRoute.put("/:id", authMiddleware, adminOrHigher, zValidator("param", idParamSchema), zValidator("json", updateVoucherSchema), async (c) => {
   const id = c.req.param("id")!;
   const body = c.req.valid("json");
   const updated = await promoService.updateVoucher(id, body);
@@ -130,7 +132,7 @@ vouchersRoute.put("/:id", authMiddleware, adminOrHigher, zValidator("json", upda
 });
 
 // PATCH /api/vouchers/:id/toggle - Toggle active status
-vouchersRoute.patch("/:id/toggle", authMiddleware, adminOrHigher, async (c) => {
+vouchersRoute.patch("/:id/toggle", authMiddleware, adminOrHigher, zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id")!;
   const updated = await promoService.toggleVoucher(id);
   return c.json({
@@ -140,14 +142,14 @@ vouchersRoute.patch("/:id/toggle", authMiddleware, adminOrHigher, async (c) => {
 });
 
 // DELETE /api/vouchers/:id - Delete voucher (Super Admin only, only if never used)
-vouchersRoute.delete("/:id", authMiddleware, superAdminOnly, async (c) => {
+vouchersRoute.delete("/:id", authMiddleware, superAdminOnly, zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id")!;
   const result = await promoService.deleteVoucher(id);
   return c.json(result);
 });
 
 // GET /api/vouchers/:id/usages - View transactions that used this voucher
-vouchersRoute.get("/:id/usages", authMiddleware, adminOrHigher, async (c) => {
+vouchersRoute.get("/:id/usages", authMiddleware, adminOrHigher, zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id")!;
   const page = parseInt(c.req.query("page") || "1", 10);
   const limit = parseInt(c.req.query("limit") || "20", 10);

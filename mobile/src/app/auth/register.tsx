@@ -34,8 +34,8 @@ export default function RegisterScreen() {
       setErrorMsg('Semua field wajib diisi');
       return;
     }
-    if (password.length < 6) {
-      setErrorMsg('Password minimal 6 karakter');
+    if (password.length < 8) {
+      setErrorMsg('Password minimal 8 karakter');
       return;
     }
     if (password !== confirmPassword) {
@@ -141,7 +141,7 @@ export default function RegisterScreen() {
                 <Ionicons name="lock-closed-outline" size={18} color={iconColor('password')} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Minimal 6 karakter"
+                  placeholder="Minimal 8 karakter"
                   placeholderTextColor="#71717A"
                   secureTextEntry={!showPassword}
                   value={password}

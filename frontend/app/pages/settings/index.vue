@@ -173,6 +173,10 @@ async function updateProfile() {
 }
 
 async function changePassword() {
+  if (passwordForm.newPassword.length < 8) {
+    toast.add({ title: 'Kata sandi baru minimal 8 karakter.', color: 'error' })
+    return
+  }
   if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
     toast.add({ title: 'Konfirmasi kata sandi tidak sesuai.', color: 'error' })
     return
@@ -262,7 +266,7 @@ async function changePassword() {
             </UFormField>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <UFormField label="Kata Sandi Baru" required>
-                <UInput v-model="passwordForm.newPassword" type="password" placeholder="Minimal 6 karakter" size="sm" class="w-full text-xs" />
+                <UInput v-model="passwordForm.newPassword" type="password" placeholder="Minimal 8 karakter" size="sm" class="w-full text-xs" />
               </UFormField>
               <UFormField label="Konfirmasi Kata Sandi Baru" required>
                 <UInput v-model="passwordForm.confirmNewPassword" type="password" placeholder="Ulangi kata sandi baru" size="sm" class="w-full text-xs" />

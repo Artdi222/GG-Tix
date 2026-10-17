@@ -60,8 +60,8 @@ export default function ProfileScreen() {
       setPasswordError('Semua kolom kata sandi wajib diisi');
       return;
     }
-    if (newPassword.length < 6) {
-      setPasswordError('Kata sandi baru minimal 6 karakter');
+    if (newPassword.length < 8) {
+      setPasswordError('Kata sandi baru minimal 8 karakter');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -491,7 +491,7 @@ export default function ProfileScreen() {
               <Text style={styles.inputLabel}>Kata Sandi Baru</Text>
               <TextInput
                 style={styles.modalInput}
-                placeholder="Minimal 6 karakter"
+                placeholder="Minimal 8 karakter"
                 placeholderTextColor="#71717A"
                 secureTextEntry
                 value={newPassword}

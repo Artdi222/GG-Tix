@@ -14,7 +14,7 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 const refreshSchema = z.object({
@@ -102,8 +102,8 @@ authRoute.patch(
     "json",
     z.object({
       currentPassword: z.string().min(1, "Password saat ini wajib diisi"),
-      newPassword: z.string().min(6, "Password baru minimal 6 karakter"),
-      confirmNewPassword: z.string().min(6),
+      newPassword: z.string().min(8, "Password baru minimal 8 karakter"),
+      confirmNewPassword: z.string().min(8),
     }).refine((data) => data.newPassword === data.confirmNewPassword, {
       message: "Konfirmasi kata sandi tidak sesuai",
       path: ["confirmNewPassword"],

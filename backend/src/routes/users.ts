@@ -24,14 +24,14 @@ const adminIdParamSchema = z.object({
 const createAdminSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email format").max(150),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["super_admin", "admin", "gate_staff"]).optional(),
 });
 
 const updateAdminSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).optional(),
   email: z.string().email("Invalid email format").max(150).optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
   role: z.enum(["super_admin", "admin", "gate_staff"]).optional(),
 });
 

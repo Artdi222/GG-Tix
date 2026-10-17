@@ -1,4 +1,5 @@
 // src/lib/midtrans.ts
+import { timingSafeEqual } from "node:crypto";
 // Midtrans Snap API client & signature verification
 
 export interface SnapTransactionDetails {
@@ -130,5 +131,7 @@ export function verifySignature(
 
   const payload = `${orderId}${statusCode}${grossAmount}${serverKey}`;
   const hash = new Bun.CryptoHasher("sha512").update(payload).digest("hex");
-  return hash.toLowerCase() === signatureKey.toLowerCase();
+  const expected = Buffer.from(hash, "utf8");
+  const received = Buffer.from(signatureKey.toLowerCase(), "utf8");
+  return expected.length === received.length && timingSafeEqual(expected, received);
 }
