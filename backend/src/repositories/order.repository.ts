@@ -1,5 +1,6 @@
 import { eq, and, desc, count, SQL, sql, inArray } from "drizzle-orm";
 import { db } from "../db";
+import { AppError } from "../lib/errors";
 import { orders, ticketCategories, events, customers, tickets, vouchers, voucherUsages, systemSettings } from "../db/schema";
 
 export interface CreateOrderInput {
@@ -36,17 +37,17 @@ export async function createOrder(data: CreateOrderInput) {
       .limit(1);
 
     if (!event) {
-      return { error: "EVENT_NOT_FOUND" as const };
+      throw new AppError("Event not found", 404);
     }
     if (event.status === "closed") {
-      return { error: "EVENT_CLOSED" as const };
+      throw new AppError("Ticket sales are closed for this event", 403);
     }
 
     const [settings] = await tx.select().from(systemSettings).where(eq(systemSettings.id, 'default')).limit(1);
-    if (settings?.maintenanceMode) return { error: 'MAINTENANCE' as const };
+    if (settings?.maintenanceMode) throw new AppError('Pemesanan sementara ditutup untuk pemeliharaan. Tiket yang sudah dibeli tetap dapat diakses.', 503);
     const maxTickets = event.maxTicketsPerOrder ?? settings?.defaultMaxTicketsPerOrder ?? 4;
     if (!Number.isInteger(data.quantity) || data.quantity < 1 || data.quantity > maxTickets) {
-      return { error: 'ORDER_LIMIT' as const, maxTickets };
+      throw new AppError(`Maksimal ${maxTickets} tiket per pesanan.`, 400);
     }
 
     // 2. Check category exists and belongs to this event (with row-level lock)
@@ -63,15 +64,14 @@ export async function createOrder(data: CreateOrderInput) {
       .limit(1);
 
     if (!category) {
-      return { error: "CATEGORY_NOT_FOUND" as const };
+      throw new AppError("Ticket category not found for this event", 404);
     }
 
     // 3. Check category quota
     if (category.quotaRemaining < data.quantity) {
-      return {
-        error: "INSUFFICIENT_QUOTA" as const,
-        available: category.quotaRemaining,
-      };
+      throw new AppError("Not enough tickets remaining", 409, {
+        available: String(category.quotaRemaining),
+      });
     }
 
     const subtotal = parseFloat(category.price) * data.quantity;
@@ -84,31 +84,31 @@ export async function createOrder(data: CreateOrderInput) {
       const [v] = await tx
         .select()
         .from(vouchers)
-        .where(eq(sql`UPPER(${vouchers.code})`, normalizedCode))
+        .where(eq(vouchers.code, normalizedCode))
         .for("update")
         .limit(1);
 
       if (!v || !v.isActive) {
-        return { error: "VOUCHER_NOT_FOUND" as const };
+        throw new AppError("Kode promo tidak ditemukan atau sudah tidak aktif.", 404);
       }
 
       const now = new Date();
       if (v.startDate && now < new Date(v.startDate)) {
-        return { error: "VOUCHER_NOT_STARTED" as const };
+        throw new AppError("Masa berlaku kode promo ini belum dimulai.", 400);
       }
       if (now > new Date(v.endDate)) {
-        return { error: "VOUCHER_EXPIRED" as const };
+        throw new AppError("Masa berlaku kode promo ini telah berakhir.", 400);
       }
       if (v.quotaRemaining <= 0) {
-        return { error: "VOUCHER_QUOTA_EXCEEDED" as const };
+        throw new AppError("Yah, kuota promo ini sudah habis terpakai.", 409);
       }
       if (v.eventId && v.eventId !== data.eventId) {
-        return { error: "VOUCHER_EVENT_MISMATCH" as const };
+        throw new AppError("Kode promo ini tidak berlaku untuk konser yang dipilih.", 400);
       }
 
       const minOrder = parseFloat(v.minOrderAmount || "0");
       if (subtotal < minOrder) {
-        return { error: "VOUCHER_MIN_SPEND_NOT_MET" as const, minOrder: v.minOrderAmount };
+        throw new AppError("Total belanja belum mencapai batas minimum penggunaan promo.", 400);
       }
 
       // Check customer usage limit
@@ -124,7 +124,7 @@ export async function createOrder(data: CreateOrderInput) {
         );
 
       if (Number(usageRes?.count || 0) >= v.maxUsagePerCustomer) {
-        return { error: "VOUCHER_CUSTOMER_LIMIT_REACHED" as const };
+        throw new AppError("Anda telah mencapai batas pemakaian untuk kode promo ini.", 400);
       }
 
       // Calculate discount
@@ -305,10 +305,10 @@ export async function verifyOrder(
       .for("update")
       .limit(1);
 
-    if (!order) return { error: "ORDER_NOT_FOUND" as const };
+    if (!order) throw new AppError("Order not found", 404);
 
     if (order.status !== "pending") {
-      return { error: "ORDER_ALREADY_PROCESSED" as const, currentStatus: order.status };
+      throw new AppError(`Order has already been ${order.status}`, 409);
     }
 
     // If rejecting, refund ticket and voucher quota

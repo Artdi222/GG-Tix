@@ -66,30 +66,46 @@ async function expoRequest(path: string, body: unknown) {
 export async function deliverNotifications() {
   await db.execute(sql`update notification_jobs set status='failed', last_error='Delivery lease expired after final attempt' where status='processing' and attempts >= 5 and available_at <= now()`);
   // Lease jobs so multiple backend instances cannot send the same batch concurrently.
-  const jobs = await db.execute(sql`
-    update notification_jobs j set status='processing', attempts=attempts+1, available_at=now()+interval '5 minutes'
-    where j.id in (
-      select n.id from notification_jobs n join push_devices d on d.id=n.device_id
-      where d.enabled and n.status in ('pending','processing') and n.available_at <= now() and n.attempts < 5
-      order by n.created_at limit 100 for update of n skip locked
-    ) returning j.*`);
+  // Device fields come back with the lease, so no per-job device lookup is needed.
+  const jobs = await db.execute<{ id: string; attempts: number; title: string; body: string; data: { customerId?: string } | null; token: string; device_customer_id: string }>(sql`
+    with leased as (
+      update notification_jobs j set status='processing', attempts=attempts+1, available_at=now()+interval '5 minutes'
+      where j.id in (
+        select n.id from notification_jobs n join push_devices d on d.id=n.device_id
+        where d.enabled and n.status in ('pending','processing') and n.available_at <= now() and n.attempts < 5
+        order by n.created_at limit 100 for update of n skip locked
+      ) returning j.*
+    )
+    select l.id, l.attempts, l.title, l.body, l.data, d.token, d.customer_id as device_customer_id
+    from leased l join push_devices d on d.id = l.device_id and d.enabled`);
+
+  const sendable = [];
   for (const job of jobs) {
-    const [device] = await db.select().from(pushDevices).where(and(eq(pushDevices.id, String(job.device_id)), eq(pushDevices.enabled, true)));
-    if (!device || (job.data as { customerId?: string })?.customerId !== device.customerId) {
-      await db.update(notificationJobs).set({ status: 'cancelled' }).where(eq(notificationJobs.id, String(job.id))); continue;
+    if (job.data?.customerId !== job.device_customer_id) {
+      await db.update(notificationJobs).set({ status: 'cancelled' }).where(eq(notificationJobs.id, job.id));
+    } else {
+      sendable.push(job);
     }
+  }
+  if (sendable.length) {
+    let results: PushResult[] | null = null;
     try {
-      const result: PushResult = await expoRequest('send', { to: device.token, title: job.title, body: job.body, data: job.data, sound: 'default', channelId: 'tickets', ttl: 3600 });
-      if (result.status === 'ok' && result.id) {
-        await db.update(notificationJobs).set({ status: 'accepted', receiptId: result.id, availableAt: new Date(Date.now() + 15 * 60000), lastError: null }).where(eq(notificationJobs.id, String(job.id)));
-      } else {
-        const reason = result.details?.error || 'ExpoRejected';
-        if (reason === 'DeviceNotRegistered') await unregisterDevice(device.customerId, device.token);
-        if (reason === 'MessageRateExceeded') throw new Error(reason);
-        await db.update(notificationJobs).set({ status: 'failed', lastError: reason }).where(eq(notificationJobs.id, String(job.id)));
-      }
+      // Expo accepts up to 100 messages per request and returns tickets in the same order.
+      results = await expoRequest('send', sendable.map(job => ({ to: job.token, title: job.title, body: job.body, data: job.data, sound: 'default', channelId: 'tickets', ttl: 3600 })));
     } catch {
-      await db.update(notificationJobs).set({ status: Number(job.attempts) >= 5 ? 'failed' : 'pending', lastError: 'Delivery temporarily unavailable', availableAt: new Date(Date.now() + 60000 * 2 ** Number(job.attempts)) }).where(eq(notificationJobs.id, String(job.id)));
+      results = null;
+    }
+    for (const [i, job] of sendable.entries()) {
+      const result = results?.[i];
+      const reason = result && !(result.status === 'ok' && result.id) ? result.details?.error || 'ExpoRejected' : null;
+      if (!result || reason === 'MessageRateExceeded') {
+        await db.update(notificationJobs).set({ status: Number(job.attempts) >= 5 ? 'failed' : 'pending', lastError: 'Delivery temporarily unavailable', availableAt: new Date(Date.now() + 60000 * 2 ** Number(job.attempts)) }).where(eq(notificationJobs.id, job.id));
+      } else if (reason) {
+        if (reason === 'DeviceNotRegistered') await unregisterDevice(job.device_customer_id, job.token);
+        await db.update(notificationJobs).set({ status: 'failed', lastError: reason }).where(eq(notificationJobs.id, job.id));
+      } else {
+        await db.update(notificationJobs).set({ status: 'accepted', receiptId: result.id, availableAt: new Date(Date.now() + 15 * 60000), lastError: null }).where(eq(notificationJobs.id, job.id));
+      }
     }
   }
   const waiting = await db.select().from(notificationJobs).where(and(eq(notificationJobs.status, 'accepted'), sql`${notificationJobs.availableAt} <= now()`)).limit(100);

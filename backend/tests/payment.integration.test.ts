@@ -167,11 +167,11 @@ describe.skipIf(!databaseUrl)('payment reconciliation (isolated PostgreSQL)', ()
     const repo = await import('../src/repositories/order.repository');
     const input = await orderFixture();
     await client`INSERT INTO system_settings (id,default_max_tickets_per_order) VALUES ('default',1)`;
-    expect(await repo.createOrder(input)).toMatchObject({ error: 'ORDER_LIMIT' });
+    await expect(repo.createOrder(input)).rejects.toMatchObject({ statusCode: 400, message: 'Maksimal 1 tiket per pesanan.' });
     await client`UPDATE events SET max_tickets_per_order=2`;
     expect(await repo.createOrder(input)).toHaveProperty('id');
     await client`UPDATE system_settings SET maintenance_mode=true`;
-    expect(await repo.createOrder(input)).toMatchObject({ error: 'MAINTENANCE' });
+    await expect(repo.createOrder(input)).rejects.toMatchObject({ statusCode: 503 });
     expect((await client`SELECT quota_remaining FROM ticket_categories`)[0].quota_remaining).toBe(6);
   });
   test('full discount produces verified order and real tickets atomically', async () => {
@@ -196,7 +196,8 @@ describe.skipIf(!databaseUrl)('payment reconciliation (isolated PostgreSQL)', ()
   });
   test('concurrent admin verification cannot issue duplicate tickets or refund twice', async () => {
     const repo = await import('../src/repositories/order.repository');
-    await Promise.all([repo.verifyOrder(orderId,'verified',crypto.randomUUID()), repo.verifyOrder(orderId,'verified',crypto.randomUUID())]);
+    const results = await Promise.allSettled([repo.verifyOrder(orderId,'verified',crypto.randomUUID()), repo.verifyOrder(orderId,'verified',crypto.randomUUID())]);
+    expect(results.filter(r => r.status === 'rejected' && (r.reason as { statusCode?: number }).statusCode === 409).length).toBe(1);
     expect((await client`SELECT * FROM tickets`).length).toBe(2);
   });
   test('notifications deduplicate payment and H-1 jobs and honor opt-out', async () => {
@@ -218,8 +219,9 @@ describe.skipIf(!databaseUrl)('payment reconciliation (isolated PostgreSQL)', ()
     await orderFixture();
     const device = await notifications.registerDevice(customerId,'ExpoPushToken[test_device]');
     await client`INSERT INTO notification_jobs(dedupe_key,device_id,title,body,data) VALUES ('test',${device.id},'Test','Test',${JSON.stringify({customerId})}::jsonb)`;
-    fetchSpy.mockImplementation(async () => Response.json({ data: { status:'ok',id:'receipt-1' } }));
+    fetchSpy.mockImplementation(async () => Response.json({ data: [{ status:'ok',id:'receipt-1' }] }));
     await notifications.deliverNotifications();
+    expect(JSON.parse(fetchSpy.mock.calls[0][1]?.body as string)).toBeArrayOfSize(1);
     expect((await client`SELECT status FROM notification_jobs`)[0].status).toBe('accepted');
     await client`UPDATE notification_jobs SET available_at=now()`;
     fetchSpy.mockImplementation(async () => Response.json({ data: { 'receipt-1': { status:'error',details:{error:'DeviceNotRegistered'} } } }));

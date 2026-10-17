@@ -49,7 +49,7 @@ export async function findVoucherByCode(code: string) {
   const [voucher] = await db
     .select()
     .from(vouchers)
-    .where(eq(sql`UPPER(${vouchers.code})`, normalizedCode))
+    .where(eq(vouchers.code, normalizedCode))
     .limit(1);
   return voucher || null;
 }

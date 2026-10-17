@@ -38,7 +38,7 @@ async function fetchTickets() {
   order.value = null
   tickets.value = []
   try {
-    const res = await request<{ data: { order: OrderInfo; tickets: TicketItem[] } }>(`/tickets/order/${props.orderId}`)
+    const res = await request<{ data: { order: OrderInfo; tickets: TicketItem[] } }>(`/tickets/order/${props.orderId}?qr=1`)
     if (res?.data) {
       order.value = res.data.order
       tickets.value = res.data.tickets || []

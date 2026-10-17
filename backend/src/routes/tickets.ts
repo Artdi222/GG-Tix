@@ -29,7 +29,7 @@ ticketRoute.get(
     const { orderId } = c.req.valid("param");
     const user = c.get("user");
 
-    const result = await ticketService.findTicketsByOrderId(orderId);
+    const result = await ticketService.findTicketsByOrderId(orderId, c.req.query("qr") === "1");
     if (!result) {
       throw new AppError("Order not found or has no tickets", 404);
     }

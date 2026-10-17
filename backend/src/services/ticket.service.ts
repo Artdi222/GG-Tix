@@ -3,7 +3,8 @@ import { db } from "../db";
 import { tickets, orders, events, ticketCategories, customers } from "../db/schema";
 import QRCode from "qrcode";
 
-export async function findTicketsByOrderId(orderId: string) {
+// PNG rendering is CPU-heavy; only the web admin modal needs it (mobile renders QR itself).
+export async function findTicketsByOrderId(orderId: string, withQrImage = false) {
   const order = await db.query.orders.findFirst({
     where: eq(orders.id, orderId),
     with: {
@@ -23,12 +24,12 @@ export async function findTicketsByOrderId(orderId: string) {
 
   const ticketsWithQR = await Promise.all(
     order.tickets.map(async (t) => {
-      const qrCodeDataUrl = await QRCode.toDataURL(t.qrCodeValue, {
+      const qrCodeDataUrl = withQrImage ? await QRCode.toDataURL(t.qrCodeValue, {
         type: "image/png",
         width: 400,
         margin: 2,
         color: { dark: "#000000", light: "#FFFFFF" },
-      });
+      }) : undefined;
       return {
         id: t.id,
         qrCodeValue: t.qrCodeValue,

@@ -1,0 +1,40 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ggtix
+          POSTGRES_PASSWORD: ggtix
+          POSTGRES_DB: ggtix_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ggtix"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://ggtix:ggtix@localhost:5432/ggtix_test
+      # Integration tests copy the migrated public schema into an isolated namespace.
+      TEST_DATABASE_URL: postgres://ggtix:ggtix@localhost:5432/ggtix_test
+      JWT_SECRET: ci-only-secret-at-least-32-characters-long
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run db:migrate
+      - run: bun test

@@ -13,8 +13,9 @@ import {
   pgEnum,
   index,
   jsonb,
+  check,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // enums
 
@@ -215,7 +216,8 @@ export const vouchers = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => ({
-    codeIdx: index("vouchers_code_idx").on(table.code),
+    // Codes are stored uppercase so lookups can use the unique index directly.
+    codeUpper: check("vouchers_code_upper_chk", sql`${table.code} = upper(${table.code})`),
     eventIdIdx: index("vouchers_event_id_idx").on(table.eventId),
     activeDateIdx: index("vouchers_active_date_idx").on(table.isActive, table.startDate, table.endDate),
   })

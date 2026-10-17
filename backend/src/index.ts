@@ -4,7 +4,6 @@ import { cors } from "hono/cors";
 import { errorHandler } from "./lib/errors";
 import {
   requestIdMiddleware,
-  timingMiddleware,
   securityHeadersMiddleware,
   bodySizeLimit,
   auditTrailMiddleware,
@@ -74,9 +73,8 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Global Middlewares Pipeline
-// 1. Request ID injector & Response Time metrics
+// 1. Request ID injector
 app.use("*", requestIdMiddleware);
-app.use("*", timingMiddleware);
 
 // 2. Security Headers (Helmet-Grade)
 app.use("*", securityHeadersMiddleware);

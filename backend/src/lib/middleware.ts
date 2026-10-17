@@ -15,26 +15,17 @@ declare module "hono" {
   }
 }
 
-// Request ID & Timing Middleware
+// Request ID Middleware (also stamps start time for audit durations)
 
 export async function requestIdMiddleware(c: Context, next: Next) {
   const existingId = c.req.header("X-Request-ID") || c.req.header("x-request-id");
   const requestId = existingId && existingId.length < 128 ? existingId : `req_${crypto.randomUUID()}`;
 
   c.set("requestId", requestId);
+  c.set("startTime", performance.now());
   c.header("X-Request-ID", requestId);
 
   await next();
-}
-
-export async function timingMiddleware(c: Context, next: Next) {
-  const start = performance.now();
-  c.set("startTime", start);
-
-  await next();
-
-  const duration = performance.now() - start;
-  c.header("X-Response-Time", `${duration.toFixed(2)}ms`);
 }
 
 // Security Headers
@@ -46,8 +37,6 @@ export async function securityHeadersMiddleware(c: Context, next: Next) {
   c.header("X-Content-Type-Options", "nosniff");
   // Clickjacking protection
   c.header("X-Frame-Options", "DENY");
-  // Legacy XSS filter
-  c.header("X-XSS-Protection", "1; mode=block");
   // Referrer policy
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   // Restrict sensitive browser APIs
