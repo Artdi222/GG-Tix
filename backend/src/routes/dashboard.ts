@@ -11,7 +11,7 @@ const rangeQuerySchema = z.object({
   days: z
     .string()
     .optional()
-    .transform((val) => (val ? Math.min(90, Math.max(1, parseInt(val, 10))) : undefined)),
+    .transform((val) => { const n = parseInt(val ?? "", 10); return Number.isFinite(n) ? Math.min(90, Math.max(1, n)) : undefined; }),
   from: z.string().optional(),
   to: z.string().optional(),
 });

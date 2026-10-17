@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as adminService from "../services/admin.service";
 import * as customerService from "../services/customer.service";
 import { authMiddleware, superAdminOnly, adminOrHigher } from "../lib/middleware";
@@ -9,8 +10,8 @@ const usersRoute = new Hono();
 
 const querySchema = z.object({
   search: z.string().optional(),
-  page: z.string().optional().transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
-  limit: z.string().optional().transform((val) => (val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10)),
+  page: pageQuery(),
+  limit: limitQuery(10),
 });
 
 const roleQuerySchema = querySchema.extend({

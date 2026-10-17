@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as settingsService from "../services/settings.service";
 import { authMiddleware, superAdminOnly } from "../lib/middleware";
 
@@ -17,9 +18,9 @@ const updateSettingsSchema = z.object({
 const auditLogQuerySchema = z.object({
   search: z.string().optional(),
   method: z.string().optional(),
-  statusCode: z.string().optional().transform((v) => (v ? parseInt(v, 10) : undefined)),
-  page: z.string().optional().transform((v) => (v ? Math.max(1, parseInt(v, 10)) : 1)),
-  limit: z.string().optional().transform((v) => (v ? Math.min(100, Math.max(1, parseInt(v, 10))) : 15)),
+  statusCode: z.string().optional().transform((v) => { const n = parseInt(v ?? "", 10); return Number.isFinite(n) ? n : undefined; }),
+  page: pageQuery(),
+  limit: limitQuery(15),
 });
 
 settingsRoute.get('/public', async c => {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as orderService from "../services/order.service";
 import { paymentReturnUrlSchema } from '../lib/payment-return';
 import {
@@ -51,16 +52,9 @@ const orderIdParamSchema = z.object({
 const adminQuerySchema = z.object({
   status: z.enum(["pending", "verified", "rejected", "expired"]).optional(),
   eventId: z.string().uuid().optional(),
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) =>
-      val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10
-    ),
+  search: z.string().max(100).optional(),
+  page: pageQuery(),
+  limit: limitQuery(10),
 });
 
 const customerQuerySchema = z.object({
@@ -122,6 +116,17 @@ orderRoute.get(
       data: result.items,
       pagination: result.pagination,
     });
+  }
+);
+
+// GET /api/orders/stats — (admin KPIs across all orders)
+orderRoute.get(
+  "/stats",
+  authMiddleware,
+  adminOrHigher,
+  zValidator("query", z.object({ eventId: z.string().uuid().optional() })),
+  async (c) => {
+    return c.json({ data: await orderService.orderStats(c.req.valid("query").eventId) });
   }
 );
 

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as eventService from "../services/event.service";
 import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
@@ -23,7 +24,7 @@ const createEventSchema = z.object({
   seatmapUrl: z.string().url("Invalid seatmap URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
   status: z.enum(["open", "closed"]).optional(),
-  imageUrl: z.string().url("Invalid image URL format").optional().or(z.literal("")),
+  imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
 });
 
 const updateEventSchema = createEventSchema.partial();
@@ -37,8 +38,8 @@ const querySchema = z.object({
   artistId: z.string().uuid().optional(),
   venueId: z.string().uuid().optional(),
   status: z.enum(["open", "closed"]).optional(),
-  page: z.string().optional().transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
-  limit: z.string().optional().transform((val) => (val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10)),
+  page: pageQuery(),
+  limit: limitQuery(10),
 });
 
 // GET /api/events - Public list events

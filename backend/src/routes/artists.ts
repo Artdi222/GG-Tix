@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as artistService from "../services/artist.service";
 import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
@@ -10,14 +11,8 @@ const idParamSchema = z.object({ id: z.string().uuid("Invalid ID format") });
 
 const listQuerySchema = z.object({
   q: z.string().optional(),
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10)),
+  page: pageQuery(),
+  limit: limitQuery(10),
 });
 
 const createArtistSchema = z.object({

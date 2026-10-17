@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as promoService from "../services/promo.service";
 import {
   authMiddleware,
@@ -50,14 +51,15 @@ const createVoucherSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-const updateVoucherSchema = createVoucherSchema.partial();
+// Code is immutable once created: orders keep a copy of it.
+const updateVoucherSchema = createVoucherSchema.omit({ code: true }).partial();
 
 const voucherQuerySchema = z.object({
   search: z.string().optional(),
   status: z.enum(["active", "inactive"]).optional(),
   eventId: z.string().uuid().optional(),
-  page: z.string().optional().transform((v) => (v ? Math.max(1, parseInt(v, 10)) : 1)),
-  limit: z.string().optional().transform((v) => (v ? Math.min(100, Math.max(1, parseInt(v, 10))) : 15)),
+  page: pageQuery(),
+  limit: limitQuery(15),
 });
 
 // 1. Customer endpoint: Validate promo code
@@ -151,8 +153,8 @@ vouchersRoute.delete("/:id", authMiddleware, superAdminOnly, zValidator("param",
 // GET /api/vouchers/:id/usages - View transactions that used this voucher
 vouchersRoute.get("/:id/usages", authMiddleware, adminOrHigher, zValidator("param", idParamSchema), async (c) => {
   const id = c.req.param("id")!;
-  const page = parseInt(c.req.query("page") || "1", 10);
-  const limit = parseInt(c.req.query("limit") || "20", 10);
+  const page = pageQuery().parse(c.req.query("page"));
+  const limit = limitQuery(20).parse(c.req.query("limit"));
   const result = await promoService.getVoucherUsages(id, page, limit);
   return c.json({
     data: result.items,

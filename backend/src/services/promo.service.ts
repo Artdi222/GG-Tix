@@ -134,6 +134,7 @@ export async function createVoucher(createdBy: string, data: Omit<promoRepo.Crea
   if (new Date(data.endDate) <= (data.startDate ? new Date(data.startDate) : new Date())) {
     throw new AppError("Tanggal berakhir harus setelah tanggal mulai.", 400);
   }
+  assertDiscountRange(data.discountType, data.discountValue);
 
   return await promoRepo.createVoucher({
     ...data,
@@ -147,7 +148,27 @@ export async function updateVoucher(id: string, data: promoRepo.UpdateVoucherInp
     throw new AppError("Voucher tidak ditemukan.", 404);
   }
 
-  return await promoRepo.updateVoucher(id, data);
+  assertDiscountRange(data.discountType ?? voucher.discountType, data.discountValue ?? voucher.discountValue);
+  const startDate = data.startDate ?? voucher.startDate;
+  const endDate = data.endDate ?? voucher.endDate;
+  if (startDate && new Date(endDate) <= new Date(startDate)) {
+    throw new AppError("Tanggal berakhir harus setelah tanggal mulai.", 400);
+  }
+
+  const updated = await promoRepo.updateVoucher(id, data);
+  if (!updated) {
+    throw new AppError(
+      `Kuota total tidak boleh kurang dari ${voucher.quotaTotal - voucher.quotaRemaining} voucher yang sudah terpakai.`,
+      400
+    );
+  }
+  return updated;
+}
+
+function assertDiscountRange(type: "fixed" | "percentage", value: string) {
+  if (type === "percentage" && Number(value) > 100) {
+    throw new AppError("Diskon persentase maksimal 100%.", 400);
+  }
 }
 
 export async function toggleVoucher(id: string) {

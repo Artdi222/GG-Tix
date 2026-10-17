@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { pageQuery, limitQuery } from "../lib/pagination";
 import * as venueService from "../services/venue.service";
 import { authMiddleware, adminOrHigher } from "../lib/middleware";
 
@@ -12,14 +13,8 @@ const venueIdParamSchema = z.object({
 
 const listQuerySchema = z.object({
   q: z.string().optional(),
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1)),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? Math.min(100, Math.max(1, parseInt(val, 10))) : 10)),
+  page: pageQuery(),
+  limit: limitQuery(10),
 });
 
 const createVenueSchema = z.object({
@@ -29,7 +24,7 @@ const createVenueSchema = z.object({
     .max(200, "Nama venue maksimum 200 karakter"),
   address: z.string().min(1, "Alamat wajib diisi"),
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter"),
-  imageUrl: z.string().url("Invalid image URL format").optional().or(z.literal("")),
+  imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
 });
 
@@ -41,7 +36,7 @@ const updateVenueSchema = z.object({
     .optional(),
   address: z.string().min(1, "Alamat wajib diisi").optional(),
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter").optional(),
-  imageUrl: z.string().url("Invalid image URL format").optional().or(z.literal("")),
+  imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
 });
 

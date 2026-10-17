@@ -160,14 +160,24 @@ export async function createVoucher(data: CreateVoucherInput) {
   return newVoucher;
 }
 
+/** Returns null when the voucher is missing or quotaTotal would drop below what is already used. */
 export async function updateVoucher(id: string, data: UpdateVoucherInput) {
+  const { quotaRemaining: _ignored, ...rest } = data;
   const [updated] = await db
     .update(vouchers)
     .set({
-      ...data,
+      ...rest,
+      // Keep used = total - remaining constant when the total changes.
+      ...(data.quotaTotal !== undefined
+        ? { quotaRemaining: sql`${vouchers.quotaRemaining} + ${data.quotaTotal} - ${vouchers.quotaTotal}` }
+        : {}),
       updatedAt: new Date(),
     })
-    .where(eq(vouchers.id, id))
+    .where(
+      data.quotaTotal !== undefined
+        ? and(eq(vouchers.id, id), sql`${vouchers.quotaTotal} - ${vouchers.quotaRemaining} <= ${data.quotaTotal}`)
+        : eq(vouchers.id, id)
+    )
     .returning();
   return updated || null;
 }

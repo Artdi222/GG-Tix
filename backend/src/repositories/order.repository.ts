@@ -1,4 +1,4 @@
-import { eq, and, desc, count, SQL, sql, inArray } from "drizzle-orm";
+import { eq, and, or, desc, count, ilike, SQL, sql, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { AppError } from "../lib/errors";
 import { orders, ticketCategories, events, customers, tickets, vouchers, voucherUsages, systemSettings } from "../db/schema";
@@ -14,6 +14,7 @@ export interface CreateOrderInput {
 export interface OrderQueryFilters {
   status?: "pending" | "verified" | "rejected" | "expired";
   eventId?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }
@@ -250,12 +251,20 @@ export async function findOrdersByCustomerId(
 
 /** Admin: list all orders with filters + pagination */
 export async function findOrders(filters: OrderQueryFilters = {}) {
-  const { status, eventId, page = 1, limit = 10 } = filters;
+  const { status, eventId, search, page = 1, limit = 10 } = filters;
   const offset = (page - 1) * limit;
 
   const conditions: SQL[] = [];
   if (status) conditions.push(eq(orders.status, status));
   if (eventId) conditions.push(eq(orders.eventId, eventId));
+  if (search?.trim()) {
+    const term = `%${search.trim()}%`;
+    conditions.push(or(
+      sql`${orders.id}::text ilike ${term}`,
+      inArray(orders.customerId, db.select({ id: customers.id }).from(customers).where(or(ilike(customers.name, term), ilike(customers.email, term)))),
+      inArray(orders.eventId, db.select({ id: events.id }).from(events).where(ilike(events.title, term)))
+    )!);
+  }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -378,6 +387,26 @@ export async function verifyOrder(
 
     return updated;
   });
+}
+
+/** Admin KPIs across all orders (optionally one event), independent of table pagination. */
+export async function orderStats(eventId?: string) {
+  const rows = await db
+    .select({
+      status: orders.status,
+      count: count(),
+      revenue: sql<string>`coalesce(sum(${orders.totalPrice}), 0)`,
+    })
+    .from(orders)
+    .where(eventId ? eq(orders.eventId, eventId) : undefined)
+    .groupBy(orders.status);
+  const counts = { pending: 0, verified: 0, rejected: 0, expired: 0 };
+  let verifiedRevenue = 0;
+  for (const row of rows) {
+    counts[row.status] = Number(row.count);
+    if (row.status === "verified") verifiedRevenue = Number(row.revenue);
+  }
+  return { ...counts, total: rows.reduce((sum, r) => sum + Number(r.count), 0), verifiedRevenue };
 }
 
 export async function customerOrderSummary(customerId: string) {

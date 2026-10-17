@@ -63,4 +63,4 @@ export async function verifyOrder(
   return orderRepo.verifyOrder(orderId, decision, adminId);
 }
 
-export { customerOrderSummary } from "../repositories/order.repository";
+export { customerOrderSummary, orderStats } from "../repositories/order.repository";
