@@ -3,6 +3,9 @@ import { getConnInfo } from "hono/bun";
 import { verifyToken, TokenPayload } from "./auth";
 import { AppError } from "./errors";
 import { createAuditLog } from "../services/settings.service";
+import { lte, sql } from "drizzle-orm";
+import { db } from "../db";
+import { rateLimits } from "../db/schema";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -106,12 +109,15 @@ export async function customerOnly(c: Context, next: Next) {
 }
 
 
-// Sliding-Window Rate Limiter & Memory Sweeper GC
+// Fixed-Window Rate Limiter (Postgres-backed, shared across instances)
 
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10);
 const RATE_LIMIT_AUTH_MAX = parseInt(process.env.RATE_LIMIT_AUTH_MAX || "10", 10);
 const RATE_LIMIT_ORDER_MAX = parseInt(process.env.RATE_LIMIT_ORDER_MAX || "20", 10);
 const RATE_LIMIT_CLEANUP_INTERVAL = parseInt(process.env.RATE_LIMIT_CLEANUP_INTERVAL || "180000", 10);
+// Number of reverse proxies in front of the app that append to X-Forwarded-For.
+// 0 (default) = trust only the socket address; headers are ignored to prevent spoofing.
+const TRUST_PROXY_HOPS = parseInt(process.env.TRUST_PROXY_HOPS || "0", 10);
 
 interface RateLimitOptions {
   windowMs?: number;
@@ -119,39 +125,50 @@ interface RateLimitOptions {
   key?: string;
 }
 
-interface RateLimitBucket {
-  count: number;
-  resetAt: number;
-}
-
-function getClientIp(c: Context): string {
+function getSocketIp(c: Context): string | undefined {
   try {
-    const info = getConnInfo(c);
-    if (info?.remote?.address) {
-      return info.remote.address;
-    }
+    return getConnInfo(c).remote?.address;
   } catch {
-    // Fall through
+    return undefined;
   }
-  return (
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-    c.req.header("x-real-ip") ||
-    "127.0.0.1"
-  );
 }
 
-// Global bucket registry with automatic garbage collection
-const globalBuckets = new Map<string, RateLimitBucket>();
+export function getClientIp(c: Context): string {
+  const socketIp = getSocketIp(c) || "unknown";
+  if (TRUST_PROXY_HOPS <= 0) return socketIp;
+  // Each trusted proxy appends the address it received from; the client is
+  // TRUST_PROXY_HOPS entries from the right. Earlier entries are client-controlled.
+  const chain = (c.req.header("x-forwarded-for") || "")
+    .split(",")
+    .map((ip) => ip.trim())
+    .filter(Boolean);
+  return chain[chain.length - TRUST_PROXY_HOPS] || chain[0] || socketIp;
+}
 
-// Periodic Memory Sweeper GC to eliminate memory leaks
+// Expired buckets are recreated by the upsert anyway; this only bounds table size.
 setInterval(() => {
-  const now = Date.now();
-  for (const [key, bucket] of globalBuckets.entries()) {
-    if (bucket.resetAt <= now) {
-      globalBuckets.delete(key);
-    }
-  }
+  db.delete(rateLimits)
+    .where(lte(rateLimits.resetAt, new Date()))
+    .catch((err) => console.error("[RateLimit] Cleanup failed:", err));
 }, RATE_LIMIT_CLEANUP_INTERVAL);
+
+async function hitBucket(key: string, windowMs: number) {
+  const resetAt = new Date(Date.now() + windowMs);
+  // DB clock decides expiry so instances with skewed clocks agree.
+  const expired = sql`${rateLimits.resetAt} <= now()`;
+  const [bucket] = await db
+    .insert(rateLimits)
+    .values({ key, count: 1, resetAt })
+    .onConflictDoUpdate({
+      target: rateLimits.key,
+      set: {
+        count: sql`case when ${expired} then 1 else ${rateLimits.count} + 1 end`,
+        resetAt: sql`case when ${expired} then excluded.reset_at else ${rateLimits.resetAt} end`,
+      },
+    })
+    .returning({ count: rateLimits.count, resetAt: rateLimits.resetAt });
+  return bucket;
+}
 
 export function rateLimit(options: RateLimitOptions = {}) {
   const windowMs = options.windowMs ?? RATE_LIMIT_WINDOW_MS;
@@ -159,22 +176,20 @@ export function rateLimit(options: RateLimitOptions = {}) {
   const keyPrefix = options.key;
 
   return async function rateLimitMiddleware(c: Context, next: Next) {
-    const ip = getClientIp(c);
     const user = c.get("user");
-    const identifier = user?.sub ? `user_${user.sub}` : `ip_${ip}`;
+    const identifier = user?.sub ? `user_${user.sub}` : `ip_${getClientIp(c)}`;
     const bucketKey = `${keyPrefix ?? c.req.routePath ?? c.req.path}:${identifier}`;
-    const now = Date.now();
 
-    let bucket = globalBuckets.get(bucketKey);
-    if (!bucket || bucket.resetAt <= now) {
-      bucket = { count: 0, resetAt: now + windowMs };
-      globalBuckets.set(bucketKey, bucket);
+    let bucket: { count: number; resetAt: Date } | undefined;
+    try {
+      bucket = await hitBucket(bucketKey, windowMs);
+    } catch (err) {
+      // Fail open: a limiter outage must not lock every user out.
+      console.error("[RateLimit] Store unavailable:", err);
     }
 
-    bucket.count++;
-
-    if (bucket.count > max) {
-      const retryAfterSec = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    if (bucket && bucket.count > max) {
+      const retryAfterSec = Math.max(1, Math.ceil((bucket.resetAt.getTime() - Date.now()) / 1000));
       c.header("Retry-After", String(retryAfterSec));
       return c.json(
         {

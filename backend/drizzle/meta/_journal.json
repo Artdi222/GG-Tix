@@ -57,6 +57,13 @@
       "when": 1792220550233,
       "tag": "0007_vengeful_lizard",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792220709040,
+      "tag": "0008_outstanding_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

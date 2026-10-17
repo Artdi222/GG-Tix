@@ -272,6 +272,15 @@ export const tickets = pgTable("tickets", {
   orderIdx: index("tickets_order_id_idx").on(table.orderId),
 }));
 
+// Fixed-window rate limit buckets, shared across instances.
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+}, (table) => ({
+  resetAtIdx: index("rate_limits_reset_at_idx").on(table.resetAt),
+}));
+
 // relations
 
 export const artistsRelations = relations(artists, ({ many }) => ({
