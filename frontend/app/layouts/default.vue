@@ -72,8 +72,7 @@ watch(() => route.path, (path) => {
       :min-size="14"
       :default-size="16"
       :max-size="20"
-      class="bg-elevated/40"
-      :ui="{ footer: 'border-t border-default' }"
+      class="bg-transparent"
     >
       <template #header="{ collapsed }">
         <NuxtLink

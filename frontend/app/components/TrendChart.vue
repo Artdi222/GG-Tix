@@ -1,6 +1,8 @@
 <script setup lang="ts">
 const props = defineProps<{
   points: { date: string, value: number }[]
+  /** Previous period, aligned by index with `points`. */
+  compare?: { date: string, value: number }[]
   format: (value: number) => string
   /** Compact formatter for axis labels. */
   axisFormat?: (value: number) => string
@@ -14,7 +16,7 @@ const chart = ref<HTMLElement | null>(null)
 
 /** A "nice" axis maximum (1, 2, 2.5 or 5 x 10^n) so gridlines land on round numbers. */
 const yMax = computed(() => {
-  const max = Math.max(0, ...props.points.map(p => p.value))
+  const max = Math.max(0, ...props.points.map(p => p.value), ...(props.compare ?? []).map(p => p.value))
   if (max === 0) return 1
   const pow = 10 ** Math.floor(Math.log10(max))
   const step = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(s => s * pow >= max)!
@@ -23,15 +25,40 @@ const yMax = computed(() => {
 
 const ticks = computed(() => [0, 0.25, 0.5, 0.75, 1].map(f => yMax.value * f))
 
-function x(i: number) {
-  return props.points.length <= 1 ? W / 2 : (i / (props.points.length - 1)) * W
+function x(i: number, n = props.points.length) {
+  return n <= 1 ? W / 2 : (i / (n - 1)) * W
 }
 function y(v: number) {
   return H - (v / yMax.value) * H
 }
 
-const line = computed(() => props.points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.value)}`).join(' '))
+/** Monotone cubic interpolation (Fritsch–Carlson): smooth, never overshoots below zero. */
+function smoothPath(values: number[]) {
+  const n = values.length
+  if (!n) return ''
+  const xs = values.map((_, i) => x(i, n))
+  const ys = values.map(y)
+  if (n < 3) return xs.map((px, i) => `${i ? 'L' : 'M'}${px},${ys[i]}`).join(' ')
+  const d = xs.slice(1).map((px, i) => (ys[i + 1]! - ys[i]!) / (px - xs[i]!))
+  const m = ys.map((_, i) => {
+    if (i === 0) return d[0]!
+    if (i === n - 1) return d[n - 2]!
+    const a = d[i - 1]!
+    const b = d[i]!
+    // Points are evenly spaced, so the harmonic mean of the slopes keeps the curve monotone.
+    return a * b <= 0 ? 0 : (2 * a * b) / (a + b)
+  })
+  let path = `M${xs[0]},${ys[0]}`
+  for (let i = 0; i < n - 1; i++) {
+    const h = (xs[i + 1]! - xs[i]!) / 3
+    path += ` C${xs[i]! + h},${ys[i]! + m[i]! * h} ${xs[i + 1]! - h},${ys[i + 1]! - m[i + 1]! * h} ${xs[i + 1]},${ys[i + 1]}`
+  }
+  return path
+}
+
+const line = computed(() => smoothPath(props.points.map(p => p.value)))
 const area = computed(() => props.points.length ? `${line.value} L${x(props.points.length - 1)},${H} L${x(0)},${H} Z` : '')
+const compareLine = computed(() => props.compare?.length ? smoothPath(props.compare.map(p => p.value)) : '')
 
 const xLabels = computed(() => {
   const n = props.points.length
@@ -54,14 +81,16 @@ function onMove(e: PointerEvent) {
   hover.value = Math.round(ratio * (props.points.length - 1))
 }
 
-const active = computed(() => hover.value === null ? null : { ...props.points[hover.value]!, i: hover.value })
+const active = computed(() => hover.value === null
+  ? null
+  : { ...props.points[hover.value]!, i: hover.value, previous: props.compare?.[hover.value] })
 const isEmpty = computed(() => props.points.every(p => p.value === 0))
 </script>
 
 <template>
   <div class="flex gap-3">
     <div
-      class="flex flex-col justify-between text-right text-xs text-dimmed tabular-nums h-55 -my-1.5 shrink-0"
+      class="flex flex-col justify-between text-right text-[11px] text-dimmed tabular-nums h-55 -my-1.5 shrink-0"
       :class="{ invisible: isEmpty }"
       aria-hidden="true"
     >
@@ -96,7 +125,7 @@ const isEmpty = computed(() => props.points.every(p => p.value === 0))
               <stop
                 offset="0%"
                 stop-color="var(--ui-primary)"
-                stop-opacity="0.18"
+                stop-opacity="0.16"
               />
               <stop
                 offset="100%"
@@ -112,8 +141,17 @@ const isEmpty = computed(() => props.points.every(p => p.value === 0))
             :x2="W"
             :y1="y(t)"
             :y2="y(t)"
-            stroke="var(--ui-border)"
-            :stroke-dasharray="t === 0 ? undefined : '3 4'"
+            :stroke="t === 0 ? 'var(--ui-border-accented)' : 'var(--ui-border)'"
+            vector-effect="non-scaling-stroke"
+          />
+          <path
+            v-if="compareLine && !isEmpty"
+            :d="compareLine"
+            fill="none"
+            stroke="var(--ui-text-dimmed)"
+            stroke-opacity="0.55"
+            stroke-width="1.5"
+            stroke-dasharray="4 4"
             vector-effect="non-scaling-stroke"
           />
           <path
@@ -128,10 +166,11 @@ const isEmpty = computed(() => props.points.every(p => p.value === 0))
             stroke="var(--ui-primary)"
             stroke-width="2"
             stroke-linejoin="round"
+            stroke-linecap="round"
             vector-effect="non-scaling-stroke"
           />
           <line
-            v-if="active"
+            v-if="active && !isEmpty"
             :x1="x(active.i)"
             :x2="x(active.i)"
             y1="0"
@@ -143,20 +182,29 @@ const isEmpty = computed(() => props.points.every(p => p.value === 0))
 
         <span
           v-if="active && !isEmpty"
-          class="absolute size-2.5 rounded-full bg-primary ring-2 ring-default -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+          class="absolute size-2.5 rounded-full bg-primary ring-2 ring-(--ui-bg) -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           :style="{ left: `${(x(active.i) / W) * 100}%`, top: `${(y(active.value) / H) * 100}%` }"
         />
         <div
-          v-if="active"
-          class="absolute top-0 z-10 rounded-md border border-default bg-default px-2.5 py-1.5 shadow-sm pointer-events-none text-xs whitespace-nowrap"
+          v-if="active && !isEmpty"
+          class="absolute top-0 z-10 min-w-36 rounded-lg ring ring-default bg-default px-3 py-2 shadow-lg pointer-events-none text-xs"
           :class="active.i > points.length / 2 ? '-translate-x-full -ml-3' : 'ml-3'"
           :style="{ left: `${(x(active.i) / W) * 100}%` }"
         >
           <p class="text-muted">
             {{ shortDate(active.date) }}
           </p>
-          <p class="font-semibold text-highlighted tabular-nums">
+          <p class="mt-0.5 flex items-center gap-1.5 font-semibold text-highlighted tabular-nums">
+            <span class="size-2 rounded-full bg-primary" />
             {{ format(active.value) }}
+          </p>
+          <p
+            v-if="active.previous"
+            class="mt-0.5 flex items-center gap-1.5 text-muted tabular-nums"
+          >
+            <span class="w-2 border-t border-dashed border-(--ui-text-dimmed)" />
+            {{ format(active.previous.value) }}
+            <span class="text-dimmed">· {{ shortDate(active.previous.date) }}</span>
           </p>
         </div>
 
@@ -169,7 +217,7 @@ const isEmpty = computed(() => props.points.every(p => p.value === 0))
       </div>
 
       <div
-        class="relative h-5 mt-2 text-xs text-dimmed"
+        class="relative h-5 mt-2 text-[11px] text-dimmed"
         aria-hidden="true"
       >
         <span

@@ -50,8 +50,22 @@ const periodLabel = computed(() => preset.value === 'custom'
   ? `${formatDate(from.value)} – ${formatDate(to.value)}`
   : `${preset.value} hari terakhir`)
 
+/** The equally long window right before the selected one, for period-over-period deltas. */
+const previousQuery = computed(() => {
+  const DAY = 86400000
+  if (preset.value === 'custom') {
+    const start = Date.parse(`${from.value}T00:00:00`)
+    const length = Math.round((Date.parse(`${to.value}T00:00:00`) - start) / DAY) + 1
+    return { from: toDateInput(new Date(start - length * DAY)), to: toDateInput(new Date(start - DAY)) }
+  }
+  const n = Number(preset.value)
+  return { from: toDateInput(new Date(Date.now() - (2 * n - 1) * DAY)), to: toDateInput(new Date(Date.now() - n * DAY)) }
+})
+
 const summary = ref<Summary | null>(null)
+const previous = ref<Summary | null>(null)
 const trend = ref<TrendItem[]>([])
+const previousTrend = ref<TrendItem[]>([])
 const events = ref<EventDetail[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -63,15 +77,20 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [s, t, e] = await Promise.all([
+    const [s, t, e, ps, pt] = await Promise.all([
       request<Summary>('/dashboard/summary', { query: rangeQuery.value }),
       request<TrendItem[]>('/dashboard/trend', { query: rangeQuery.value }),
-      request<{ data: EventDetail[] }>('/dashboard/events')
+      request<{ data: EventDetail[] }>('/dashboard/events'),
+      // Comparison data is a nice-to-have; never fail the page over it.
+      request<Summary>('/dashboard/summary', { query: previousQuery.value }).catch(() => null),
+      request<TrendItem[]>('/dashboard/trend', { query: previousQuery.value }).catch(() => [])
     ])
     if (id !== requestId) return
     summary.value = s
     trend.value = t ?? []
     events.value = e.data ?? []
+    previous.value = ps
+    previousTrend.value = pt ?? []
   } catch (err) {
     if (id === requestId) error.value = apiErrorMessage(err, 'Ringkasan gagal dimuat.')
   } finally {
@@ -83,11 +102,40 @@ watch(rangeQuery, load, { deep: true })
 onMounted(load)
 
 const metric = ref<'revenue' | 'tickets'>('revenue')
-const trendPoints = computed(() => trend.value.map(t => ({ date: t.date, value: metric.value === 'revenue' ? t.revenue : t.tickets })))
-const avgOrder = computed(() => {
-  const v = summary.value?.overallStats.verified
-  return v && v.tickets ? summary.value!.overview.totalRevenue / v.tickets : 0
+const pick = (t: TrendItem) => metric.value === 'revenue' ? t.revenue : t.tickets
+const trendPoints = computed(() => trend.value.map(t => ({ date: t.date, value: pick(t) })))
+const comparePoints = computed(() => previousTrend.value.map(t => ({ date: t.date, value: pick(t) })))
+const trendTotal = computed(() => trend.value.reduce((s, t) => s + pick(t), 0))
+const previousTrendTotal = computed(() => previousTrend.value.reduce((s, t) => s + pick(t), 0))
+
+function avgPerTicket(s: Summary | null) {
+  const v = s?.overallStats.verified
+  return v && v.tickets ? s!.overview.totalRevenue / v.tickets : 0
+}
+const avgOrder = computed(() => avgPerTicket(summary.value))
+
+/** Percent change, or null when there is no baseline to compare against. */
+function change(current: number, before: number | undefined) {
+  if (!previous.value || before === undefined || before === 0) return null
+  return ((current - before) / before) * 100
+}
+const deltas = computed(() => ({
+  revenue: change(summary.value?.overview.totalRevenue ?? 0, previous.value?.overview.totalRevenue),
+  tickets: change(summary.value?.overview.totalTicketsSold ?? 0, previous.value?.overview.totalTicketsSold),
+  avg: change(avgOrder.value, avgPerTicket(previous.value) || undefined),
+  trend: change(trendTotal.value, previousTrendTotal.value)
+}))
+
+const { user } = useAuth()
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const part = h < 11 ? 'pagi' : h < 15 ? 'siang' : h < 19 ? 'sore' : 'malam'
+  return `Selamat ${part}, ${user.value?.name.split(' ')[0] ?? ''}`
 })
+const todayLabel = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+// Categorical tier colors: brand first, then distinct hues that stay legible together.
+const TIER_COLORS = ['#6d28d9', '#a78bfa', '#f2a93b', '#0ea5e9', '#10b981', '#a1a1aa']
 
 // Category rows are per event; the same tier name (VIP, Reguler…) is merged across events.
 const tiers = computed(() => {
@@ -102,7 +150,13 @@ const tiers = computed(() => {
   return [...byName.values()]
     .map(t => ({ ...t, share: total ? Math.round((t.revenue / total) * 1000) / 10 : 0 }))
     .sort((a, b) => b.revenue - a.revenue)
+    .map((t, i) => ({ ...t, color: TIER_COLORS[Math.min(i, TIER_COLORS.length - 1)]! }))
 })
+
+function dateTile(iso: string) {
+  const d = new Date(iso)
+  return { day: d.getDate(), month: d.toLocaleDateString('id-ID', { month: 'short' }) }
+}
 
 const upcoming = computed(() => events.value
   .filter(e => e.status === 'open' && Date.parse(e.dateTime) >= Date.now())
@@ -170,7 +224,10 @@ function occupancyColor(pct: number) {
           </div>
         </template>
         <template #right>
-          <span class="text-sm text-muted hidden md:inline">{{ periodLabel }}</span>
+          <span
+            v-if="previous"
+            class="text-xs text-dimmed hidden md:inline"
+          >Dibandingkan dengan {{ formatDate(previousQuery.from) }} – {{ formatDate(previousQuery.to) }}</span>
         </template>
       </UDashboardToolbar>
     </template>
@@ -192,18 +249,29 @@ function occupancyColor(pct: number) {
         :actions="[{ label: 'Coba lagi', color: 'error', variant: 'outline', onClick: load }]"
       />
 
-      <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div>
+        <h1 class="text-xl font-semibold tracking-tight text-highlighted">
+          {{ greeting }}
+        </h1>
+        <p class="mt-0.5 text-sm text-muted">
+          {{ todayLabel }} · performa penjualan {{ periodLabel.toLowerCase() }}
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard
           label="Pendapatan"
           :value="formatIDR(summary?.overview.totalRevenue ?? 0)"
-          :hint="`Rata-rata ${formatIDR(avgOrder)} / tiket`"
+          :delta="deltas.revenue"
+          hint="vs periode sebelumnya"
           icon="i-lucide-wallet"
           :loading="loading && !summary"
         />
         <StatCard
           label="Tiket terjual"
           :value="formatNumber(summary?.overview.totalTicketsSold)"
-          :hint="periodLabel"
+          :delta="deltas.tickets"
+          :hint="`Rata-rata ${formatIDR(avgOrder)} / tiket`"
           icon="i-lucide-ticket"
           :loading="loading && !summary"
         />
@@ -228,14 +296,28 @@ function occupancyColor(pct: number) {
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
         <UCard class="xl:col-span-2">
           <template #header>
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p class="font-medium text-highlighted">
-                  Tren penjualan
+                <p class="text-[13px] font-medium text-muted">
+                  Tren penjualan · pesanan lunas per hari
                 </p>
-                <p class="text-xs text-muted">
-                  Pesanan lunas per hari · {{ periodLabel }}
-                </p>
+                <div class="mt-1 flex items-center gap-2.5">
+                  <p class="text-xl font-semibold tracking-tight text-highlighted tabular-nums">
+                    {{ metric === 'revenue' ? formatIDR(trendTotal) : `${formatNumber(trendTotal)} tiket` }}
+                  </p>
+                  <span
+                    v-if="deltas.trend !== null"
+                    class="rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums"
+                    :class="deltas.trend >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'"
+                  >{{ deltas.trend >= 0 ? '+' : '' }}{{ (Math.round(deltas.trend * 10) / 10).toLocaleString('id-ID') }}%</span>
+                </div>
+                <div class="mt-2 flex items-center gap-4 text-xs text-muted">
+                  <span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full bg-primary" />Periode ini</span>
+                  <span
+                    v-if="comparePoints.length"
+                    class="flex items-center gap-1.5"
+                  ><span class="w-3 border-t-2 border-dashed border-(--ui-border-accented)" />Periode sebelumnya</span>
+                </div>
               </div>
               <UTabs
                 v-model="metric"
@@ -253,6 +335,7 @@ function occupancyColor(pct: number) {
           <TrendChart
             v-else
             :points="trendPoints"
+            :compare="comparePoints"
             :label="metric === 'revenue' ? 'Pendapatan harian' : 'Tiket harian'"
             :format="metric === 'revenue' ? (v: number) => formatIDR(v) : (v: number) => `${formatNumber(v)} tiket`"
             :axis-format="metric === 'revenue' ? (v: number) => formatIDR(v, true) : (v: number) => formatNumber(Math.round(v))"
@@ -286,28 +369,38 @@ function occupancyColor(pct: number) {
             variant="naked"
             size="sm"
           />
-          <ul
-            v-else
-            class="space-y-4"
-          >
-            <li
-              v-for="tier in tiers.slice(0, 6)"
-              :key="tier.name"
+          <template v-else>
+            <p class="text-xl font-semibold tracking-tight text-highlighted tabular-nums">
+              {{ formatIDR(summary?.overview.totalRevenue ?? 0) }}
+            </p>
+            <div
+              class="mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-full"
+              role="img"
+              :aria-label="tiers.map(t => `${t.name} ${t.share}%`).join(', ')"
             >
-              <div class="flex items-baseline justify-between gap-2 text-sm">
-                <span class="truncate text-highlighted">{{ tier.name }}</span>
-                <span class="tabular-nums text-muted shrink-0">{{ tier.share }}%</span>
-              </div>
-              <UProgress
-                :model-value="tier.share"
-                size="sm"
-                class="mt-1.5"
+              <span
+                v-for="tier in tiers"
+                :key="tier.name"
+                class="h-full first:rounded-s-full last:rounded-e-full"
+                :style="{ width: `${tier.share}%`, background: tier.color }"
               />
-              <p class="mt-1 text-xs text-dimmed tabular-nums">
-                {{ formatIDR(tier.revenue) }} · {{ formatNumber(tier.ticketsSold) }} tiket
-              </p>
-            </li>
-          </ul>
+            </div>
+            <ul class="mt-5 divide-y divide-default">
+              <li
+                v-for="tier in tiers.slice(0, 6)"
+                :key="tier.name"
+                class="flex items-center gap-3 py-2.5 first:pt-0 text-sm"
+              >
+                <span
+                  class="size-2.5 shrink-0 rounded-sm"
+                  :style="{ background: tier.color }"
+                />
+                <span class="flex-1 truncate text-highlighted">{{ tier.name }}</span>
+                <span class="text-xs text-dimmed tabular-nums">{{ formatNumber(tier.ticketsSold) }} tiket</span>
+                <span class="w-12 text-right tabular-nums font-medium text-highlighted">{{ tier.share.toLocaleString('id-ID') }}%</span>
+              </li>
+            </ul>
+          </template>
         </UCard>
       </div>
 
@@ -434,23 +527,28 @@ function occupancyColor(pct: number) {
               :key="ev.id"
               class="px-4 py-3"
             >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium text-highlighted truncate">
-                    {{ ev.title }}
+              <div class="flex items-start gap-3">
+                <div class="w-11 shrink-0 overflow-hidden rounded-lg ring ring-default text-center">
+                  <p class="bg-primary/10 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    {{ dateTile(ev.dateTime).month }}
                   </p>
-                  <p class="text-xs text-muted truncate">
-                    {{ formatDateTime(ev.dateTime) }} · {{ ev.venue ?? 'Venue belum diatur' }}{{ ev.city ? `, ${ev.city}` : '' }}
+                  <p class="py-0.5 text-base font-semibold text-highlighted tabular-nums">
+                    {{ dateTile(ev.dateTime).day }}
                   </p>
                 </div>
-                <UBadge
-                  :label="daysUntil(ev.dateTime)"
-                  color="neutral"
-                  variant="soft"
-                  class="shrink-0"
-                />
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="text-sm font-medium text-highlighted truncate">
+                      {{ ev.title }}
+                    </p>
+                    <span class="shrink-0 text-xs text-muted">{{ daysUntil(ev.dateTime) }}</span>
+                  </div>
+                  <p class="text-xs text-muted truncate">
+                    {{ formatTime(ev.dateTime) }} · {{ ev.venue ?? 'Venue belum diatur' }}{{ ev.city ? `, ${ev.city}` : '' }}
+                  </p>
+                </div>
               </div>
-              <div class="mt-2 flex items-center gap-3 text-xs text-muted tabular-nums">
+              <div class="mt-2.5 ps-14 flex items-center gap-3 text-xs text-muted tabular-nums">
                 <UProgress
                   :model-value="Math.min(ev.occupancyPct, 100)"
                   :color="occupancyColor(ev.occupancyPct)"

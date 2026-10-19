@@ -16,6 +16,9 @@ export interface EventRow {
   imageUrl: string | null
   artist?: { id: string, name: string } | null
   venue?: { id: string, name: string, city: string } | null
+  /** Ticket totals across categories (list endpoint only). */
+  capacity?: number
+  sold?: number
 }
 
 export interface Option { label: string, value: string }

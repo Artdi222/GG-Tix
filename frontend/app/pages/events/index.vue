@@ -106,11 +106,13 @@ const columns: TableColumn<EventRow>[] = [
   { accessorKey: 'title', header: 'Event' },
   { accessorKey: 'dateTime', header: 'Jadwal' },
   { accessorKey: 'venue', header: 'Venue' },
-  { accessorKey: 'status', header: 'Penjualan' },
+  { id: 'sales', header: 'Tiket terjual' },
+  { accessorKey: 'status', header: 'Status' },
   { id: 'actions', header: '' }
 ]
 
 const isPast = (iso: string) => Date.parse(iso) < Date.now()
+const soldPct = (e: EventRow) => e.capacity ? Math.round(((e.sold ?? 0) / e.capacity) * 100) : 0
 const filtered = computed(() => !!list.search.value || status.value !== 'all')
 </script>
 
@@ -179,20 +181,11 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
         >
           <template #title-cell="{ row }">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-16 aspect-video shrink-0 overflow-hidden rounded-md bg-elevated border border-default">
-                <img
-                  v-if="row.original.imageUrl"
-                  :src="row.original.imageUrl"
-                  alt=""
-                  class="size-full object-cover"
-                  loading="lazy"
-                >
-                <UIcon
-                  v-else
-                  name="i-lucide-image"
-                  class="size-4 m-auto mt-2.5 block text-dimmed"
-                />
-              </div>
+              <EventCover
+                :title="row.original.title"
+                :src="row.original.imageUrl"
+                class="w-16 aspect-video shrink-0"
+              />
               <div class="min-w-0">
                 <p class="font-medium text-highlighted truncate max-w-72">
                   {{ row.original.title }}
@@ -221,6 +214,27 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
             <p class="text-xs text-muted">
               {{ row.original.venue?.city }}
             </p>
+          </template>
+          <template #sales-cell="{ row }">
+            <div
+              v-if="row.original.capacity"
+              class="w-40"
+            >
+              <div class="flex items-baseline justify-between text-xs tabular-nums">
+                <span class="font-medium text-highlighted">{{ formatNumber(row.original.sold) }}<span class="font-normal text-dimmed"> / {{ formatNumber(row.original.capacity) }}</span></span>
+                <span class="text-muted">{{ soldPct(row.original) }}%</span>
+              </div>
+              <UProgress
+                :model-value="soldPct(row.original)"
+                :color="soldPct(row.original) >= 90 ? 'error' : soldPct(row.original) >= 60 ? 'warning' : 'primary'"
+                size="xs"
+                class="mt-1.5"
+              />
+            </div>
+            <span
+              v-else
+              class="text-xs text-dimmed"
+            >Belum ada kategori</span>
           </template>
           <template #status-cell="{ row }">
             <StatusBadge :status="row.original.status" />

@@ -23,9 +23,35 @@
 
 :root {
   --ui-radius: 0.5rem;
+  /* The app canvas is a step darker than content sheets. */
+  --ui-bg-canvas: #f4f4f6;
+}
+
+body {
+  background: var(--ui-bg-canvas);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-brand-100);
+  color: var(--color-brand-950);
+}
+
+/* Quiet scrollbars that don't fight the content. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--ui-text-dimmed) 45%, transparent) transparent;
 }
 
 /* Tabular figures keep numeric columns and KPIs aligned. */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
