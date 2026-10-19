@@ -1,3 +1,4 @@
+import { likeContains } from "../lib/pagination";
 import { eq, and, ilike, or, count, desc, inArray, sql, SQL } from "drizzle-orm";
 import { db } from "../db";
 import { events, ticketCategories } from "../db/schema";
@@ -86,7 +87,7 @@ export async function findEvents(filters: EventQueryFilters = {}) {
   const conditions: SQL[] = [];
 
   if (search && search.trim() !== "") {
-    const term = `%${search.trim()}%`;
+    const term = likeContains(search);
     conditions.push(
       or(
         ilike(events.title, term),

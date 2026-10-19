@@ -1,3 +1,4 @@
+import { likeContains } from "../lib/pagination";
 import { eq, ilike, or, count, desc, and, SQL } from "drizzle-orm";
 import { db } from "../db";
 import { customers } from "../db/schema";
@@ -75,7 +76,7 @@ export async function findCustomers(filters: CustomerQueryFilters = {}) {
   const conditions: SQL[] = [];
 
   if (search && search.trim() !== "") {
-    const term = `%${search.trim()}%`;
+    const term = likeContains(search);
     conditions.push(
       or(
         ilike(customers.name, term),

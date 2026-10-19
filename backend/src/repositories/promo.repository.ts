@@ -1,6 +1,7 @@
 import { eq, and, sql, desc, count, ilike } from "drizzle-orm";
 import { db } from "../db";
 import { vouchers, voucherUsages, events, customers, orders } from "../db/schema";
+import { likeContains } from "../lib/pagination";
 
 export interface CreateVoucherInput {
   code: string;
@@ -85,7 +86,7 @@ export async function findVouchers(filters: VoucherQueryFilters) {
   const conditions = [];
 
   if (filters.search) {
-    const q = `%${filters.search.trim()}%`;
+    const q = likeContains(filters.search);
     conditions.push(sql`(${vouchers.code} ILIKE ${q} OR ${vouchers.name} ILIKE ${q})`);
   }
 

@@ -12,3 +12,6 @@ export const limitQuery = (defaultLimit: number, max = 100) =>
     const n = parseInt(v ?? "", 10);
     return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : defaultLimit;
   });
+
+/** ILIKE "contains" pattern with user input escaped, so `%` and `_` match literally. */
+export const likeContains = (value: string) => `%${value.trim().replace(/[\\%_]/g, "\\$&")}%`;

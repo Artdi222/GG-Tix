@@ -1,3 +1,4 @@
+import { likeContains } from "../lib/pagination";
 import { eq, and, or, desc, count, ilike, SQL, sql, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { AppError } from "../lib/errors";
@@ -258,7 +259,7 @@ export async function findOrders(filters: OrderQueryFilters = {}) {
   if (status) conditions.push(eq(orders.status, status));
   if (eventId) conditions.push(eq(orders.eventId, eventId));
   if (search?.trim()) {
-    const term = `%${search.trim()}%`;
+    const term = likeContains(search);
     conditions.push(or(
       sql`${orders.id}::text ilike ${term}`,
       inArray(orders.customerId, db.select({ id: customers.id }).from(customers).where(or(ilike(customers.name, term), ilike(customers.email, term)))),

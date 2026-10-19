@@ -1,3 +1,4 @@
+import { likeContains } from "../lib/pagination";
 import { eq, count, desc, and, SQL, ilike, or, sql, lt } from "drizzle-orm";
 import { db } from "../db";
 import { systemSettings, auditLogs, admins } from "../db/schema";
@@ -54,7 +55,7 @@ export async function getAuditLogs(filters: {
   const conditions: SQL[] = [];
 
   if (search?.trim()) {
-    const term = `%${search.trim()}%`;
+    const term = likeContains(search);
     conditions.push(
       or(
         ilike(auditLogs.path, term),

@@ -1,3 +1,4 @@
+import { likeContains } from "../lib/pagination";
 import { eq, ilike, desc, count, and } from "drizzle-orm";
 import { db } from "../db";
 import { venues } from "../db/schema";
@@ -12,7 +13,7 @@ export async function findAllVenues(filters: VenueQuery = {}) {
   const { q, page = 1, limit = 10 } = filters;
   const offset = (page - 1) * limit;
 
-  const conditions = q && q.trim() !== "" ? [ilike(venues.name, `%${q.trim()}%`)] : [];
+  const conditions = q && q.trim() !== "" ? [ilike(venues.name, likeContains(q))] : [];
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const items = await db

@@ -1,3 +1,4 @@
+import { likeContains } from "../lib/pagination";
 import { eq, ilike, desc, count, and } from "drizzle-orm";
 import { db } from "../db";
 import { artists, events } from "../db/schema";
@@ -12,7 +13,7 @@ export async function findAllArtists(filters: ArtistQuery = {}) {
   const { search, page = 1, limit = 10 } = filters;
   const offset = (page - 1) * limit;
 
-  const conditions = search && search.trim() !== "" ? [ilike(artists.name, `%${search.trim()}%`)] : [];
+  const conditions = search && search.trim() !== "" ? [ilike(artists.name, likeContains(search))] : [];
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const items = await db

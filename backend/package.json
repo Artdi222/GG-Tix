@@ -6,6 +6,7 @@
     "dev": "bun run --hot src/index.ts",
     "check": "tsc --noEmit",
     "test": "bun test",
+    "test:api": "bash scripts/test-api.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "bun run src/db/seed.ts",
