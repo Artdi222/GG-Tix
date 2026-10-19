@@ -126,13 +126,15 @@ export async function findEvents(filters: EventQueryFilters = {}) {
     .from(events)
     .where(whereClause);
 
-  // Ticket capacity and sales per event, so list views can show sell-through.
+  // Ticket capacity, sales and starting price per event, so list views can show
+  // sell-through and "from Rp…" without loading every category.
   const sales = items.length
     ? await db
         .select({
           eventId: ticketCategories.eventId,
           capacity: sql<number>`coalesce(sum(${ticketCategories.quotaTotal}), 0)::int`,
           sold: sql<number>`coalesce(sum(${ticketCategories.quotaTotal} - ${ticketCategories.quotaRemaining}), 0)::int`,
+          minPrice: sql<number | null>`min(${ticketCategories.price})::float8`,
         })
         .from(ticketCategories)
         .where(inArray(ticketCategories.eventId, items.map((e) => e.id)))
@@ -145,6 +147,7 @@ export async function findEvents(filters: EventQueryFilters = {}) {
       ...e,
       capacity: salesByEvent.get(e.id)?.capacity ?? 0,
       sold: salesByEvent.get(e.id)?.sold ?? 0,
+      minPrice: salesByEvent.get(e.id)?.minPrice ?? null,
     })),
     pagination: {
       page,
