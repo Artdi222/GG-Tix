@@ -22,7 +22,7 @@ interface Options {
  */
 export function usePaginatedList<T>(endpoint: MaybeRefOrGetter<string>, options: Options = {}) {
   const { request } = useApi()
-  const limit = options.limit ?? 20
+  const limit = options.limit ?? 10
 
   const items = ref<T[]>([]) as Ref<T[]>
   const page = ref(1)

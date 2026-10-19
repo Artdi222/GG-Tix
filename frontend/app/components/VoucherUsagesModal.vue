@@ -14,7 +14,7 @@ interface Usage {
 const props = defineProps<{ voucherId: string, voucherCode: string }>()
 const open = defineModel<boolean>('open', { default: false })
 
-const list = usePaginatedList<Usage>(() => `/vouchers/${props.voucherId}/usages`, { limit: 10, immediate: false })
+const list = usePaginatedList<Usage>(() => `/vouchers/${props.voucherId}/usages`, { immediate: false })
 watch([open, () => props.voucherId], ([isOpen]) => {
   if (!isOpen) return
   if (list.page.value !== 1) list.page.value = 1
