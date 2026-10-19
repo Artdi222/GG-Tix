@@ -92,6 +92,7 @@ async function submit() {
           variant="subtle"
           icon="i-lucide-circle-alert"
           :title="formError"
+          role="alert"
           class="sm:col-span-2"
         />
       </form>

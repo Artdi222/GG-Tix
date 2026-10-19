@@ -285,6 +285,7 @@ async function submit() {
           variant="subtle"
           icon="i-lucide-circle-alert"
           :title="formError"
+          role="alert"
         />
       </form>
     </template>

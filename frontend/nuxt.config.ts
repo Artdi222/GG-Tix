@@ -35,6 +35,9 @@ export default defineNuxtConfig({
     }
   },
 
+  // Lets the e2e suite run its own dev server without clobbering a running one.
+  buildDir: process.env.NUXT_BUILD_DIR || '.nuxt',
+
   devServer: { port: 3001 },
 
   compatibilityDate: '2026-06-30',

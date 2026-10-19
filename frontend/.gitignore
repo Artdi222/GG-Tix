@@ -2,6 +2,9 @@
 .output
 .data
 .nuxt
+.nuxt-e2e
+test-results
+playwright-report
 .nitro
 .cache
 dist

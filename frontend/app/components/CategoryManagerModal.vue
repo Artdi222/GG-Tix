@@ -164,6 +164,7 @@ async function remove(category: Category) {
           variant="subtle"
           icon="i-lucide-circle-alert"
           :title="formError"
+          role="alert"
         />
         <div class="flex justify-end gap-2">
           <UButton

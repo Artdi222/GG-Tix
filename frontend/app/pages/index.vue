@@ -246,6 +246,7 @@ function occupancyColor(pct: number) {
         variant="subtle"
         icon="i-lucide-circle-alert"
         :title="error"
+        role="alert"
         :actions="[{ label: 'Coba lagi', color: 'error', variant: 'outline', onClick: load }]"
       />
 

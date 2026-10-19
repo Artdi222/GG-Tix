@@ -385,6 +385,7 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
               variant="subtle"
               icon="i-lucide-circle-alert"
               :title="formError"
+              role="alert"
             />
           </form>
         </template>

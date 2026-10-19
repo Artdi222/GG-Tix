@@ -125,6 +125,7 @@ async function submit() {
             variant="subtle"
             icon="i-lucide-circle-alert"
             :title="error"
+            role="alert"
           />
 
           <UButton
