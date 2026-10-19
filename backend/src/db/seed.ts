@@ -193,7 +193,7 @@ async function seed() {
         artistId: insertedArtists[0].id,
         publisherName: "Kuro Games",
         venueId: insertedVenues[0].id,
-        dateTime: new Date("2026-10-12T19:00:00Z"),
+        dateTime: new Date("2026-10-12T19:00:00+07:00"),
         description: "An epic orchestral concert featuring the soundscapes of Solaris.",
         tags: ["WutheringWaves", "GameMusic", "Orchestra"],
         maxTicketsPerOrder: 4,
@@ -205,7 +205,7 @@ async function seed() {
         artistId: insertedArtists[1].id,
         publisherName: "HoYoverse",
         venueId: insertedVenues[1].id,
-        dateTime: new Date("2026-11-08T18:30:00Z"),
+        dateTime: new Date("2026-11-08T18:30:00+07:00"),
         description: "Hop aboard the Astral Express for a night of cosmic pop and synth-rock.",
         tags: ["HSR", "AstralExpress", "HoYoverse"],
         maxTicketsPerOrder: 4,
@@ -217,7 +217,7 @@ async function seed() {
         artistId: insertedArtists[2].id,
         publisherName: "HoYoverse",
         venueId: insertedVenues[2].id,
-        dateTime: new Date("2026-11-22T19:00:00Z"),
+        dateTime: new Date("2026-11-22T19:00:00+07:00"),
         description: "Journey through Mondstadt, Liyue, Inazuma, Sumeru, Fontaine, and Natlan.",
         tags: ["GenshinImpact", "Teyvat", "Symphony"],
         maxTicketsPerOrder: 4,
@@ -229,7 +229,7 @@ async function seed() {
         artistId: insertedArtists[3].id,
         publisherName: "Hypergryph",
         venueId: insertedVenues[3].id,
-        dateTime: new Date("2026-12-05T20:00:00Z"),
+        dateTime: new Date("2026-12-05T20:00:00+07:00"),
         description: "Industrial rock and electronic beats from Rhodes Island.",
         tags: ["Arknights", "RhodesIsland", "OST"],
         maxTicketsPerOrder: 4,
@@ -241,7 +241,7 @@ async function seed() {
         artistId: insertedArtists[4].id,
         publisherName: "HoYoverse",
         venueId: insertedVenues[4].id,
-        dateTime: new Date("2027-01-15T20:00:00Z"),
+        dateTime: new Date("2027-01-15T20:00:00+07:00"),
         description: "High-energy urban DJ set straight from New Eridu's hollows.",
         tags: ["ZZZ", "NewEridu", "Electronic"],
         maxTicketsPerOrder: 4,
@@ -253,7 +253,7 @@ async function seed() {
         artistId: insertedArtists[0].id,
         publisherName: "Kuro Games",
         venueId: insertedVenues[5].id,
-        dateTime: new Date("2027-02-20T19:30:00Z"),
+        dateTime: new Date("2027-02-20T19:30:00+07:00"),
         description: "An exclusive encore performance in the island paradise of Bali.",
         tags: ["WutheringWaves", "Encore", "Bali"],
         maxTicketsPerOrder: 4,
@@ -308,7 +308,7 @@ async function seed() {
       totalPrice: "3000000.00",
       status: "verified" as const,
       verifiedBy: adminBudi.id,
-      verifiedAt: new Date("2026-08-01T10:00:00Z"),
+      verifiedAt: new Date("2026-08-01T10:00:00+07:00"),
     },
     // Sari orders Star Rail VIP — pending
     {
@@ -328,7 +328,7 @@ async function seed() {
       totalPrice: "1000000.00",
       status: "verified" as const,
       verifiedBy: adminBudi.id,
-      verifiedAt: new Date("2026-08-02T14:30:00Z"),
+      verifiedAt: new Date("2026-08-02T14:30:00+07:00"),
     },
     // Andi orders Genshin VIP — verified
     {
@@ -339,7 +339,7 @@ async function seed() {
       totalPrice: "1800000.00",
       status: "verified" as const,
       verifiedBy: adminBudi.id,
-      verifiedAt: new Date("2026-08-03T09:15:00Z"),
+      verifiedAt: new Date("2026-08-03T09:15:00+07:00"),
     },
     // Rina orders Genshin VVIP — pending
     {
@@ -359,7 +359,7 @@ async function seed() {
       totalPrice: "900000.00",
       status: "rejected" as const,
       verifiedBy: adminBudi.id,
-      verifiedAt: new Date("2026-08-01T16:45:00Z"),
+      verifiedAt: new Date("2026-08-01T16:45:00+07:00"),
     },
     // Sari orders WuWa Encore VIP (closed event) — verified
     {
@@ -370,7 +370,7 @@ async function seed() {
       totalPrice: "1700000.00",
       status: "verified" as const,
       verifiedBy: adminBudi.id,
-      verifiedAt: new Date("2026-07-20T11:00:00Z"),
+      verifiedAt: new Date("2026-07-20T11:00:00+07:00"),
     },
     // Andi orders WuWa VIP — verified
     {
@@ -381,7 +381,7 @@ async function seed() {
       totalPrice: "2250000.00",
       status: "verified" as const,
       verifiedBy: adminBudi.id,
-      verifiedAt: new Date("2026-08-04T08:00:00Z"),
+      verifiedAt: new Date("2026-08-04T08:00:00+07:00"),
     },
   ];
 
@@ -436,7 +436,7 @@ async function seed() {
           orderId: ord.id,
           qrCodeValue: `tix_${crypto.randomUUID()}`,
           checkedIn: isCheckedIn,
-          checkedInAt: isCheckedIn ? new Date("2026-08-05T18:00:00Z") : null,
+          checkedInAt: isCheckedIn ? new Date("2026-08-05T18:00:00+07:00") : null,
         });
       }
     }
@@ -468,8 +468,8 @@ async function seed() {
         quotaRemaining: 98,
         maxUsagePerCustomer: 1,
         createdBy: adminBudi.id,
-        startDate: new Date("2026-01-01T00:00:00Z"),
-        endDate: new Date("2026-12-31T23:59:59Z"),
+        startDate: new Date("2026-01-01T00:00:00+07:00"),
+        endDate: new Date("2026-12-31T23:59:59+07:00"),
         isActive: true,
       },
       {
@@ -484,8 +484,8 @@ async function seed() {
         quotaRemaining: 50,
         maxUsagePerCustomer: 2,
         createdBy: adminBudi.id,
-        startDate: new Date("2026-01-01T00:00:00Z"),
-        endDate: new Date("2026-12-31T23:59:59Z"),
+        startDate: new Date("2026-01-01T00:00:00+07:00"),
+        endDate: new Date("2026-12-31T23:59:59+07:00"),
         isActive: true,
       },
       {
@@ -500,8 +500,8 @@ async function seed() {
         quotaRemaining: 200,
         maxUsagePerCustomer: 1,
         createdBy: adminBudi.id,
-        startDate: new Date("2026-01-01T00:00:00Z"),
-        endDate: new Date("2026-12-31T23:59:59Z"),
+        startDate: new Date("2026-01-01T00:00:00+07:00"),
+        endDate: new Date("2026-12-31T23:59:59+07:00"),
         isActive: true,
       },
     ])

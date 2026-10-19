@@ -87,7 +87,8 @@ export async function getDashboardSummary(range: DashboardRange = {}) {
       })
       .from(events)
       .leftJoin(venues, eq(events.venueId, venues.id))
-      .where(eq(events.status, "open"))
+      // Open events whose date already passed are not "upcoming".
+      .where(and(eq(events.status, "open"), sql`${events.dateTime} >= now()`))
       .orderBy(asc(events.dateTime))
       .limit(5),
     db

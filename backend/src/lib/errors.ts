@@ -49,6 +49,16 @@ export function errorHandler(err: Error, c: Context) {
     return c.json({ error: err.message, requestId }, err.status);
   }
 
+  // Postgres constraint violations are client conflicts, not server faults.
+  // Drizzle may wrap the driver error in `cause`.
+  const pgCode = (err as { code?: string }).code ?? (err.cause as { code?: string } | undefined)?.code;
+  if (pgCode === "23503") {
+    return c.json({ error: "Data ini masih digunakan oleh data lain (misalnya pesanan atau event) sehingga tidak dapat dihapus atau diubah.", requestId }, 409);
+  }
+  if (pgCode === "23505") {
+    return c.json({ error: "Data dengan nilai yang sama sudah ada.", requestId }, 409);
+  }
+
   console.error(`[Unhandled Server Error] ReqID: ${requestId || "-"}`, err);
   return c.json({ error: "Internal Server Error", requestId }, 500);
 }

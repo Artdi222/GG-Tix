@@ -1,3 +1,6 @@
+import { count, eq } from "drizzle-orm";
+import { db } from "../db";
+import { admins } from "../db/schema";
 import * as adminRepo from "../repositories/admin.repository";
 import { AppError } from "../lib/errors";
 
@@ -40,6 +43,13 @@ export async function updateAdmin(
     throw new AppError("Admin not found", 404);
   }
 
+  if (data.role && data.role !== existing.role) {
+    if (id === currentAdminId) {
+      throw new AppError("Anda tidak dapat mengubah role akun Anda sendiri.", 403);
+    }
+    if (existing.role === "super_admin") await assertNotLastSuperAdmin();
+  }
+
   if (data.email && data.email !== existing.email) {
     const emailConflict = await adminRepo.findAdminByEmail(data.email);
     if (emailConflict) {
@@ -49,8 +59,8 @@ export async function updateAdmin(
 
   let passwordHash: string | undefined;
   if (data.password) {
-    if (data.password.length < 6) {
-      throw new AppError("Password must be at least 6 characters", 400);
+    if (data.password.length < 8) {
+      throw new AppError("Password must be at least 8 characters", 400);
     }
     passwordHash = await Bun.password.hash(data.password);
   }
@@ -72,6 +82,15 @@ export async function deleteAdmin(id: string, currentAdminId: string) {
   if (!existing) {
     throw new AppError("Admin not found", 404);
   }
+  if (existing.role === "super_admin") await assertNotLastSuperAdmin();
 
   return await adminRepo.deleteAdmin(id);
+}
+
+/** The platform must always keep at least one super admin. */
+async function assertNotLastSuperAdmin() {
+  const [{ total }] = await db.select({ total: count() }).from(admins).where(eq(admins.role, "super_admin"));
+  if (Number(total) <= 1) {
+    throw new AppError("Harus ada minimal satu Super Admin. Tetapkan Super Admin lain terlebih dahulu.", 409);
+  }
 }
