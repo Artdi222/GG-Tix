@@ -1,6 +1,6 @@
-import { eq, and, ilike, or, count, desc, SQL } from "drizzle-orm";
+import { eq, and, ilike, or, count, desc, inArray, sql, SQL } from "drizzle-orm";
 import { db } from "../db";
-import { events } from "../db/schema";
+import { events, ticketCategories } from "../db/schema";
 
 export interface CreateEventInput {
   title: string;
@@ -125,8 +125,26 @@ export async function findEvents(filters: EventQueryFilters = {}) {
     .from(events)
     .where(whereClause);
 
+  // Ticket capacity and sales per event, so list views can show sell-through.
+  const sales = items.length
+    ? await db
+        .select({
+          eventId: ticketCategories.eventId,
+          capacity: sql<number>`coalesce(sum(${ticketCategories.quotaTotal}), 0)::int`,
+          sold: sql<number>`coalesce(sum(${ticketCategories.quotaTotal} - ${ticketCategories.quotaRemaining}), 0)::int`,
+        })
+        .from(ticketCategories)
+        .where(inArray(ticketCategories.eventId, items.map((e) => e.id)))
+        .groupBy(ticketCategories.eventId)
+    : [];
+  const salesByEvent = new Map(sales.map((s) => [s.eventId, s]));
+
   return {
-    items,
+    items: items.map((e) => ({
+      ...e,
+      capacity: salesByEvent.get(e.id)?.capacity ?? 0,
+      sold: salesByEvent.get(e.id)?.sold ?? 0,
+    })),
     pagination: {
       page,
       limit,
