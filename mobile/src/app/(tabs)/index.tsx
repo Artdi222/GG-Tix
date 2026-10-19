@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -125,40 +125,36 @@ export default function HomeScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cityModalVisible, setCityModalVisible] = useState(false);
 
+  // One loader for first load, pull-to-refresh and retry; a newer load or unmount aborts the older one.
+  const loadController = useRef<AbortController | null>(null);
   const loadEvents = useCallback(async () => {
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     try {
-      setErrorMessage(null);
-      const items = await collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`));
-      setEvents(items);
+      const items = await collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`, { signal: controller.signal }));
+      if (!controller.signal.aborted) {
+        setEvents(items);
+        setErrorMessage(null);
+      }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Gagal memuat daftar konser');
+      if (!controller.signal.aborted) setErrorMessage(err.message || 'Gagal memuat daftar konser');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
     const controller = new AbortController();
+    loadController.current = controller;
     collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`, { signal: controller.signal }))
-      .then((items) => {
-        if (!isMounted) return;
-        setEvents(items);
-      })
-      .catch((err: any) => {
-        if (!isMounted) return;
-        setErrorMessage(err.message || 'Gagal memuat daftar konser');
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
+      .then((items) => { if (!controller.signal.aborted) setEvents(items); })
+      .catch((err: any) => { if (!controller.signal.aborted) setErrorMessage(err.message || 'Gagal memuat daftar konser'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => loadController.current?.abort();
   }, []);
 
   const onRefresh = useCallback(() => {

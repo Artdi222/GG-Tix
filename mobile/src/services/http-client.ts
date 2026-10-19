@@ -8,6 +8,19 @@ export interface SessionAdapter {
   expire(expected: number): Promise<void>;
 }
 
+const TIMEOUT_MS = 15000;
+
+// A caller's abort signal must not drop the timeout, or a dead host hangs the screen forever.
+// Built by hand because Hermes lacks AbortSignal.any/timeout.
+export function withTimeout(signal?: AbortSignal | null, ms = TIMEOUT_MS): AbortSignal {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  const abort = () => { clearTimeout(timer); controller.abort(); };
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
+  return controller.signal;
+}
+
 // Kept independent of React Native so concurrent refresh/logout behavior is testable.
 export function createHttpClient(baseUrl: string, session: SessionAdapter, send: typeof fetch = fetch) {
   let refreshing: { revision: number; promise: Promise<void> } | undefined;
@@ -21,7 +34,8 @@ export function createHttpClient(baseUrl: string, session: SessionAdapter, send:
       if (token && !publicAuth) headers.set('Authorization', `Bearer ${token}`);
       try {
         return await send(`${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
-          ...options, headers, signal: options.signal ?? AbortSignal.timeout(15000),
+          ...options, headers,
+          signal: withTimeout(options.signal),
         });
       } catch (error) {
         if (options.signal?.aborted) throw error;
@@ -44,7 +58,7 @@ export function createHttpClient(baseUrl: string, session: SessionAdapter, send:
           try {
             res = await send(`${baseUrl}/auth/refresh`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken: initial.refreshToken }), signal: AbortSignal.timeout(15000),
+              body: JSON.stringify({ refreshToken: initial.refreshToken }), signal: withTimeout(),
             });
           } catch { throw new ApiError('Koneksi terputus. Sesi tersimpan; coba lagi.', 0, true); }
           if (!res.ok) {

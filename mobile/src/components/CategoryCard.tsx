@@ -34,13 +34,13 @@ export function CategoryCard({ category, isSelected, onSelect }: CategoryCardPro
 
   const handlePressIn = () => {
     if (!isSoldOut) {
-      scale.value = withSpring(MOTION_TOKENS.pressScale.card, MOTION_TOKENS.springSnappy);
+      scale.set(withSpring(MOTION_TOKENS.pressScale.card, MOTION_TOKENS.springSnappy));
     }
   };
 
   const handlePressOut = () => {
     if (!isSoldOut) {
-      scale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+      scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
     }
   };
 

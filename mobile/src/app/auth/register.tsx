@@ -10,7 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, useLocalSearchParams, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/auth-store';
 import { apiFetch } from '../../services/api';
@@ -26,6 +26,9 @@ export default function RegisterScreen() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const router = useRouter();
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
+  // Only in-app paths, so a crafted deep link can't bounce the user elsewhere.
+  const nextPath = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/(tabs)';
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const handleRegister = async () => {
@@ -52,7 +55,7 @@ export default function RegisterScreen() {
 
       if (res.token && res.user) {
         await setAuth(res.token, res.user, res.refreshToken);
-        router.replace('/(tabs)');
+        router.replace(nextPath as any);
       } else {
         throw new Error('Pendaftaran berhasil, silakan masuk.');
       }
@@ -200,7 +203,7 @@ export default function RegisterScreen() {
 
             <View style={styles.linkRow}>
               <Text style={styles.linkNormal}>Sudah punya akun? </Text>
-              <Link href="/auth/login" asChild>
+              <Link href={{ pathname: "/auth/login", params: redirect ? { redirect } : {} }} asChild>
                 <TouchableOpacity>
                   <Text style={styles.linkHighlight}>Masuk</Text>
                 </TouchableOpacity>

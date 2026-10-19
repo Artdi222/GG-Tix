@@ -79,6 +79,7 @@ function OrderCardItem({ item, onPress }: OrderCardProps) {
     if (!isoString) return '';
     try {
       return new Date(isoString).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta',
         weekday: 'short',
         day: 'numeric',
         month: 'short',
@@ -277,7 +278,7 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <FlatList
-          ListFooterComponent={data.page < data.totalPages ? <TouchableOpacity onPress={data.loadMore} disabled={loading} style={{ padding: 20, alignItems: 'center' }} accessibilityRole="button"><Text style={{ color: BRAND_COLORS.accent }}>{loading ? 'Memuat...' : 'Muat lebih banyak'}</Text></TouchableOpacity> : null}
+          ListFooterComponent={data.page < data.totalPages ? <TouchableOpacity onPress={data.loadMore} disabled={data.loadingMore} style={{ padding: 20, alignItems: 'center' }} accessibilityRole="button"><Text style={{ color: BRAND_COLORS.accent }}>{data.loadingMore ? 'Memuat...' : 'Muat lebih banyak'}</Text></TouchableOpacity> : null}
           data={filteredHistory}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
   ActivityIndicator,
   Linking,
 } from 'react-native';
@@ -41,7 +42,11 @@ export default function ProfileScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+
   const openPasswordModal = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
     if (Platform.OS !== 'web') {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -90,7 +95,7 @@ export default function ProfileScreen() {
       });
 
       setPasswordSuccess('Kata sandi berhasil diubah!');
-      setTimeout(() => {
+      closeTimer.current = setTimeout(() => {
         setIsPasswordModalVisible(false);
       }, 1200);
     } catch (err: any) {
@@ -140,8 +145,10 @@ export default function ProfileScreen() {
     finally { setPushLoading(false); }
   };
   const exitAccount = async () => {
-    try { if (await isPushEnabled()) await disablePushNotifications(); await logout(); router.replace('/auth/login'); }
-    catch { setNotice('Gagal menutup sesi perangkat. Periksa koneksi dan coba keluar lagi.'); }
+    // Unregistering the push device is best-effort: being offline must never trap the user in their account.
+    try { if (await isPushEnabled()) await disablePushNotifications(); } catch {}
+    await logout();
+    router.replace('/auth/login');
   };
 
   const handleLogout = async () => {
@@ -290,8 +297,12 @@ export default function ProfileScreen() {
             <Ionicons name="notifications-outline" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>Notifikasi {pushEnabled ? 'Aktif' : 'Nonaktif'}</Text><Text style={styles.menuDesc}>{pushLoading ? 'Memproses...' : 'Pembayaran, pengingat H-1, dan konser baru'}</Text></View>
           </TouchableOpacity>
           {support ? <>
-            <TouchableOpacity style={styles.menuItem} onPress={() => void Linking.openURL(`mailto:${support.supportEmail}`).catch(() => setNotice('Aplikasi email tidak tersedia.'))}><Text style={styles.menuTitle}>{support.supportEmail}</Text></TouchableOpacity>
-            {support.supportWhatsapp ? <TouchableOpacity style={styles.menuItem} onPress={() => void Linking.openURL(`https://wa.me/${support.supportWhatsapp.replace(/\D/g, '')}`).catch(() => setNotice('WhatsApp tidak dapat dibuka.'))}><Text style={styles.menuTitle}>Hubungi Bantuan WhatsApp</Text></TouchableOpacity> : null}
+            <TouchableOpacity style={styles.menuItem} accessibilityRole="link" onPress={() => void Linking.openURL(`mailto:${support.supportEmail}`).catch(() => setNotice('Aplikasi email tidak tersedia.'))}>
+              <Ionicons name="mail-outline" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>Email Bantuan</Text><Text style={styles.menuDesc}>{support.supportEmail}</Text></View>
+            </TouchableOpacity>
+            {support.supportWhatsapp ? <TouchableOpacity style={styles.menuItem} onPress={() => void Linking.openURL(`https://wa.me/${support.supportWhatsapp.replace(/\D/g, '')}`).catch(() => setNotice('WhatsApp tidak dapat dibuka.'))} accessibilityRole="link">
+              <Ionicons name="logo-whatsapp" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>WhatsApp Bantuan</Text><Text style={styles.menuDesc}>Chat dengan tim GG Tix</Text></View>
+            </TouchableOpacity> : null}
           </> : null}
         </View>
 
@@ -421,7 +432,7 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <Modal visible={editProfile} transparent animationType="fade" onRequestClose={() => setEditProfile(false)}>
-        <View style={styles.modalBackdrop}><View style={styles.modalContent}>
+        <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Edit Profil</Text>
           <View style={styles.modalForm}>
             <Text style={styles.inputLabel}>Nama</Text><TextInput accessibilityLabel="Nama profil" style={styles.modalInput} value={name} onChangeText={setName} maxLength={100} />
@@ -432,7 +443,7 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditProfile(false)} disabled={saving}><Text style={styles.modalCancelText}>Batal</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSubmitBtn} onPress={saveProfile} disabled={saving}><Text style={styles.modalSubmitText}>{saving ? 'Menyimpan...' : 'Simpan Profil'}</Text></TouchableOpacity>
           </View>
-        </View></View>
+        </View></KeyboardAvoidingView>
       </Modal>
 
       {/* Change Password Modal */}
@@ -442,7 +453,7 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setIsPasswordModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -531,7 +542,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

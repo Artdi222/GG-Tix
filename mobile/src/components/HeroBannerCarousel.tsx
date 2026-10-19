@@ -20,10 +20,11 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { BRAND_COLORS } from '../constants/config';
-import { EventItem, getPosterImage } from './EventCard';
+import { EventItem, formatEventDate, getPosterImage } from './EventCard';
+import { LinearGradient } from './LinearGradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_BANNER_HEIGHT = Math.round(SCREEN_WIDTH * (9 / 21));
+const HERO_BANNER_HEIGHT = Math.round(SCREEN_WIDTH * (10 / 16));
 const AUTOPLAY_INTERVAL_MS = 4000; 
 
 interface HeroBannerCarouselProps {
@@ -70,6 +71,14 @@ function HeroSlideItem({ item, index, scrollX, onPress }: SlideItemProps) {
         </Animated.View>
       </View>
 
+      {/* Scrim keeps the title readable on bright, busy concert photos. */}
+      <LinearGradient
+        colors={['rgba(9,9,11,0)', 'rgba(9,9,11,0.55)', 'rgba(9,9,11,0.95)']}
+        locations={[0, 0.5, 1]}
+        style={styles.heroScrim}
+        pointerEvents="none"
+      />
+
       <View style={styles.heroContentOverlay}>
         <View style={styles.heroBadgeRow}>
           <View style={styles.heroUrgentBadge}>
@@ -83,8 +92,11 @@ function HeroSlideItem({ item, index, scrollX, onPress }: SlideItemProps) {
           )}
         </View>
 
-        <Text style={styles.heroTitle} numberOfLines={1}>
+        <Text style={styles.heroTitle} numberOfLines={2}>
           {item.title}
+        </Text>
+        <Text style={styles.heroMeta} numberOfLines={1}>
+          {[formatEventDate(item.dateTime).full, item.artist?.name].filter(Boolean).join(' · ')}
         </Text>
       </View>
     </TouchableOpacity>
@@ -262,9 +274,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  heroScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '70%',
+  },
   heroContentOverlay: {
     position: 'absolute',
-    bottom: 12,
+    bottom: 22,
     left: 16,
     right: 16,
   },
@@ -272,7 +291,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   heroUrgentBadge: {
     flexDirection: 'row',
@@ -304,17 +323,24 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#FAFAFA',
-    fontSize: 15,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: '900',
-    letterSpacing: -0.2,
+    letterSpacing: -0.4,
     textShadowColor: 'rgba(0, 0, 0, 0.9)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
   },
+  heroMeta: {
+    color: '#D4D4D8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
   heroDotsOverlay: {
     position: 'absolute',
-    bottom: 8,
-    right: 16,
+    bottom: 10,
+    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,

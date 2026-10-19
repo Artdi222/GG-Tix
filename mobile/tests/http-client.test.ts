@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { createHttpClient } from '../src/services/http-client';
+import { createHttpClient, withTimeout } from '../src/services/http-client';
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 function harness(send: typeof fetch) {
   let state = { token: 'old', refreshToken: 'refresh', revision: 1 } as { token: string | null; refreshToken: string | null; revision: number };
@@ -41,5 +41,22 @@ describe('session refresh', () => {
     await expect(h.request('/tickets')).rejects.toThrow(); expect(h.session.snapshot().token).toBeNull();
     const forbidden = harness((async () => json({}, 403)) as typeof fetch);
     await expect(forbidden.request('/tickets')).rejects.toThrow(); expect(forbidden.session.snapshot().token).toBe('old');
+  });
+});
+
+describe('withTimeout', () => {
+  test('still times out when the caller passes its own signal', async () => {
+    const caller = new AbortController();
+    const signal = withTimeout(caller.signal, 20);
+    await new Promise(r => setTimeout(r, 40));
+    expect(signal.aborted).toBe(true);
+    expect(caller.signal.aborted).toBe(false);
+  });
+
+  test('follows the caller abort immediately', () => {
+    const caller = new AbortController();
+    const signal = withTimeout(caller.signal, 10_000);
+    caller.abort();
+    expect(signal.aborted).toBe(true);
   });
 });

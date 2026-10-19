@@ -58,6 +58,8 @@ export default function EventDetailScreen() {
   const [loading, setLoading] = useState(Boolean(id));
   const [selectedCategory, setSelectedCategory] = useState<TicketCategoryItem | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -99,7 +101,8 @@ export default function EventDetailScreen() {
         })
         .catch((error: any) => {
           if (!isMounted) return;
-          Alert.alert('Error', error.message || 'Gagal memuat detail konser.');
+          // 404 has nothing to retry; the empty error falls through to the "not found" copy without a retry button.
+          setLoadError(error?.status === 404 ? '' : error.message || 'Gagal memuat detail konser.');
         })
         .finally(() => {
           if (!isMounted) return;
@@ -110,7 +113,7 @@ export default function EventDetailScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const maxAllowed = Math.min(
     event?.maxTicketsPerOrder || 4,
@@ -169,7 +172,7 @@ export default function EventDetailScreen() {
   };
 
   const handleCheckout = () => {
-    if (event?.maintenanceMode) return;
+    if (event?.maintenanceMode || event?.status !== 'open') return;
     if (!selectedCategory) {
       Alert.alert('Peringatan', 'Silakan pilih kategori tiket terlebih dahulu.');
       return;
@@ -186,12 +189,12 @@ export default function EventDetailScreen() {
     if (!token) {
       if (Platform.OS === 'web') {
         const toLogin = typeof window !== 'undefined' ? window.confirm('Silakan masuk atau daftar terlebih dahulu untuk membeli tiket.') : true;
-        if (toLogin) router.push('/auth/login');
+        if (toLogin) router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } });
         return;
       }
       Alert.alert('Perlu Masuk', 'Silakan masuk atau daftar terlebih dahulu untuk membeli tiket.', [
         { text: 'Batal', style: 'cancel' },
-        { text: 'Masuk', onPress: () => router.push('/auth/login') },
+        { text: 'Masuk', onPress: () => router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } }) },
       ]);
       return;
     }
@@ -217,11 +220,39 @@ export default function EventDetailScreen() {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Asia/Jakarta',
       });
     } catch {
       return isoString;
     }
   };
+
+  if (!loading && !event) {
+    return (
+      <View style={[styles.centerContainer, { paddingHorizontal: 32 }]}>
+        <Ionicons name="cloud-offline-outline" size={40} color={BRAND_COLORS.textDim} />
+        <Text style={[styles.loadingText, { textAlign: 'center' }]}>{loadError || 'Konser tidak ditemukan atau sudah dihapus.'}</Text>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+          <TouchableOpacity
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            style={{ paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: BRAND_COLORS.borderMedium }}
+            accessibilityRole="button"
+          >
+            <Text style={{ color: BRAND_COLORS.textLight, fontWeight: '700' }}>Kembali</Text>
+          </TouchableOpacity>
+          {loadError ? (
+            <TouchableOpacity
+              onPress={() => { setLoadError(''); setLoading(true); setReloadKey((k) => k + 1); }}
+              style={{ paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: BRAND_COLORS.accent }}
+              accessibilityRole="button"
+            >
+              <Text style={{ color: '#09090B', fontWeight: '800' }}>Coba Lagi</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
 
   if (loading || !event) {
     return (
@@ -247,6 +278,8 @@ export default function EventDetailScreen() {
   }).format(totalPrice);
 
   const posterUri = getPosterImage(event as any);
+  const salesClosed = event.status !== 'open';
+  const checkoutBlocked = event.maintenanceMode || salesClosed || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0;
 
   return (
     <View style={styles.container}>
@@ -299,10 +332,17 @@ export default function EventDetailScreen() {
               </View>
             )}
 
-            <View style={styles.statusOpenBadge}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusOpenText}>Tiket Tersedia</Text>
-            </View>
+            {salesClosed ? (
+              <View style={[styles.statusOpenBadge, { backgroundColor: BRAND_COLORS.dangerBg, borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+                <View style={[styles.statusDot, { backgroundColor: BRAND_COLORS.danger }]} />
+                <Text style={[styles.statusOpenText, { color: BRAND_COLORS.danger }]}>Penjualan Ditutup</Text>
+              </View>
+            ) : (
+              <View style={styles.statusOpenBadge}>
+                <View style={styles.statusDot} />
+                <Text style={styles.statusOpenText}>Tiket Tersedia</Text>
+              </View>
+            )}
           </View>
 
           <Text style={styles.title}>{event.title}</Text>
@@ -466,12 +506,11 @@ export default function EventDetailScreen() {
           <TouchableOpacity
             style={[
               styles.checkoutBtn,
-              (event?.maintenanceMode || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0) &&
-                styles.checkoutBtnDisabled,
+              checkoutBlocked && styles.checkoutBtnDisabled,
             ]}
-            disabled={event?.maintenanceMode || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0}
+            disabled={checkoutBlocked}
             onPressIn={() => {
-              if (selectedCategory && Number(selectedCategory.quotaRemaining) > 0) {
+              if (!checkoutBlocked) {
                 checkoutScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
               }
             }}
@@ -481,9 +520,9 @@ export default function EventDetailScreen() {
             onPress={handleCheckout}
             activeOpacity={1}
             accessibilityRole="button"
-            accessibilityLabel={event?.maintenanceMode ? "Pemesanan ditutup sementara" : "Beli Tiket Sekarang"}
+            accessibilityLabel={event?.maintenanceMode || salesClosed ? 'Pemesanan ditutup' : 'Beli Tiket Sekarang'}
           >
-            <Text style={styles.checkoutBtnText}>{event?.maintenanceMode ? 'Pemesanan Ditutup' : 'Lanjut Checkout'}</Text>
+            <Text style={styles.checkoutBtnText}>{event?.maintenanceMode || salesClosed ? 'Pemesanan Ditutup' : 'Lanjut Checkout'}</Text>
             <Ionicons name="arrow-forward" size={16} color="#09090B" />
           </TouchableOpacity>
         </Animated.View>

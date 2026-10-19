@@ -78,6 +78,7 @@ export function TicketQRCode({
     if (!iso) return '';
     try {
       return new Date(iso).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta',
         day: 'numeric',
         month: 'short',
         year: 'numeric',

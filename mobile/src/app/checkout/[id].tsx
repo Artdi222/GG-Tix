@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,8 +9,9 @@ import {
   Alert,
   Platform,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { paymentReturnBase } from '../../services/payment';
@@ -34,18 +35,40 @@ export default function CheckoutScreen() {
 
   const [loading, setLoading] = useState(false);
   const [eventData, setEventData] = useState<any>(null);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  // State updates land on the next render, so two fast taps would both pass a state check.
+  const submittingRef = useRef(false);
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const authReady = useAuthStore((state) => state.isInitialized);
 
   const payButtonScale = useSharedValue(1);
   const payButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: payButtonScale.value }],
   }));
 
-  const quantity = parseInt(qty || '1', 10);
-  const unitPrice = Number(eventData?.ticketCategories?.find((category: { id: string }) => category.id === categoryId)?.price ?? price ?? 0);
+  // Route params come from deep links too, so clamp them to what the event allows.
+  const category = eventData?.ticketCategories?.find((c: { id: string }) => c.id === categoryId);
+  const maxQty = Math.max(1, Math.min(Number(eventData?.maxTicketsPerOrder) || 10, category ? Number(category.quotaRemaining) || 1 : 10));
+  const parsedQty = parseInt(qty || '1', 10);
+  const quantity = Number.isFinite(parsedQty) ? Math.min(Math.max(parsedQty, 1), maxQty) : 1;
+  const unitPrice = Number(category?.price ?? price ?? 0);
+  const blockedReason = !eventData
+    ? null
+    : !category
+      ? 'Kategori tiket tidak ditemukan. Kembali dan pilih ulang kategori.'
+      : eventData.status !== 'open'
+        ? 'Penjualan tiket untuk konser ini sudah ditutup.'
+        : Number(category.quotaRemaining) <= 0
+          ? 'Kategori tiket ini sudah habis.'
+          : eventData.maintenanceMode
+            ? 'Pemesanan sementara ditutup untuk pemeliharaan.'
+            : null;
+  const canPay = !!eventData && !blockedReason;
   const totalPrice = unitPrice * quantity;
 
   // Promo code & voucher discount state
@@ -69,14 +92,14 @@ export default function CheckoutScreen() {
           const data = res?.data || res;
           setEventData(data);
         })
-        .catch(() => {
-          
+        .catch((error: any) => {
+          if (isMounted) setLoadError(error.message || 'Gagal memuat detail konser.');
         });
     }
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const formattedUnitPrice = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -112,6 +135,7 @@ export default function CheckoutScreen() {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Asia/Jakarta',
       });
     } catch {
       return isoString;
@@ -170,8 +194,8 @@ export default function CheckoutScreen() {
   };
 
   const handlePay = async () => {
-    if (loading) return;
-    if (eventData?.maintenanceMode) { setPromoError('Pemesanan sementara ditutup untuk pemeliharaan.'); return; }
+    if (submittingRef.current || !canPay) return;
+    submittingRef.current = true;
 
     if (Platform.OS !== 'web') {
       try {
@@ -204,14 +228,19 @@ export default function CheckoutScreen() {
         Alert.alert('Gagal Memproses Pesanan', error.message || 'Terjadi kesalahan saat memproses checkout.');
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
   const posterUri = eventData ? getPosterImage(eventData) : null;
 
+  if (authReady && !token) {
+    return <Redirect href={{ pathname: '/auth/login', params: { redirect: `/event/${id}` } }} />;
+  }
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -228,6 +257,18 @@ export default function CheckoutScreen() {
           <Text style={styles.sslBadgeText}>256-BIT SSL</Text>
         </View>
       </View>
+
+      {loadError || blockedReason ? (
+        <View style={styles.blockedBanner}>
+          <Ionicons name="alert-circle" size={16} color={BRAND_COLORS.danger} />
+          <Text style={styles.blockedText}>{loadError || blockedReason}</Text>
+          {loadError ? (
+            <TouchableOpacity onPress={() => { setLoadError(''); setReloadKey((k) => k + 1); }} accessibilityRole="button">
+              <Text style={styles.blockedAction}>Coba lagi</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       <ScrollView
         contentContainerStyle={[
@@ -251,7 +292,7 @@ export default function CheckoutScreen() {
                 <Text style={styles.tierBadgeText}>{categoryName || 'General Admission'}</Text>
               </View>
               <Text style={styles.eventTitle} numberOfLines={2}>
-                {eventData?.title || 'Memuat Detail Konser...'}
+                {eventData?.title || (loadError ? 'Detail konser gagal dimuat' : 'Memuat detail konser…')}
               </Text>
               {eventData?.dateTime ? (
                 <View style={styles.eventMetaRow}>
@@ -338,7 +379,7 @@ export default function CheckoutScreen() {
               <View style={styles.promoInputRow}>
                 <TextInput
                   style={styles.promoInput}
-                  placeholder="KODE PROMO (Misal: EARLYBIRD)"
+                  placeholder="Kode promo"
                   placeholderTextColor="#71717A"
                   value={promoCodeInput}
                   onChangeText={(val) => setPromoCodeInput(val.toUpperCase())}
@@ -461,10 +502,10 @@ export default function CheckoutScreen() {
 
         <Animated.View style={payButtonAnimatedStyle}>
           <TouchableOpacity
-            style={[styles.payButton, loading && styles.payButtonDisabled]}
-            disabled={loading}
+            style={[styles.payButton, (loading || !canPay) && styles.payButtonDisabled]}
+            disabled={loading || !canPay}
             onPressIn={() => {
-              if (!loading) {
+              if (!loading && canPay) {
                 payButtonScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
               }
             }}
@@ -487,11 +528,35 @@ export default function CheckoutScreen() {
           </TouchableOpacity>
         </Animated.View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  blockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: BRAND_COLORS.dangerBg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  blockedText: {
+    flex: 1,
+    color: '#FCA5A5',
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  blockedAction: {
+    color: BRAND_COLORS.accent,
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
   container: {
     flex: 1,
     backgroundColor: '#09090B',

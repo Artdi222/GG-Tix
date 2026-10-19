@@ -38,6 +38,10 @@ export interface EventItem {
     city: string;
     address?: string;
   } | null;
+  /** List endpoint only: totals and starting price across categories. */
+  capacity?: number;
+  sold?: number;
+  minPrice?: number | null;
   ticketCategories?: {
     id: string;
     name: string;
@@ -65,8 +69,10 @@ export function getPosterImage(event: EventItem): string {
   if (event.imageUrl && event.imageUrl.trim().startsWith('http')) {
     return event.imageUrl.trim();
   }
-  const index = Math.abs(event.title.length) % FALLBACK_POSTERS.length;
-  return FALLBACK_POSTERS[index];
+  // Hash the id so neighbouring events don't all land on the same stock photo.
+  let hash = 0;
+  for (const ch of event.id ?? event.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return FALLBACK_POSTERS[Math.abs(hash) % FALLBACK_POSTERS.length];
 }
 
 export function formatRupiah(val?: string | number | null): string {
@@ -82,11 +88,12 @@ export function formatEventDate(isoString?: string): { day: string; month: strin
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return { day: '-', month: '-', time: '', full: '-', weekday: '-' };
 
-    const day = d.toLocaleDateString('id-ID', { day: '2-digit' });
-    const month = d.toLocaleDateString('id-ID', { month: 'short' }).toUpperCase();
-    const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    const weekday = d.toLocaleDateString('id-ID', { weekday: 'short' }).toUpperCase();
+    const day = d.toLocaleDateString('id-ID', { day: '2-digit', timeZone: 'Asia/Jakarta' });
+    const month = d.toLocaleDateString('id-ID', { month: 'short', timeZone: 'Asia/Jakarta' }).toUpperCase();
+    const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+    const weekday = d.toLocaleDateString('id-ID', { weekday: 'short', timeZone: 'Asia/Jakarta' }).toUpperCase();
     const full = d.toLocaleDateString('id-ID', {
+      timeZone: 'Asia/Jakarta',
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -101,7 +108,7 @@ export function formatEventDate(isoString?: string): { day: string; month: strin
 
 export function getLowestPrice(event: EventItem): string {
   if (!event.ticketCategories || event.ticketCategories.length === 0) {
-    return 'Cek Tiket';
+    return event.minPrice != null ? formatRupiah(event.minPrice) : 'Cek Tiket';
   }
   const prices = event.ticketCategories
     .map((c) => (typeof c.price === 'string' ? parseFloat(c.price) : c.price))
@@ -123,11 +130,11 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(MOTION_TOKENS.pressScale.card, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(MOTION_TOKENS.pressScale.card, MOTION_TOKENS.springSnappy));
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, MOTION_TOKENS.springSnappy);
+    scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
   };
 
   const dateInfo = formatEventDate(event.dateTime);
@@ -135,11 +142,12 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
   const posterUri = imageError ? FALLBACK_POSTERS[0] : getPosterImage(event);
 
   const isSoldOut =
-    event.ticketCategories &&
+    (event.capacity !== undefined && event.capacity > 0 && (event.sold ?? 0) >= event.capacity) ||
+    (event.ticketCategories &&
     event.ticketCategories.length > 0 &&
     event.ticketCategories.every(
       (c) => c.quotaRemaining !== undefined && Number(c.quotaRemaining) <= 0
-    );
+    ));
 
   const handlePress = () => {
     if (Platform.OS !== 'web') {

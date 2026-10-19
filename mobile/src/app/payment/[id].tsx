@@ -17,6 +17,8 @@ export default function PaymentScreen() {
 
 function PaymentContent({ id, autoPay }: { id: string; autoPay?: string }) {
   const token = useAuthStore(state => state.token);
+  // Polling keys on having a session, not the token string, so a silent refresh doesn't restart it.
+  const hasSession = !!token;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [payment, setPayment] = useState<PaymentStatus | null>(null);
@@ -31,7 +33,7 @@ function PaymentContent({ id, autoPay }: { id: string; autoPay?: string }) {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const restartPolling = useCallback(() => { setPollingEnded(false); retry.current?.(); }, []);
   useFocusEffect(useCallback(() => {
-    if (!id || !token) return;
+    if (!id || !hasSession) return;
     let active = true;
     const poller = createPaymentPoller({
       request: signal => apiFetch<PaymentStatus>(`/payments/midtrans/${id}/sync`, { method: 'POST', signal }),
@@ -47,7 +49,7 @@ function PaymentContent({ id, autoPay }: { id: string; autoPay?: string }) {
       else poller.pause();
     });
     return () => { active = false; retry.current = null; poller.pause(); subscription.remove(); };
-  }, [id, token]));
+  }, [id, hasSession]));
 
   const continuePayment = useCallback(async () => {
     if (!id || openingRef.current) return;

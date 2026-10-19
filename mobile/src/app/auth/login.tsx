@@ -10,7 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, useLocalSearchParams, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/auth-store';
 import { apiFetch } from '../../services/api';
@@ -25,6 +25,9 @@ export default function LoginScreen() {
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const router = useRouter();
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
+  // Only in-app paths, so a crafted deep link can't bounce the user elsewhere.
+  const nextPath = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/(tabs)';
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const handleLogin = async () => {
@@ -43,7 +46,7 @@ export default function LoginScreen() {
 
       if (res.token && res.user) {
         await setAuth(res.token, res.user, res.refreshToken);
-        router.replace('/(tabs)');
+        router.replace(nextPath as any);
       } else {
         throw new Error('Format respon login tidak sesuai.');
       }
@@ -160,7 +163,7 @@ export default function LoginScreen() {
 
             <View style={styles.linkRow}>
               <Text style={styles.linkNormal}>Belum punya akun? </Text>
-              <Link href="/auth/register" asChild>
+              <Link href={{ pathname: "/auth/register", params: redirect ? { redirect } : {} }} asChild>
                 <TouchableOpacity>
                   <Text style={styles.linkHighlight}>Daftar Sekarang</Text>
                 </TouchableOpacity>

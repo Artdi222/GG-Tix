@@ -76,6 +76,7 @@ function TicketCard({ item, onPress }: TicketCardProps) {
     if (!isoString) return '';
     try {
       return new Date(isoString).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta',
         weekday: 'short',
         day: 'numeric',
         month: 'short',
@@ -282,7 +283,7 @@ export default function TicketsScreen() {
         </View>
       ) : (
         <FlatList
-          ListFooterComponent={data.page < data.totalPages ? <TouchableOpacity onPress={data.loadMore} disabled={loading} style={{ padding: 20, alignItems: 'center' }} accessibilityRole="button"><Text style={{ color: BRAND_COLORS.accent }}>{loading ? 'Memuat...' : 'Muat lebih banyak'}</Text></TouchableOpacity> : null}
+          ListFooterComponent={data.page < data.totalPages ? <TouchableOpacity onPress={data.loadMore} disabled={data.loadingMore} style={{ padding: 20, alignItems: 'center' }} accessibilityRole="button"><Text style={{ color: BRAND_COLORS.accent }}>{data.loadingMore ? 'Memuat...' : 'Muat lebih banyak'}</Text></TouchableOpacity> : null}
           data={filteredOrders}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
