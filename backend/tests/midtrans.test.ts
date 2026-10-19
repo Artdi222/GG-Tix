@@ -26,6 +26,9 @@ test('only transaction-not-found is treated as missing, gateway failures throw',
   process.env.MIDTRANS_SERVER_KEY = 'test-server-key';
   fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({status_code: '404'}, {status: 404}));
   expect(await midtrans.getTransactionStatus('example')).toBeNull();
+  // Midtrans v2 reports an unknown order as HTTP 200 with status_code "404".
+  fetchSpy.mockResolvedValue(Response.json({status_code: '404', status_message: "Transaction doesn't exist."}, {status: 200}));
+  expect(await midtrans.getTransactionStatus('example')).toBeNull();
   fetchSpy.mockResolvedValue(Response.json({status_code: '503'}, {status: 503}));
   await expect(midtrans.getTransactionStatus('example')).rejects.toThrow();
   fetchSpy.mockResolvedValue(Response.json({status_code: '401'}, {status: 401}));

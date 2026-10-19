@@ -1,5 +1,6 @@
 // src/lib/midtrans.ts
 import { timingSafeEqual } from "node:crypto";
+import { AppError } from "./errors";
 // Midtrans Snap API client & signature verification
 
 export interface SnapTransactionDetails {
@@ -112,10 +113,11 @@ export async function getTransactionStatus(orderId: string): Promise<MidtransWeb
     headers: { Accept: 'application/json', Authorization: `Basic ${Buffer.from(key + ':').toString('base64')}` },
     signal: AbortSignal.timeout(10000),
   });
-  const data = await response.json() as MidtransWebhookPayload;
-  if (response.status === 404 && data.status_code === '404') return null;
+  const data = await response.json().catch(() => ({})) as MidtransWebhookPayload;
+  // The v2 status API answers an unknown order with HTTP 200 and status_code "404" in the body.
+  if (data.status_code === '404') return null;
   if (!response.ok || !data.transaction_status || !data.order_id) {
-    throw new Error(`Gagal memeriksa pembayaran di Midtrans (HTTP ${response.status}). Coba lagi.`);
+    throw new AppError('Status pembayaran belum dapat diperiksa ke Midtrans. Coba lagi sebentar.', 502);
   }
   return data;
 }
