@@ -47,13 +47,13 @@ const deltaState = computed(() => {
     />
     <p
       v-else
-      class="mt-2 text-[26px] leading-tight font-semibold tracking-tight text-highlighted tabular-nums truncate"
+      class="mt-2 text-lg sm:text-[26px] leading-tight font-semibold tracking-tight text-highlighted tabular-nums truncate"
     >
       {{ value }}
     </p>
     <div
       v-if="!loading && (deltaState || hint)"
-      class="mt-2 flex items-center gap-2 min-w-0 text-xs"
+      class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-xs"
     >
       <span
         v-if="deltaState"
@@ -68,7 +68,7 @@ const deltaState = computed(() => {
       </span>
       <span
         v-if="hint"
-        class="text-dimmed truncate"
+        class="text-dimmed truncate max-w-full"
       >{{ hint }}</span>
     </div>
   </UCard>

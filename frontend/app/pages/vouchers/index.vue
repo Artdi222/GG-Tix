@@ -163,7 +163,7 @@ function afterSave() {
     </template>
 
     <template #body>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-3 max-sm:*:last:col-span-2 gap-3">
         <StatCard
           label="Voucher aktif"
           :value="formatNumber(stats?.activeVouchers)"

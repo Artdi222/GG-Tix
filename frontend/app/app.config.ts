@@ -23,6 +23,14 @@ export default defineAppConfig({
         body: 'min-h-0 *:shrink-0'
       }
     },
+    // On phones the toolbar wraps: search takes a full row and filters share the next one.
+    dashboardToolbar: {
+      slots: {
+        root: 'max-sm:flex-wrap max-sm:py-2 gap-2',
+        left: 'min-w-0 max-sm:w-full max-sm:overflow-x-auto max-sm:*:flex-1 max-sm:*:min-w-0',
+        right: 'max-sm:w-full max-sm:*:flex-1 max-sm:*:min-w-0'
+      }
+    },
     dashboardSidebar: {
       variants: { side: { left: { root: 'border-e-0' } } }
     },

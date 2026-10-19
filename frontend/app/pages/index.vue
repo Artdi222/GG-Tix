@@ -259,7 +259,7 @@ function occupancyColor(pct: number) {
         </p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard
           label="Pendapatan"
           :value="formatIDR(summary?.overview.totalRevenue ?? 0)"
