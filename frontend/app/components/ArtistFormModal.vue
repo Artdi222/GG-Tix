@@ -57,7 +57,7 @@ async function submit() {
       >
         <UFormField
           label="Foto"
-          hint="1:1"
+          help="1:1"
         >
           <ImageField
             v-model="state.photoUrl"

@@ -103,7 +103,6 @@ async function submit() {
         </div>
         <UFormField
           label="Denah / foto venue"
-          hint="Opsional"
         >
           <ImageField
             v-model="state.imageUrl"

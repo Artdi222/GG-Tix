@@ -288,7 +288,7 @@ watch(tab, (t) => {
               <div class="grid sm:grid-cols-2 gap-4">
                 <UFormField
                   label="Kata sandi baru"
-                  hint="Min. 8 karakter"
+                  help="Min. 8 karakter"
                 >
                   <UInput
                     v-model="pw.newPassword"
@@ -409,7 +409,7 @@ watch(tab, (t) => {
               <div class="grid sm:grid-cols-2 gap-4">
                 <UFormField
                   label="Default maks. tiket per pesanan"
-                  hint="1–10"
+                  help="1–10"
                 >
                   <UInputNumber
                     v-model="settings.defaultMaxTicketsPerOrder"
@@ -420,7 +420,7 @@ watch(tab, (t) => {
                 </UFormField>
                 <UFormField
                   label="Batas waktu pembayaran (menit)"
-                  hint="5–120"
+                  help="5–120"
                 >
                   <UInputNumber
                     v-model="settings.pendingOrderExpiryMinutes"

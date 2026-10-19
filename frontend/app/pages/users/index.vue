@@ -359,7 +359,7 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
             <UFormField
               :label="editing ? 'Password baru' : 'Password'"
               :required="!editing"
-              :hint="editing ? 'Kosongkan jika tidak diubah' : 'Minimal 8 karakter'"
+              :help="editing ? 'Kosongkan jika tidak diubah' : 'Minimal 8 karakter'"
             >
               <UInput
                 v-model="form.password"
@@ -370,7 +370,7 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
             </UFormField>
             <UFormField
               label="Role"
-              :hint="isSelf ? 'Role akun sendiri tidak dapat diubah' : undefined"
+              :help="isSelf ? 'Role akun sendiri tidak dapat diubah' : undefined"
             >
               <USelect
                 v-model="form.role"

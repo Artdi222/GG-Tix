@@ -145,7 +145,7 @@ async function submit() {
           <UFormField
             label="Kode"
             required
-            :hint="isEdit ? 'Tidak dapat diubah' : undefined"
+            :help="isEdit ? 'Tidak dapat diubah' : undefined"
           >
             <UInput
               v-model="state.code"
@@ -197,7 +197,6 @@ async function submit() {
           <UFormField
             v-if="state.discountType === 'percentage'"
             label="Maks. potongan (Rp)"
-            hint="Opsional"
           >
             <UInputNumber
               v-model="state.maxDiscountAmount"
@@ -217,7 +216,7 @@ async function submit() {
           <UFormField
             label="Kuota total"
             required
-            :hint="isEdit ? `${used} terpakai` : undefined"
+            :help="isEdit ? `${used} terpakai` : undefined"
           >
             <UInputNumber
               v-model="state.quotaTotal"
@@ -246,7 +245,7 @@ async function submit() {
         <div class="grid sm:grid-cols-2 gap-4">
           <UFormField
             label="Mulai"
-            hint="Kosong = langsung berlaku"
+            help="Kosong = langsung berlaku"
           >
             <UInput
               v-model="state.startDate"

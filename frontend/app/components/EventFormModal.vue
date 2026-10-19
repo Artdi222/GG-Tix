@@ -190,7 +190,7 @@ async function submit() {
           </UFormField>
           <UFormField
             label="Maks. tiket per pesanan"
-            hint="1–10, kosong = default"
+            help="1–10, kosong = default"
           >
             <UInputNumber
               v-model="state.maxTicketsPerOrder"
@@ -212,7 +212,6 @@ async function submit() {
           </UFormField>
           <UFormField
             label="Selesai"
-            hint="Opsional"
           >
             <UInput
               v-model="state.endDateTime"
@@ -234,7 +233,7 @@ async function submit() {
 
         <UFormField
           label="Tag"
-          hint="Tekan Enter untuk menambah"
+          help="Tekan Enter untuk menambah"
         >
           <UInputTags
             v-model="state.tags"
@@ -253,7 +252,7 @@ async function submit() {
           </UFormField>
           <UFormField
             label="Urutan tampil"
-            hint="Angka kecil tampil lebih dulu"
+            help="Angka kecil tampil lebih dulu"
           >
             <UInputNumber
               v-model="state.sortOrder"
@@ -272,7 +271,6 @@ async function submit() {
           </UFormField>
           <UFormField
             label="Seatmap"
-            hint="Opsional"
           >
             <ImageField
               v-model="state.seatmapUrl"

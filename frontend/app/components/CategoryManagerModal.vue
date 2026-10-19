@@ -139,7 +139,7 @@ async function remove(category: Category) {
           <UFormField
             label="Kuota"
             required
-            :hint="editing ? `${sold(editing)} terjual` : undefined"
+            :help="editing ? `${sold(editing)} terjual` : undefined"
           >
             <UInputNumber
               v-model="form.quotaTotal"
@@ -150,7 +150,7 @@ async function remove(category: Category) {
         </div>
         <UFormField
           label="Benefit"
-          hint="Tekan Enter untuk menambah"
+          help="Tekan Enter untuk menambah"
         >
           <UInputTags
             v-model="form.benefits"
