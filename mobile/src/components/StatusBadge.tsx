@@ -10,52 +10,52 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
   let label = status;
-  let dotColor = '#9CA3AF';
+  let dotColor = '#71717A';
   let badgeStyle = styles.badgeGray;
-  let textColor = '#E5E7EB';
+  let textColor = '#27272A';
 
   switch (status) {
     case 'verified':
       label = 'Berhasil ✓';
-      dotColor = '#10B981';
+      dotColor = '#059669';
       badgeStyle = styles.badgeGreen;
-      textColor = '#34D399';
+      textColor = '#059669';
       break;
     case 'pending':
       label = 'Menunggu Pembayaran';
-      dotColor = '#F59E0B';
+      dotColor = '#D97706';
       badgeStyle = styles.badgeYellow;
-      textColor = '#FBBF24';
+      textColor = '#B45309';
       break;
     case 'rejected':
       label = 'Pembayaran Ditolak';
-      dotColor = '#EF4444';
+      dotColor = '#DC2626';
       badgeStyle = styles.badgeRed;
-      textColor = '#F87171';
+      textColor = '#DC2626';
       break;
     case 'expired':
       label = 'Kadaluwarsa';
-      dotColor = '#9CA3AF';
+      dotColor = '#71717A';
       badgeStyle = styles.badgeGray;
-      textColor = '#D1D5DB';
+      textColor = '#3F3F46';
       break;
     case 'checked_in':
       label = 'Sudah Masuk Venue';
-      dotColor = '#38BDF8';
+      dotColor = '#0284C7';
       badgeStyle = styles.badgeBlue;
-      textColor = '#7DD3FC';
+      textColor = '#0369A1';
       break;
     case 'open':
       label = 'Tiket Tersedia';
-      dotColor = '#10B981';
+      dotColor = '#059669';
       badgeStyle = styles.badgeGreen;
-      textColor = '#34D399';
+      textColor = '#059669';
       break;
     case 'closed':
       label = 'Penjualan Ditutup';
-      dotColor = '#EF4444';
+      dotColor = '#DC2626';
       badgeStyle = styles.badgeRed;
-      textColor = '#F87171';
+      textColor = '#DC2626';
       break;
     default:
       label = status;
@@ -120,11 +120,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.35)',
   },
   badgeBlue: {
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
-    borderColor: 'rgba(56, 189, 248, 0.35)',
+    backgroundColor: 'rgba(2, 132, 199, 0.12)',
+    borderColor: 'rgba(2, 132, 199, 0.35)',
   },
   badgeGray: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(24, 24, 27, 0.06)',
+    borderColor: 'rgba(24, 24, 27, 0.12)',
   },
 });

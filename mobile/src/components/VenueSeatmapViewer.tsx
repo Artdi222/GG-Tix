@@ -104,7 +104,7 @@ export function VenueSeatmapViewer({
       <View style={styles.stageAnchor}>
         <View style={styles.stageGlowLine} />
         <View style={styles.stagePill}>
-          <Ionicons name="sparkles" size={11} color="#09090B" />
+          <Ionicons name="sparkles" size={11} color="#FFFFFF" />
           <Text style={styles.stageText}>STAGE / PANGGUNG UTAMA</Text>
         </View>
       </View>
@@ -123,11 +123,11 @@ export function VenueSeatmapViewer({
 
         <View style={styles.overlayBar}>
           <View style={styles.helperTag}>
-            <Ionicons name="finger-print-outline" size={13} color="#FAFAFA" />
+            <Ionicons name="finger-print-outline" size={13} color="#18181B" />
             <Text style={styles.helperText}>Ketuk untuk perbesar & lihat detail zona</Text>
           </View>
           <View style={styles.zoomBadge}>
-            <Ionicons name="search" size={13} color="#FAFAFA" />
+            <Ionicons name="search" size={13} color="#18181B" />
           </View>
         </View>
       </TouchableOpacity>
@@ -159,7 +159,7 @@ export function VenueSeatmapViewer({
                   key={cat.id}
                   style={[
                     styles.legendChip,
-                    isSelected && { borderColor: color, backgroundColor: 'rgba(255,255,255,0.06)' },
+                    isSelected && { borderColor: color, backgroundColor: 'rgba(24, 24, 27,0.06)' },
                   ]}
                   onPress={() => onSelectCategory && onSelectCategory(cat)}
                   activeOpacity={0.7}
@@ -187,7 +187,7 @@ export function VenueSeatmapViewer({
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <StatusBar barStyle="light-content" backgroundColor="#09090B" />
+          <StatusBar barStyle="dark-content" backgroundColor="#F6F6F8" />
 
           <View style={styles.modalHeader}>
             <TouchableOpacity
@@ -196,7 +196,7 @@ export function VenueSeatmapViewer({
               accessibilityRole="button"
               accessibilityLabel="Tutup denah"
             >
-              <Ionicons name="close" size={20} color="#FAFAFA" />
+              <Ionicons name="close" size={20} color="#18181B" />
             </TouchableOpacity>
 
             <View style={styles.modalTitleWrap}>
@@ -211,7 +211,7 @@ export function VenueSeatmapViewer({
 
           <View style={styles.modalStageAnchor}>
             <View style={styles.stagePill}>
-              <Ionicons name="sparkles" size={11} color="#09090B" />
+              <Ionicons name="sparkles" size={11} color="#FFFFFF" />
               <Text style={styles.stageText}>STAGE / PANGGUNG UTAMA</Text>
             </View>
           </View>
@@ -256,7 +256,7 @@ export function VenueSeatmapViewer({
                       key={`modal-${cat.id}`}
                       style={[
                         styles.modalCatChip,
-                        isSelected && { borderColor: color, backgroundColor: 'rgba(255,255,255,0.1)' },
+                        isSelected && { borderColor: color, backgroundColor: 'rgba(24, 24, 27,0.1)' },
                       ]}
                       onPress={() => {
                         if (onSelectCategory) onSelectCategory(cat);
@@ -292,12 +292,12 @@ export function VenueSeatmapViewer({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   headerRow: {
     flexDirection: 'row',
@@ -313,19 +313,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.2,
   },
   expandButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(124, 58, 237, 0.25)',
   },
   expandButtonText: {
     color: BRAND_COLORS.accent,
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   stageText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.8,
@@ -372,10 +372,10 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     position: 'relative',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   mapImage: {
     width: '100%',
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopColor: 'rgba(24, 24, 27, 0.08)',
   },
   helperTag: {
     flexDirection: 'row',
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   helperText: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 11,
     fontWeight: '500',
   },
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -417,11 +417,11 @@ const styles = StyleSheet.create({
 
   selectedPositionCard: {
     marginTop: 12,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(124, 58, 237, 0.3)',
   },
   positionHeaderRow: {
     flexDirection: 'row',
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   positionDescription: {
-    color: '#D4D4D8',
+    color: '#3F3F46',
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#27272A',
+    borderTopColor: '#E4E4E7',
   },
   legendHeader: {
     color: '#71717A',
@@ -471,12 +471,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   colorIndicator: {
     width: 8,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   legendName: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
 
   modalContainer: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -501,15 +501,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 40 : 54,
     paddingBottom: 14,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    borderBottomColor: '#E4E4E7',
   },
   modalCloseBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   modalTitle: {
-    color: '#FAFAFA',
+    color: '#18181B',
     fontSize: 15,
     fontWeight: '800',
   },
@@ -531,13 +531,13 @@ const styles = StyleSheet.create({
   modalStageAnchor: {
     alignItems: 'center',
     paddingVertical: 10,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    borderBottomColor: '#E4E4E7',
   },
   modalScrollView: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   modalScrollContent: {
     minHeight: SCREEN_HEIGHT * 0.55,
@@ -550,10 +550,10 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 0.5,
   },
   modalFooter: {
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#27272A',
+    borderTopColor: '#E4E4E7',
   },
   zoomHintRow: {
     flexDirection: 'row',
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   zoomHintText: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 12,
     fontWeight: '500',
   },
@@ -575,15 +575,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   modalCatName: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalConfirmBtnText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },

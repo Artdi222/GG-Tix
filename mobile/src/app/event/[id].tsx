@@ -246,7 +246,7 @@ export default function EventDetailScreen() {
               style={{ paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: BRAND_COLORS.accent }}
               accessibilityRole="button"
             >
-              <Text style={{ color: '#09090B', fontWeight: '800' }}>Coba Lagi</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Coba Lagi</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -291,7 +291,7 @@ export default function EventDetailScreen() {
           accessibilityLabel="Kembali"
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
+          <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -301,7 +301,7 @@ export default function EventDetailScreen() {
           accessibilityLabel="Bagikan event"
           activeOpacity={0.7}
         >
-          <Ionicons name="share-social-outline" size={19} color="#FAFAFA" />
+          <Ionicons name="share-social-outline" size={19} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
@@ -455,7 +455,7 @@ export default function EventDetailScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Kurangi jumlah tiket"
                   >
-                    <Ionicons name="remove" size={20} color="#FAFAFA" />
+                    <Ionicons name="remove" size={20} color="#18181B" />
                   </TouchableOpacity>
                 </Animated.View>
 
@@ -470,7 +470,7 @@ export default function EventDetailScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Tambah jumlah tiket"
                   >
-                    <Ionicons name="add" size={20} color="#FAFAFA" />
+                    <Ionicons name="add" size={20} color="#18181B" />
                   </TouchableOpacity>
                 </Animated.View>
               </View>
@@ -493,7 +493,7 @@ export default function EventDetailScreen() {
         ]}
       >
         <View style={styles.footerPriceCol}>
-          <Text style={styles.footerPriceLabel}>Total Pembayaran ({quantity} Tiket)</Text>
+          <Text style={styles.footerPriceLabel} numberOfLines={1}>Total · {quantity} tiket</Text>
           <Text style={styles.footerPriceValue}>{formattedTotalPrice}</Text>
           {selectedCategory && (
             <Text style={styles.footerCategoryBadge} numberOfLines={1}>
@@ -523,7 +523,7 @@ export default function EventDetailScreen() {
             accessibilityLabel={event?.maintenanceMode || salesClosed ? 'Pemesanan ditutup' : 'Beli Tiket Sekarang'}
           >
             <Text style={styles.checkoutBtnText}>{event?.maintenanceMode || salesClosed ? 'Pemesanan Ditutup' : 'Lanjut Checkout'}</Text>
-            <Ionicons name="arrow-forward" size={16} color="#09090B" />
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -534,13 +534,13 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     gap: 12,
   },
   loadingText: {
@@ -561,11 +561,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(9, 9, 11, 0.85)',
+    backgroundColor: 'rgba(9, 9, 11, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   scrollContent: {
     paddingBottom: 24,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 250,
     position: 'relative',
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
   },
   coverImage: {
     width: '100%',
@@ -593,12 +593,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#1E1E24',
+    backgroundColor: BRAND_COLORS.accentGlow,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: BRAND_COLORS.borderGold,
   },
   publisherText: {
     color: BRAND_COLORS.accent,
@@ -631,19 +631,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
     lineHeight: 28,
     marginBottom: 16,
     letterSpacing: -0.4,
   },
 
   infoCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   infoRow: {
     flexDirection: 'row',
@@ -654,11 +654,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   infoLabel: {
     fontSize: 11,
@@ -669,16 +669,16 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   infoSub: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     marginTop: 2,
   },
   infoDivider: {
     height: 1,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     marginVertical: 12,
   },
 
@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.2,
   },
   categoryCount: {
@@ -703,14 +703,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   artistCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   artistPhoto: {
     width: 56,
@@ -722,17 +722,17 @@ const styles = StyleSheet.create({
   artistName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     marginBottom: 2,
   },
   artistBio: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     lineHeight: 16,
   },
   descriptionText: {
     fontSize: 13,
-    color: '#D4D4D8',
+    color: '#3F3F46',
     lineHeight: 20,
     marginTop: 8,
   },
@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
   },
 
   stepperSection: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -752,12 +752,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   stepperLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   stepperSub: {
     fontSize: 11,
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -783,7 +783,7 @@ const styles = StyleSheet.create({
   qtyText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     minWidth: 24,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
@@ -794,9 +794,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#27272A',
+    borderTopColor: '#E4E4E7',
     paddingHorizontal: 16,
     paddingTop: 12,
     flexDirection: 'row',
@@ -822,7 +822,7 @@ const styles = StyleSheet.create({
   },
   footerCategoryBadge: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     marginTop: 2,
   },
   checkoutBtn: {
@@ -836,11 +836,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   checkoutBtnDisabled: {
-    backgroundColor: '#3F3F46',
+    backgroundColor: '#D4D4D8',
     opacity: 0.6,
   },
   checkoutBtnText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },

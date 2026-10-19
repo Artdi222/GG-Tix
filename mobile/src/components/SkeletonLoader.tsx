@@ -86,7 +86,7 @@ export function HomeSkeletonLoader() {
 
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: '#27272E',
+    backgroundColor: '#EDEDF0',
   },
   homeSkeletonContainer: {
     paddingHorizontal: 16,

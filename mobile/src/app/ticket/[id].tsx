@@ -93,7 +93,7 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
     return <View style={styles.centerContainer}>
       <Text style={styles.loadingText}>{error || 'Tiket belum tersedia.'}</Text>
       <TouchableOpacity onPress={() => { setData(null); setLoading(true); setError(''); setIsOffline(false); setAttempt(n => n + 1); }} style={{ padding: 16 }}><Text style={{ color: BRAND_COLORS.accent }}>Coba lagi</Text></TouchableOpacity>
-      <TouchableOpacity onPress={() => router.replace('/(tabs)/tickets')} style={{ padding: 16 }}><Text style={{ color: '#FAFAFA' }}>Kembali ke tiket saya</Text></TouchableOpacity>
+      <TouchableOpacity onPress={() => router.replace('/(tabs)/tickets')} style={{ padding: 16 }}><Text style={{ color: '#18181B' }}>Kembali ke tiket saya</Text></TouchableOpacity>
     </View>;
   }
   if (loading || !data) {
@@ -128,7 +128,7 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
             accessibilityLabel="Kembali ke daftar tiket"
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
+            <Ionicons name="arrow-back" size={20} color="#18181B" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>E-Ticket Digital</Text>
           <View style={styles.sslBadge}>
@@ -210,7 +210,7 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
@@ -238,16 +238,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.2,
   },
   sslBadge: {
@@ -289,9 +289,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     minHeight: 38,
     justifyContent: 'center',
   },
@@ -300,13 +300,13 @@ const styles = StyleSheet.create({
     borderColor: BRAND_COLORS.accent,
   },
   switcherTabText: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 12,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   switcherTabTextActive: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   errorText: {
@@ -319,11 +319,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     marginTop: 18,
     maxWidth: 360,
     width: '100%',
@@ -332,16 +332,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(124, 58, 237, 0.25)',
   },
   tipTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     marginBottom: 2,
   },
   tipText: {
@@ -353,10 +353,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(124, 58, 237, 0.25)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 12,

@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,18 +23,22 @@ function TabBarIcon({
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
+        // Each tab renders its own safe-area header, so the navigator header would only duplicate the title.
+        headerShown: false,
         tabBarActiveTintColor: BRAND_COLORS.accent,
         tabBarInactiveTintColor: '#71717A',
         tabBarStyle: {
-          backgroundColor: '#111114',
-          borderTopColor: '#27272A',
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E4E4E7',
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
+          // Grows with the home-indicator inset instead of clipping labels under it.
+          height: 66 + insets.bottom,
           paddingTop: 6,
+          paddingBottom: insets.bottom + 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -42,11 +47,11 @@ export default function TabLayout() {
           marginTop: 2,
         },
         headerStyle: {
-          backgroundColor: '#09090B',
-          borderBottomColor: '#27272A',
+          backgroundColor: '#F6F6F8',
+          borderBottomColor: '#E4E4E7',
           borderBottomWidth: 1,
         },
-        headerTintColor: '#FAFAFA',
+        headerTintColor: '#18181B',
         headerTitleStyle: {
           fontWeight: '800',
           fontSize: 17,

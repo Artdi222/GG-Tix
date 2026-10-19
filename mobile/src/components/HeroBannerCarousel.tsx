@@ -82,7 +82,7 @@ function HeroSlideItem({ item, index, scrollX, onPress }: SlideItemProps) {
       <View style={styles.heroContentOverlay}>
         <View style={styles.heroBadgeRow}>
           <View style={styles.heroUrgentBadge}>
-            <Ionicons name="sparkles" size={11} color="#09090B" />
+            <Ionicons name="sparkles" size={11} color="#FFFFFF" />
             <Text style={styles.heroUrgentText}>POPULER</Text>
           </View>
           {item.venue?.city && (
@@ -133,7 +133,7 @@ function MorphingPaginationDot({ index, scrollX }: PaginationDotProps) {
     return {
       width,
       opacity,
-      backgroundColor: opacity > 0.6 ? BRAND_COLORS.accent : '#FAFAFA',
+      backgroundColor: opacity > 0.6 ? BRAND_COLORS.accent : '#18181B',
     };
   });
 
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     height: HERO_BANNER_HEIGHT,
     position: 'relative',
     marginBottom: 20,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
   },
   heroSlide: {
     width: SCREEN_WIDTH,
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   heroUrgentText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.2,
@@ -314,15 +314,15 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   heroCityText: {
-    color: '#FAFAFA',
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
   },
   heroTitle: {
-    color: '#FAFAFA',
+    color: '#FFFFFF',
     fontSize: 20,
     lineHeight: 24,
     fontWeight: '900',
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 6,
   },
   heroMeta: {
-    color: '#D4D4D8',
+    color: '#E4E4E7',
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,

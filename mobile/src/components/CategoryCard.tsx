@@ -174,16 +174,16 @@ export function CategoryCard({ category, isSelected, onSelect }: CategoryCardPro
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   cardSelected: {
     borderColor: BRAND_COLORS.accent,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     shadowColor: BRAND_COLORS.accent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   cardSoldOut: {
     opacity: 0.45,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     marginBottom: 4,
     letterSpacing: -0.2,
   },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#71717A',
+    borderColor: '#A1A1AA',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -262,13 +262,13 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.accent,
   },
   soldOutBadge: {
-    backgroundColor: '#7F1D1D',
+    backgroundColor: '#FEE2E2',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
   },
   soldOutText: {
-    color: '#F87171',
+    color: '#DC2626',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   quotaText: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#52525B',
     fontVariant: ['tabular-nums'],
   },
   percentText: {
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   },
   progressBarTrack: {
     height: 5,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#27272A',
+    borderTopColor: '#E4E4E7',
     gap: 6,
   },
   benefitRow: {
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     fontSize: 12,
-    color: '#D4D4D8',
+    color: '#3F3F46',
     flex: 1,
   },
 });

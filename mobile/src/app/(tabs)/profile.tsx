@@ -209,7 +209,7 @@ export default function ProfileScreen() {
           accessibilityLabel="Masuk ke Akun"
         >
           <Text style={styles.loginBtnText}>Masuk ke Akun</Text>
-          <Ionicons name="arrow-forward" size={16} color="#09090B" />
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     );
@@ -288,7 +288,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {notice ? <Text style={{ color: '#F2A93B', padding: 16 }}>{notice}</Text> : null}
+        {notice ? <Text style={{ color: '#7C3AED', padding: 16 }}>{notice}</Text> : null}
         <View style={styles.menuCard}>
           <TouchableOpacity style={styles.menuItem} onPress={() => { setName(user?.name || ''); setEmail(user?.email || ''); setProfileError(''); setEditProfile(true); }} accessibilityRole="button">
             <Ionicons name="person-outline" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>Edit Profil</Text><Text style={styles.menuDesc}>Perbarui nama dan email akun</Text></View>
@@ -424,7 +424,7 @@ export default function ProfileScreen() {
           accessibilityRole="button"
           accessibilityLabel="Keluar dari Akun"
         >
-          <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+          <Ionicons name="log-out-outline" size={18} color="#DC2626" />
           <Text style={styles.logoutBtnText}>Keluar dari Akun</Text>
         </TouchableOpacity>
 
@@ -466,7 +466,7 @@ export default function ProfileScreen() {
                 onPress={() => setIsPasswordModalVisible(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={20} color="#A1A1AA" />
+                <Ionicons name="close" size={20} color="#52525B" />
               </TouchableOpacity>
             </View>
 
@@ -535,7 +535,7 @@ export default function ProfileScreen() {
                 disabled={passwordLoading}
               >
                 {passwordLoading ? (
-                  <ActivityIndicator size="small" color="#09090B" />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.modalSubmitText}>Simpan Sandi</Text>
                 )}
@@ -551,7 +551,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   header: {
     flexDirection: 'row',
@@ -559,14 +559,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     borderBottomWidth: 1,
-    borderBottomColor: '#16161A',
+    borderBottomColor: '#E4E4E7',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.3,
   },
   headerSub: {
@@ -597,11 +597,11 @@ const styles = StyleSheet.create({
   },
 
   profileCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     marginBottom: 20,
   },
   profileHeaderRow: {
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.2,
     marginBottom: 2,
   },
@@ -643,13 +643,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(124, 58, 237, 0.25)',
   },
   memberPillText: {
     color: BRAND_COLORS.accent,
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     marginVertical: 14,
   },
 
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     fontVariant: ['tabular-nums'],
   },
   summaryLabel: {
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
   },
 
   menuSection: {
@@ -699,14 +699,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#71717A',
     letterSpacing: 0.8,
+    marginTop: 24,
     marginBottom: 8,
     paddingLeft: 4,
   },
   menuCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     overflow: 'hidden',
   },
   menuItem: {
@@ -720,11 +721,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   menuTextCol: {
     flex: 1,
@@ -732,7 +733,7 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   menuDesc: {
     fontSize: 11,
@@ -741,7 +742,7 @@ const styles = StyleSheet.create({
   },
   menuDivider: {
     height: 1,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     marginLeft: 62,
   },
 
@@ -760,12 +761,12 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   logoutBtnText: {
-    color: '#EF4444',
+    color: '#DC2626',
     fontSize: 14,
     fontWeight: '700',
   },
   versionText: {
-    color: '#52525B',
+    color: '#A1A1AA',
     fontSize: 11,
     textAlign: 'center',
   },
@@ -780,17 +781,17 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(124, 58, 237, 0.25)',
     marginBottom: 4,
   },
   promptTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   promptSub: {
     color: '#71717A',
@@ -810,7 +811,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   loginBtnText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },
@@ -825,11 +826,11 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -841,18 +842,18 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#52525B',
     lineHeight: 17,
     marginBottom: 14,
   },
@@ -897,17 +898,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#A1A1AA',
+    color: '#52525B',
     marginBottom: 2,
   },
   modalInput: {
     height: 42,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     paddingHorizontal: 12,
-    color: '#FAFAFA',
+    color: '#18181B',
     fontSize: 13,
   },
   modalActions: {
@@ -919,10 +920,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
   },
   modalCancelText: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -936,7 +937,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalSubmitText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },

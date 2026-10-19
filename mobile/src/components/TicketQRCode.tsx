@@ -132,7 +132,7 @@ export function TicketQRCode({
             <QRCode
               value={ticket.qrCodeValue}
               size={220}
-              color="#09090B"
+              color="#FFFFFF"
               backgroundColor="#FFFFFF"
             />
           </View>
@@ -149,7 +149,7 @@ export function TicketQRCode({
           )}
 
           <View style={styles.brightnessHintRow}>
-            <Ionicons name="sunny-outline" size={12} color="#9CA3AF" />
+            <Ionicons name="sunny-outline" size={12} color="#71717A" />
             <Text style={styles.brightnessHintText}>
               Kecerahan layar otomatis dinaikkan untuk scan QR
             </Text>
@@ -177,10 +177,10 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   topSection: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     padding: 20,
     position: 'relative',
     overflow: 'hidden',
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     top: -80,
     width: 60,
     height: 300,
-    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    backgroundColor: 'rgba(124, 58, 237, 0.18)',
     shadowColor: BRAND_COLORS.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     lineHeight: 24,
     marginBottom: 6,
     letterSpacing: -0.2,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   venueName: {
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#52525B',
     marginBottom: 12,
     fontWeight: '500',
   },
@@ -235,12 +235,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   catBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: 'rgba(124, 58, 237, 0.35)',
   },
   catBadgeText: {
     color: BRAND_COLORS.accent,
@@ -261,9 +261,9 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     borderRightWidth: 1,
-    borderRightColor: '#27272A',
+    borderRightColor: '#E4E4E7',
   },
   cutoutRight: {
     position: 'absolute',
@@ -271,9 +271,9 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     borderLeftWidth: 1,
-    borderLeftColor: '#27272A',
+    borderLeftColor: '#E4E4E7',
   },
   dashedLine: {
     width: '80%',
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   },
   brightnessHintText: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: '#71717A',
     fontWeight: '500',
   },
 });

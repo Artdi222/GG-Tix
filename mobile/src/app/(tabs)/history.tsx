@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
+  ScrollView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -161,22 +162,23 @@ function OrderCardItem({ item, onPress }: OrderCardProps) {
         <View style={styles.divider} />
 
         <View style={styles.cardFooterRow}>
-          <View>
-            <Text style={styles.footerQuantity}>
+          {/* Shrinks before the action button so long dates never run under it on narrow phones. */}
+          <View style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+            <Text style={styles.footerQuantity} numberOfLines={1}>
               {item.quantity} Tiket • {formatCurrency(item.totalPrice)}
             </Text>
-            <Text style={styles.footerDate}>Dipesan: {formatDate(item.createdAt)}</Text>
+            <Text style={styles.footerDate} numberOfLines={1}>Dipesan {formatDate(item.createdAt)}</Text>
           </View>
 
           {isVerified ? (
             <View style={styles.qrActionBtn}>
-              <Ionicons name="qr-code" size={14} color="#09090B" />
+              <Ionicons name="qr-code" size={14} color="#FFFFFF" />
               <Text style={styles.qrActionText}>Buka E-Tiket</Text>
             </View>
           ) : (
             <View style={styles.detailActionBtn}>
               <Text style={styles.detailActionText}>Detail</Text>
-              <Ionicons name="chevron-forward" size={13} color="#A1A1AA" />
+              <Ionicons name="chevron-forward" size={13} color="#52525B" />
             </View>
           )}
         </View>
@@ -219,7 +221,7 @@ export default function HistoryScreen() {
           accessibilityLabel="Masuk ke akun"
         >
           <Text style={styles.loginBtnText}>Masuk ke Akun</Text>
-          <Ionicons name="arrow-forward" size={16} color="#09090B" />
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     );
@@ -237,7 +239,8 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      <View style={styles.filterContainer}>
+      {/* Scrolls sideways instead of squeezing four chips into a 320px screen. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.filterContainer}>
         {filterTabs.map((tab) => {
           const isActive = activeFilter === tab.key;
           return (
@@ -267,10 +270,10 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       {data.offline ? <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}><Text style={{ color: BRAND_COLORS.accent }}>Mode offline: menampilkan status pesanan terakhir yang tersimpan.</Text></View> : null}
-      {error ? <TouchableOpacity onPress={data.reload} style={{ padding: 16 }} accessibilityRole="button"><Text style={{ color: '#FCA5A5' }}>{error} Ketuk untuk coba lagi.</Text></TouchableOpacity> : null}
+      {error ? <TouchableOpacity onPress={data.reload} style={{ padding: 16 }} accessibilityRole="button"><Text style={{ color: '#B91C1C' }}>{error} Ketuk untuk coba lagi.</Text></TouchableOpacity> : null}
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={BRAND_COLORS.accent} />
@@ -318,7 +321,7 @@ export default function HistoryScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Jelajahi konser"
               >
-                <Ionicons name="musical-notes-outline" size={16} color="#09090B" />
+                <Ionicons name="musical-notes-outline" size={16} color="#FFFFFF" />
                 <Text style={styles.exploreBtnText}>Temukan Konser</Text>
               </TouchableOpacity>
             </View>
@@ -332,7 +335,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   header: {
     flexDirection: 'row',
@@ -340,14 +343,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     borderBottomWidth: 1,
-    borderBottomColor: '#16161A',
+    borderBottomColor: '#E4E4E7',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.3,
   },
   headerSub: {
@@ -356,15 +359,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   countBadge: {
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   countBadgeText: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 10,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
@@ -375,23 +378,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 6,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   filterChip: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
     minHeight: 40,
-    paddingHorizontal: 6,
+    paddingHorizontal: 14,
     borderRadius: 10,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   filterChipActive: {
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     borderColor: BRAND_COLORS.accent,
   },
   filterText: {
@@ -404,16 +406,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   filterCountDot: {
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 10,
   },
   filterCountDotActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
   },
   filterCountText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
     color: '#71717A',
     fontVariant: ['tabular-nums'],
@@ -437,12 +439,12 @@ const styles = StyleSheet.create({
   },
 
   orderCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -464,7 +466,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     marginVertical: 10,
   },
 
@@ -477,13 +479,13 @@ const styles = StyleSheet.create({
     width: 60,
     height: 82,
     borderRadius: 8,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
   },
   eventThumbPlaceholder: {
     width: 60,
     height: 82,
     borderRadius: 8,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -500,7 +502,7 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     lineHeight: 18,
     marginBottom: 6,
     letterSpacing: -0.2,
@@ -513,7 +515,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     fontWeight: '500',
   },
 
@@ -526,7 +528,7 @@ const styles = StyleSheet.create({
   footerQuantity: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     fontVariant: ['tabular-nums'],
   },
   footerDate: {
@@ -545,7 +547,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   qrActionText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 11,
   },
@@ -553,14 +555,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     minHeight: 36,
   },
   detailActionText: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -575,17 +577,17 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(124, 58, 237, 0.25)',
     marginBottom: 4,
   },
   promptTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   promptSub: {
     color: '#71717A',
@@ -605,7 +607,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   loginBtnText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },
@@ -620,16 +622,16 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   emptyText: {
     color: '#71717A',
@@ -649,7 +651,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   exploreBtnText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 13,
   },

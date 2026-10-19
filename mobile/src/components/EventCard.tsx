@@ -245,7 +245,7 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
         <View style={styles.rowContent}>
           <View style={styles.rowHeader}>
             <View style={styles.rowDatePill}>
-              <Ionicons name="calendar-outline" size={11} color="#F59E0B" />
+              <Ionicons name="calendar-outline" size={11} color="#7C3AED" />
               <Text style={styles.rowDateText}>{dateInfo.full}</Text>
             </View>
             {event.venue?.city ? (
@@ -262,7 +262,7 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
 
           {event.artist?.name ? (
             <View style={styles.rowArtistRow}>
-              <Ionicons name="mic-outline" size={12} color="#A1A1AA" />
+              <Ionicons name="mic-outline" size={12} color="#52525B" />
               <Text style={styles.rowArtistText} numberOfLines={1}>
                 {event.artist.name}
               </Text>
@@ -285,7 +285,7 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
               <Text style={[styles.actionButtonText, isSoldOut && styles.actionButtonTextSold]}>
                 {isSoldOut ? 'Habis' : 'Pilih Kursi'}
               </Text>
-              {!isSoldOut && <Ionicons name="chevron-forward" size={12} color="#09090B" />}
+              {!isSoldOut && <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />}
             </View>
           </View>
         </View>
@@ -297,17 +297,17 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
 const styles = StyleSheet.create({
   portraitContainer: {
     width: 148,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   portraitPosterWrapper: {
     width: '100%',
     height: 196,
     position: 'relative',
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
   },
   portraitPosterImage: {
     width: '100%',
@@ -347,10 +347,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   posterDateText: {
-    color: '#FAFAFA',
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
   },
@@ -360,13 +360,13 @@ const styles = StyleSheet.create({
   portraitTitle: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
     lineHeight: 17,
     marginBottom: 4,
   },
   portraitArtist: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     marginBottom: 8,
   },
   portraitBottomRow: {
@@ -378,36 +378,36 @@ const styles = StyleSheet.create({
   portraitPrice: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#F59E0B',
+    color: '#7C3AED',
   },
   portraitBuyPill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(124, 58, 237, 0.3)',
   },
   portraitBuyPillText: {
-    color: '#F59E0B',
+    color: '#7C3AED',
     fontSize: 10,
     fontWeight: '800',
   },
 
   rowContainer: {
     flexDirection: 'row',
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     marginBottom: 12,
   },
   rowPosterWrapper: {
     width: 105,
     height: 145,
     position: 'relative',
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
   },
   rowPosterImage: {
     width: '100%',
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rowSoldText: {
-    color: '#EF4444',
+    color: '#DC2626',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
   },
   rowDateText: {
     fontSize: 11,
-    color: '#F59E0B',
+    color: '#7C3AED',
     fontWeight: '700',
   },
   cityLocationRow: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
     lineHeight: 18,
     marginBottom: 2,
   },
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   rowArtistText: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     fontWeight: '500',
   },
   rowVenueText: {
@@ -497,22 +497,22 @@ const styles = StyleSheet.create({
   rowPrice: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#F59E0B',
+    color: '#7C3AED',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#7C3AED',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 6,
   },
   actionButtonSold: {
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
   },
   actionButtonText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '800',
   },

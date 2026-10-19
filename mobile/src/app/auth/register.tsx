@@ -72,7 +72,7 @@ export default function RegisterScreen() {
   ];
 
   const iconColor = (field: string) =>
-    focusedField === field ? '#F59E0B' : '#71717A';
+    focusedField === field ? '#7C3AED' : '#71717A';
 
   return (
     <KeyboardAvoidingView
@@ -98,7 +98,7 @@ export default function RegisterScreen() {
         <View style={styles.formArea}>
           {errorMsg ? (
             <View style={styles.errorBox}>
-              <Ionicons name="alert-circle" size={16} color="#EF4444" />
+              <Ionicons name="alert-circle" size={16} color="#DC2626" />
               <Text style={styles.errorText}>{errorMsg}</Text>
             </View>
           ) : null}
@@ -189,7 +189,7 @@ export default function RegisterScreen() {
               style={[styles.button, loading && styles.buttonDisabled]}
             >
               {loading ? (
-                <ActivityIndicator color="#09090B" size="small" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <Text style={styles.buttonText}>Daftar Sekarang</Text>
               )}
@@ -219,7 +219,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -228,9 +228,9 @@ const styles = StyleSheet.create({
     paddingTop: 56,
     paddingBottom: 24,
     paddingHorizontal: 24,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    borderBottomColor: '#E4E4E7',
   },
   logoRow: {
     flexDirection: 'row',
@@ -242,26 +242,26 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
   },
   brandTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: 2,
   },
   heroHeadline: {
     fontSize: 28,
     fontWeight: '400',
-    color: '#A1A1AA',
+    color: '#52525B',
     lineHeight: 34,
     marginBottom: 6,
   },
   heroHeadlineBold: {
     fontWeight: '900',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   subtitle: {
     fontSize: 13,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   errorText: {
-    color: '#F87171',
+    color: '#DC2626',
     fontSize: 13,
     flex: 1,
     lineHeight: 18,
@@ -297,28 +297,28 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: '#D4D4D8',
+    color: '#3F3F46',
     fontSize: 13,
     fontWeight: '600',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     paddingHorizontal: 12,
   },
   inputWrapperFocused: {
-    borderColor: '#F59E0B',
+    borderColor: '#7C3AED',
   },
   inputIcon: {
     marginRight: 8,
   },
   input: {
     flex: 1,
-    color: '#FAFAFA',
+    color: '#18181B',
     paddingVertical: 12,
     fontSize: 14,
   },
@@ -330,13 +330,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 10,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#7C3AED',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
   },
   dividerText: {
     color: '#71717A',
@@ -362,11 +362,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   linkNormal: {
-    color: '#A1A1AA',
+    color: '#52525B',
     fontSize: 13,
   },
   linkHighlight: {
-    color: '#F59E0B',
+    color: '#7C3AED',
     fontSize: 13,
     fontWeight: '700',
   },

@@ -249,7 +249,7 @@ export default function CheckoutScreen() {
           accessibilityLabel="Kembali ke detail konser"
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
+          <Ionicons name="arrow-back" size={20} color="#18181B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Konfirmasi Pembayaran</Text>
         <View style={styles.sslBadge}>
@@ -371,7 +371,7 @@ export default function CheckoutScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Hapus voucher promo"
               >
-                <Ionicons name="close" size={16} color="#A1A1AA" />
+                <Ionicons name="close" size={16} color="#52525B" />
               </TouchableOpacity>
             </View>
           ) : (
@@ -395,7 +395,7 @@ export default function CheckoutScreen() {
                   accessibilityLabel="Terapkan kode promo"
                 >
                   {isApplyingPromo ? (
-                    <ActivityIndicator size="small" color="#09090B" />
+                    <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <Text style={styles.promoApplyBtnText}>Terapkan</Text>
                   )}
@@ -518,11 +518,11 @@ export default function CheckoutScreen() {
             accessibilityLabel="Bayar sekarang dengan Midtrans"
           >
             {loading ? (
-              <ActivityIndicator color="#09090B" size="small" />
+              <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <>
                 <Text style={styles.payButtonText}>Bayar Sekarang</Text>
-                <Ionicons name="arrow-forward" size={16} color="#09090B" />
+                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
               </>
             )}
           </TouchableOpacity>
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   },
   blockedText: {
     flex: 1,
-    color: '#FCA5A5',
+    color: '#B91C1C',
     fontSize: 12.5,
     fontWeight: '600',
   },
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
   },
   header: {
     flexDirection: 'row',
@@ -567,24 +567,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#09090B',
+    backgroundColor: '#F6F6F8',
     borderBottomWidth: 1,
-    borderBottomColor: '#1F1F24',
+    borderBottomColor: '#EBEBEF',
   },
   backBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.2,
   },
   sslBadge: {
@@ -609,12 +609,12 @@ const styles = StyleSheet.create({
   },
 
   ticketStubCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   eventRow: {
     flexDirection: 'row',
@@ -625,13 +625,13 @@ const styles = StyleSheet.create({
     width: 76,
     height: 104,
     borderRadius: 10,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
   },
   eventThumbPlaceholder: {
     width: 76,
     height: 104,
     borderRadius: 10,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -643,12 +643,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(124, 58, 237, 0.3)',
     marginBottom: 6,
   },
   tierDot: {
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     lineHeight: 20,
     marginBottom: 6,
     letterSpacing: -0.2,
@@ -679,17 +679,17 @@ const styles = StyleSheet.create({
   },
   eventMetaText: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#52525B',
     fontWeight: '500',
   },
 
   sectionCard: {
-    backgroundColor: '#16161A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -701,16 +701,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#1F1F24',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   cardHeaderTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   cardHeaderSub: {
     fontSize: 11,
@@ -722,17 +722,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   userAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -744,11 +744,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   userEmail: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     marginTop: 1,
   },
   verifiedChip: {
@@ -774,12 +774,12 @@ const styles = StyleSheet.create({
   promoInput: {
     flex: 1,
     height: 44,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     paddingHorizontal: 12,
-    color: '#FAFAFA',
+    color: '#18181B',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   promoApplyBtnText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -831,21 +831,21 @@ const styles = StyleSheet.create({
   },
   promoAppliedName: {
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#52525B',
     marginTop: 3,
   },
   promoRemoveBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   divider: {
     height: 1,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     marginVertical: 10,
   },
   priceRow: {
@@ -856,13 +856,13 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#52525B',
     fontWeight: '500',
   },
   priceValue: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     fontVariant: ['tabular-nums'],
   },
   priceValueMuted: {
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   totalSub: {
     fontSize: 10,
@@ -920,19 +920,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
   },
   channelChipActive: {
     borderColor: BRAND_COLORS.accent,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
   },
   channelChipText: {
-    color: '#D4D4D8',
+    color: '#3F3F46',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -960,9 +960,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#111114',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#27272A',
+    borderTopColor: '#E4E4E7',
     paddingHorizontal: 16,
     paddingTop: 12,
     flexDirection: 'row',
@@ -997,11 +997,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   payButtonDisabled: {
-    backgroundColor: '#3F3F46',
+    backgroundColor: '#D4D4D8',
     opacity: 0.6,
   },
   payButtonText: {
-    color: '#09090B',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },

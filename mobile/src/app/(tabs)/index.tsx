@@ -97,7 +97,7 @@ function CityCardItem({ item, isSelected, onSelect }: CityCardItemProps) {
           <Ionicons
             name={item.iconName}
             size={18}
-            color={isSelected ? BRAND_COLORS.accent : '#A1A1AA'}
+            color={isSelected ? BRAND_COLORS.accent : '#52525B'}
           />
         </View>
         <Text style={[styles.cityCardName, isSelected && styles.cityCardNameActive]} numberOfLines={1}>
@@ -225,7 +225,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screenContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#050507" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 12) + 6 }]}>
         <View style={styles.headerLeft}>
@@ -244,7 +244,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="location" size={13} color={BRAND_COLORS.accent} />
               <Text style={styles.locationSelectorText} numberOfLines={1}>{selectedCity}</Text>
-              <Ionicons name="chevron-down" size={11} color="#A1A1AA" />
+              <Ionicons name="chevron-down" size={11} color="#52525B" />
             </TouchableOpacity>
           </View>
         </View>
@@ -257,7 +257,7 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Notifikasi"
           >
-            <Ionicons name="notifications-outline" size={18} color="#FAFAFA" />
+            <Ionicons name="notifications-outline" size={18} color="#18181B" />
             <View style={styles.notificationDot} />
           </TouchableOpacity>
 
@@ -273,7 +273,7 @@ export default function HomeScreen() {
                 <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
               </View>
             ) : (
-              <Ionicons name="person-outline" size={18} color="#A1A1AA" />
+              <Ionicons name="person-outline" size={18} color="#52525B" />
             )}
           </TouchableOpacity>
         </View>
@@ -330,7 +330,7 @@ export default function HomeScreen() {
                 <Ionicons
                   name={genre.icon as any}
                   size={14}
-                  color={isActive ? '#050507' : '#A1A1AA'}
+                  color={isActive ? '#FFFFFF' : '#52525B'}
                 />
                 <Text style={[styles.genreChipText, isActive && styles.genreChipTextActive]}>
                   {genre.label}
@@ -369,7 +369,7 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Coba muat ulang daftar konser"
             >
-              <Ionicons name="refresh" size={14} color="#FAFAFA" />
+              <Ionicons name="refresh" size={14} color="#18181B" />
               <Text style={styles.retryButtonText}>Muat Ulang</Text>
             </TouchableOpacity>
           </View>
@@ -382,7 +382,7 @@ export default function HomeScreen() {
 
             {filteredEvents.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="search" size={32} color="#52525B" />
+                <Ionicons name="search" size={32} color="#A1A1AA" />
                 <Text style={styles.emptyTitle}>Konser Tidak Ditemukan</Text>
                 <Text style={styles.emptySubtitle}>Tidak ada jadwal yang cocok dengan kata kunci &quot;{searchQuery}&quot;</Text>
               </View>
@@ -463,7 +463,7 @@ export default function HomeScreen() {
 
               {localEvents.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="location-outline" size={32} color="#52525B" />
+                  <Ionicons name="location-outline" size={32} color="#A1A1AA" />
                   <Text style={styles.emptyTitle}>Belum Ada Konser di {selectedCity}</Text>
                   <Text style={styles.emptySubtitle}>Pilih kota lainnya atau cek jadwal di seluruh Indonesia.</Text>
                 </View>
@@ -517,7 +517,7 @@ export default function HomeScreen() {
                     <Ionicons
                       name={city.iconName}
                       size={18}
-                      color={isSelected ? BRAND_COLORS.accent : '#A1A1AA'}
+                      color={isSelected ? BRAND_COLORS.accent : '#52525B'}
                     />
                     <Text style={[styles.modalCityText, isSelected && styles.modalCityTextActive]}>
                       {city.name}
@@ -539,7 +539,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#050507',
+    backgroundColor: '#EFEFF2',
   },
   headerContainer: {
     flexDirection: 'row',
@@ -547,9 +547,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#050507',
+    backgroundColor: '#EFEFF2',
     borderBottomWidth: 1,
-    borderBottomColor: '#121216',
+    borderBottomColor: '#E4E4E7',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -560,9 +560,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   brandText: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: 0.5,
   },
   brandDot: {
@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
   locationSelectorText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
     maxWidth: 130,
   },
   headerRight: {
@@ -608,9 +608,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#E4E4E7',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -635,26 +635,26 @@ const styles = StyleSheet.create({
   userAvatarText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#050507',
+    color: '#FFFFFF',
   },
 
   searchFilterWrapper: {
-    backgroundColor: '#050507',
+    backgroundColor: '#EFEFF2',
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#121216',
+    borderBottomColor: '#E4E4E7',
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 46,
     borderWidth: 1,
-    borderColor: '#222228',
+    borderColor: '#EBEBEF',
     marginBottom: 10,
   },
   searchIcon: {
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#FAFAFA',
+    color: '#18181B',
     paddingVertical: 0,
   },
   clearSearchBtn: {
@@ -677,12 +677,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#222228',
+    borderColor: '#EBEBEF',
   },
   genreChipActive: {
     backgroundColor: BRAND_COLORS.accent,
@@ -691,12 +691,12 @@ const styles = StyleSheet.create({
   genreChipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#A1A1AA',
+    color: '#52525B',
   },
   genreChipTextActive: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#050507',
+    color: '#FFFFFF',
   },
 
   mainScroll: {
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
     letterSpacing: -0.2,
   },
   sectionActionText: {
@@ -764,13 +764,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cityCard: {
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 12,
     width: 100,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#222228',
+    borderColor: '#EBEBEF',
     gap: 6,
   },
   cityCardActive: {
@@ -786,15 +786,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cityCardIconWrapActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
   },
   cityCardName: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#A1A1AA',
+    color: '#52525B',
   },
   cityCardNameActive: {
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   cityCardCount: {
     fontSize: 10,
@@ -815,7 +815,7 @@ const styles = StyleSheet.create({
   cityFeedTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   cityFeedCount: {
     fontSize: 11,
@@ -824,18 +824,18 @@ const styles = StyleSheet.create({
   },
 
   emptyCard: {
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#222228',
+    borderColor: '#EBEBEF',
     gap: 8,
   },
   emptyTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   emptySubtitle: {
     fontSize: 12,
@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
 
   errorContainer: {
     margin: 16,
-    backgroundColor: '#121216',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
@@ -865,11 +865,11 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
   errorSubtitle: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#52525B',
     textAlign: 'center',
     marginBottom: 6,
     lineHeight: 16,
@@ -878,7 +878,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#27272A',
+    backgroundColor: '#E4E4E7',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FAFAFA',
+    color: '#18181B',
   },
 
   bottomSpacer: {
@@ -905,20 +905,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#222228',
+    borderTopColor: '#EBEBEF',
   },
   modalHandleBar: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#3F3F46',
+    backgroundColor: '#D4D4D8',
     alignSelf: 'center',
     marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#FAFAFA',
+    color: '#18181B',
     marginBottom: 4,
   },
   modalSubtitle: {
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#222228',
+    borderColor: '#EBEBEF',
   },
   modalCityCardActive: {
     backgroundColor: '#1E1E28',
@@ -949,9 +949,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: '#A1A1AA',
+    color: '#52525B',
   },
   modalCityTextActive: {
-    color: '#FAFAFA',
+    color: '#18181B',
   },
 });

@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: C.cardBg, borderColor: C.borderLight, borderWidth: 1, borderRadius: 20, padding: 24, gap: 20 },
   title: { fontSize: 24, lineHeight: 32, fontWeight: '700', color: C.textLight },
   description: { fontSize: 15, lineHeight: 23, color: C.textMuted }, reference: { color: C.textMuted, fontSize: 13, lineHeight: 22 },
-  amount: { fontSize: 18, fontWeight: '600', color: C.textLight }, error: { color: '#F87171', fontSize: 15, lineHeight: 22 },
+  amount: { fontSize: 18, fontWeight: '600', color: C.textLight }, error: { color: '#DC2626', fontSize: 15, lineHeight: 22 },
   primary: { backgroundColor: C.accent, borderRadius: 12, padding: 16, minHeight: 48, alignItems: 'center' },
   primaryText: { color: C.bgDark, fontWeight: '700', fontSize: 16 },
   secondary: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, alignItems: 'center' },
