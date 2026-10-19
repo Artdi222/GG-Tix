@@ -132,7 +132,7 @@ export function TicketQRCode({
             <QRCode
               value={ticket.qrCodeValue}
               size={220}
-              color="#FFFFFF"
+              color="#09090B"
               backgroundColor="#FFFFFF"
             />
           </View>
