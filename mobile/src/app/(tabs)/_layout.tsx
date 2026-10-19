@@ -36,15 +36,17 @@ export default function TabLayout() {
           borderTopColor: '#E4E4E7',
           borderTopWidth: 1,
           // Grows with the home-indicator inset instead of clipping labels under it.
-          height: 66 + insets.bottom,
+          height: 68 + insets.bottom,
           paddingTop: 6,
-          paddingBottom: insets.bottom + 10,
+          paddingBottom: insets.bottom + 6,
         },
         tabBarLabelStyle: {
+          // Fixed line height: the label box is clipped, so "normal" leading cut off descenders.
           fontSize: 11,
+          lineHeight: 14,
           fontWeight: '700',
           letterSpacing: 0.2,
-          marginTop: 2,
+          marginTop: 0,
         },
         headerStyle: {
           backgroundColor: '#F6F6F8',
@@ -107,7 +109,6 @@ const styles = StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     position: 'relative',
-    paddingTop: 3,
   },
   activeDot: {
     position: 'absolute',
