@@ -17,7 +17,10 @@ export default defineAppConfig({
     // Content sits on a floating sheet above the muted app canvas.
     dashboardPanel: {
       slots: {
-        root: 'lg:my-2 lg:me-2 lg:rounded-lg lg:ring lg:ring-default lg:shadow-sm bg-default lg:min-h-0 lg:h-[calc(100svh-1rem)] overflow-hidden'
+        root: 'lg:my-2 lg:me-2 lg:rounded-lg lg:ring lg:ring-default lg:shadow-sm bg-default lg:min-h-0 lg:h-[calc(100svh-1rem)] overflow-hidden',
+        // The body scrolls; its sections must keep their natural height instead of
+        // flex-shrinking into the fixed-height sheet (which clipped tables and pagination).
+        body: 'min-h-0 *:shrink-0'
       }
     },
     dashboardSidebar: {
