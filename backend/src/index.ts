@@ -61,16 +61,9 @@ const corsOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
-if (process.env.NODE_ENV !== "production") {
-  corsOrigins.push(
-    "http://localhost:5173",
-    "http://localhost:3001",
-    "http://localhost:3000",
-    "http://localhost:8081",
-    "http://localhost:19006",
-    "http://127.0.0.1:8081"
-  );
-}
+// In dev, dev servers hop ports when one is taken, so allow any loopback origin.
+const isDevLoopback = (origin: string) =>
+  process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
 // Global Middlewares Pipeline
 // 1. Request ID injector
@@ -83,7 +76,10 @@ app.use("*", securityHeadersMiddleware);
 app.use("*", logger());
 
 // 4. CORS Whitelist
-app.use("*", cors({ origin: corsOrigins, credentials: true }));
+app.use("*", cors({
+  origin: (origin) => (corsOrigins.includes(origin) || isDevLoopback(origin) ? origin : null),
+  credentials: true,
+}));
 
 // 5. Payload & Body Size Safety Guard
 app.use("*", bodySizeLimit());
