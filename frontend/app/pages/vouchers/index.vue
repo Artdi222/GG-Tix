@@ -199,7 +199,6 @@ function afterSave() {
           :data="list.items.value"
           :columns="columns"
           :loading="list.loading.value"
-          class="min-h-64"
           :ui="{ th: 'text-xs font-medium text-muted', td: 'py-3' }"
         >
           <template #code-cell="{ row }">
@@ -267,7 +266,18 @@ function afterSave() {
             </div>
           </template>
           <template #empty>
+            <div
+              v-if="list.loading.value"
+              class="space-y-3 p-4"
+            >
+              <USkeleton
+                v-for="i in 5"
+                :key="i"
+                class="h-9 w-full"
+              />
+            </div>
             <UEmpty
+              v-else
               icon="i-lucide-ticket-percent"
               :title="filtered ? 'Tidak ada voucher yang cocok' : 'Belum ada voucher'"
               :description="filtered ? 'Ubah kata kunci atau filter.' : 'Buat kode promo untuk mendorong penjualan tiket.'"

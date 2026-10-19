@@ -495,7 +495,6 @@ watch(tab, (t) => {
               :data="audit.items.value"
               :columns="auditColumns"
               :loading="audit.loading.value"
-              class="min-h-64"
               :ui="{ th: 'text-xs font-medium text-muted', td: 'py-2.5 text-xs' }"
             >
               <template #createdAt-cell="{ row }">
@@ -537,7 +536,18 @@ watch(tab, (t) => {
                 <span class="font-mono text-muted">{{ row.original.ip }}</span>
               </template>
               <template #empty>
+                <div
+                  v-if="audit.loading.value"
+                  class="space-y-3 p-4"
+                >
+                  <USkeleton
+                    v-for="i in 5"
+                    :key="i"
+                    class="h-9 w-full"
+                  />
+                </div>
                 <UEmpty
+                  v-else
                   icon="i-lucide-scroll-text"
                   title="Belum ada aktivitas tercatat"
                   description="Setiap perubahan oleh admin akan tercatat di sini."

@@ -176,7 +176,6 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
           :data="list.items.value"
           :columns="columns"
           :loading="list.loading.value"
-          class="min-h-64"
           :ui="{ th: 'text-xs font-medium text-muted', td: 'py-3' }"
         >
           <template #title-cell="{ row }">
@@ -256,7 +255,18 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
             </div>
           </template>
           <template #empty>
+            <div
+              v-if="list.loading.value"
+              class="space-y-3 p-4"
+            >
+              <USkeleton
+                v-for="i in 5"
+                :key="i"
+                class="h-9 w-full"
+              />
+            </div>
             <UEmpty
+              v-else
               icon="i-lucide-calendar-days"
               :title="filtered ? 'Tidak ada event yang cocok' : 'Belum ada event'"
               :description="filtered ? 'Ubah kata kunci atau filter.' : 'Buat event pertama, lalu tambahkan kategori tiketnya.'"

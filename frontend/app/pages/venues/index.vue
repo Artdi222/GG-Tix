@@ -81,7 +81,6 @@ const columns: TableColumn<Venue>[] = [
           :data="list.items.value"
           :columns="columns"
           :loading="list.loading.value"
-          class="min-h-64"
           :ui="{ th: 'text-xs font-medium text-muted', td: 'py-3' }"
         >
           <template #name-cell="{ row }">
@@ -130,7 +129,18 @@ const columns: TableColumn<Venue>[] = [
             </div>
           </template>
           <template #empty>
+            <div
+              v-if="list.loading.value"
+              class="space-y-3 p-4"
+            >
+              <USkeleton
+                v-for="i in 5"
+                :key="i"
+                class="h-9 w-full"
+              />
+            </div>
             <UEmpty
+              v-else
               icon="i-lucide-map-pin"
               :title="list.search.value ? 'Tidak ada venue yang cocok' : 'Belum ada venue'"
               :description="list.search.value ? 'Ubah kata kunci pencarian.' : 'Tambahkan venue sebelum membuat event.'"

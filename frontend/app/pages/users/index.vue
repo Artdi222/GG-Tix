@@ -172,7 +172,6 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
             :data="customers.items.value"
             :columns="customerColumns"
             :loading="customers.loading.value"
-            class="min-h-64"
             :ui="{ th: 'text-xs font-medium text-muted', td: 'py-3' }"
           >
             <template #name-cell="{ row }">
@@ -195,7 +194,18 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
               <span class="text-muted">{{ formatDate(row.original.createdAt) }}</span>
             </template>
             <template #empty>
+              <div
+                v-if="customers.loading.value"
+                class="space-y-3 p-4"
+              >
+                <USkeleton
+                  v-for="i in 5"
+                  :key="i"
+                  class="h-9 w-full"
+                />
+              </div>
               <UEmpty
+                v-else
                 icon="i-lucide-users"
                 :title="customers.search.value ? 'Tidak ada pelanggan yang cocok' : 'Belum ada pelanggan'"
                 variant="naked"
@@ -230,7 +240,6 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
             :data="admins.items.value"
             :columns="adminColumns"
             :loading="admins.loading.value"
-            class="min-h-64"
             :ui="{ th: 'text-xs font-medium text-muted', td: 'py-3' }"
           >
             <template #name-cell="{ row }">
@@ -283,7 +292,18 @@ const roleColor = (r: AdminRole) => (r === 'super_admin' ? 'primary' : r === 'ad
               </div>
             </template>
             <template #empty>
+              <div
+                v-if="admins.loading.value"
+                class="space-y-3 p-4"
+              >
+                <USkeleton
+                  v-for="i in 5"
+                  :key="i"
+                  class="h-9 w-full"
+                />
+              </div>
               <UEmpty
+                v-else
                 icon="i-lucide-shield-user"
                 title="Tidak ada akun yang cocok"
                 variant="naked"

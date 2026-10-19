@@ -263,7 +263,6 @@ function refreshAll() {
           :data="list.items.value"
           :columns="columns"
           :loading="list.loading.value"
-          class="min-h-64"
           :ui="{ th: 'text-xs font-medium text-muted', td: 'py-3' }"
         >
           <template #id-cell="{ row }">
@@ -324,7 +323,18 @@ function refreshAll() {
             </div>
           </template>
           <template #empty>
+            <div
+              v-if="list.loading.value"
+              class="space-y-3 p-4"
+            >
+              <USkeleton
+                v-for="i in 5"
+                :key="i"
+                class="h-9 w-full"
+              />
+            </div>
             <UEmpty
+              v-else
               icon="i-lucide-receipt-text"
               :title="list.search.value || status !== 'all' || eventId !== 'all' ? 'Tidak ada pesanan yang cocok' : 'Belum ada pesanan'"
               :description="list.search.value || status !== 'all' || eventId !== 'all' ? 'Ubah kata kunci atau filter untuk melihat hasil lain.' : 'Pesanan dari aplikasi pelanggan akan muncul di sini.'"

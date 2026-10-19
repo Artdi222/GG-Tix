@@ -72,7 +72,18 @@ const columns: TableColumn<Usage>[] = [
           <span class="whitespace-nowrap text-muted">{{ formatDateTime(row.original.createdAt) }}</span>
         </template>
         <template #empty>
+          <div
+            v-if="list.loading.value"
+            class="space-y-3 p-4"
+          >
+            <USkeleton
+              v-for="i in 5"
+              :key="i"
+              class="h-9 w-full"
+            />
+          </div>
           <UEmpty
+            v-else
             icon="i-lucide-ticket-percent"
             title="Belum pernah dipakai"
             variant="naked"
