@@ -1,589 +1,620 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
+
+useHead({ title: 'Pengaturan' })
+
+interface SystemSettings {
+  defaultMaxTicketsPerOrder: number
+  pendingOrderExpiryMinutes: number
+  supportEmail: string
+  supportWhatsapp: string
+  maintenanceMode: boolean
+}
+interface AuditLog {
+  id: string
+  userEmail: string | null
+  userName: string | null
+  userRole: string | null
+  method: string
+  path: string
+  statusCode: number
+  ip: string
+  durationMs: number | null
+  createdAt: string
+}
+interface Diagnostics {
+  database: { status: string, latencyMs: number }
+  storage: { status: string, provider: string }
+  paymentGateway: { status: string, environment: string }
+  runtime: { platform: string, nodeEnv: string, uptimeSeconds: number }
+}
+
+const route = useRoute()
+const router = useRouter()
 const { request } = useApi()
-const { user } = useAuth()
+const { user, isSuperAdmin, logout } = useAuth()
 const toast = useToast()
+const confirm = useConfirm()
 
-// Tab Management
-const activeTab = ref('profile')
-const tabs = computed(() => {
-  const allTabs = [
-    { label: 'Profil & Keamanan', icon: 'i-lucide-user', value: 'profile' },
-    { label: 'Preferensi Scanner', icon: 'i-lucide-scan', value: 'scanner' },
-    { label: 'Konfigurasi Platform', icon: 'i-lucide-settings', value: 'config', hidden: user.value?.role !== 'super_admin' },
-    { label: 'Audit Trail & Aktivitas', icon: 'i-lucide-file-text', value: 'audit', hidden: user.value?.role !== 'super_admin' },
-    { label: 'Status Sistem & Diagnostik', icon: 'i-lucide-heart-pulse', value: 'status', hidden: user.value?.role !== 'super_admin' }
-  ]
-  return allTabs.filter(t => !t.hidden)
+const tabs = computed(() => [
+  { label: 'Profil & keamanan', value: 'profile', icon: 'i-lucide-user-cog' },
+  { label: 'Scanner', value: 'scanner', icon: 'i-lucide-scan-line' },
+  ...(isSuperAdmin.value
+    ? [
+        { label: 'Platform', value: 'platform', icon: 'i-lucide-sliders-horizontal' },
+        { label: 'Log audit', value: 'audit', icon: 'i-lucide-scroll-text' },
+        { label: 'Status sistem', value: 'status', icon: 'i-lucide-activity' }
+      ]
+    : [])
+])
+const tab = computed({
+  get: () => tabs.value.some(t => t.value === route.query.tab) ? String(route.query.tab) : 'profile',
+  set: value => router.replace({ query: { tab: value } })
 })
 
-// Profile State
-const profileForm = reactive({
-  name: user.value?.name || '',
-  email: user.value?.email || ''
-})
-const passwordForm = reactive({
-  currentPassword: '',
-  newPassword: '',
-  confirmNewPassword: ''
-})
-const profileLoading = ref(false)
-const passwordLoading = ref(false)
-
-// Scanner State (LocalStorage)
-const scannerSettings = reactive({
-  soundEnabled: true,
-  soundVolume: 80,
-  continuousMode: true,
-  cameraFacing: 'environment'
-})
-
-function saveScannerSettings() {
-  localStorage.setItem('scanner_settings', JSON.stringify(scannerSettings))
-  toast.add({ title: 'Preferensi scanner disimpan.', color: 'success' })
-}
-
-function testBeep() {
+// Profile
+const profile = reactive({ name: '', email: '' })
+watch(user, (u) => {
+  profile.name = u?.name ?? ''
+  profile.email = u?.email ?? ''
+}, { immediate: true })
+const profileSaving = ref(false)
+async function saveProfile() {
+  if (profile.name.trim().length < 2) return toast.add({ title: 'Nama minimal 2 karakter', color: 'error' })
+  profileSaving.value = true
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const oscillator = audioCtx.createOscillator()
-    const gainNode = audioCtx.createGain()
-    oscillator.connect(gainNode)
-    gainNode.connect(audioCtx.destination)
-    oscillator.frequency.value = 800
-    oscillator.type = 'sine'
-    gainNode.gain.value = (scannerSettings.soundVolume / 100) * 0.5
-    oscillator.start()
-    setTimeout(() => oscillator.stop(), 200)
-  } catch (e) {
-    console.error('Audio context error:', e)
-  }
-}
-
-// Settings State (Super Admin)
-const systemSettings = reactive({
-  defaultMaxTicketsPerOrder: 4,
-  pendingOrderExpiryMinutes: 15,
-  supportEmail: 'support@ggtix.id',
-  supportWhatsapp: '+6281234567890',
-  maintenanceMode: false
-})
-
-const settingsLoading = ref(false)
-
-async function loadSettings() {
-  try {
-    const res = await request<{ data: typeof systemSettings }>('/settings/system')
-    if (res?.data) {
-      Object.assign(systemSettings, res.data)
-    }
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-async function saveSettings() {
-  settingsLoading.value = true
-  try {
-    await request('/settings/system', { method: 'PATCH', body: systemSettings })
-    toast.add({ title: 'Pengaturan berhasil diperbarui.', color: 'success' })
-  } catch (e) {
-    toast.add({ title: 'Gagal memperbarui pengaturan.', color: 'error' })
+    const res = await request<{ data: AdminUser }>('/auth/profile', { method: 'PATCH', body: { name: profile.name.trim(), email: profile.email.trim() } })
+    user.value = res.data
+    toast.add({ title: 'Profil diperbarui', color: 'success' })
+  } catch (err) {
+    toast.add({ title: 'Profil gagal diperbarui', description: apiErrorMessage(err), color: 'error' })
   } finally {
-    settingsLoading.value = false
+    profileSaving.value = false
   }
 }
 
-// Audit Logs State
-const auditLogs = ref<any[]>([])
-const auditPagination = ref({ page: 1, totalPages: 1, totalCount: 0 })
-const auditSearch = ref('')
-const auditMethod = ref('ALL')
-const auditLoading = ref(false)
-
-async function loadAuditLogs() {
-  auditLoading.value = true
-  try {
-    const rawMethod = auditMethod.value as any
-    const methodStr = typeof rawMethod === 'object' && rawMethod !== null ? rawMethod.value : rawMethod
-    const methodFilter = (methodStr && methodStr !== 'ALL') ? methodStr : undefined
-
-    const res = await request<{ data: any[], pagination: any }>('/settings/audit-logs', {
-      query: {
-        page: auditPagination.value.page,
-        search: auditSearch.value || undefined,
-        method: methodFilter
-      }
-    })
-    auditLogs.value = res?.data || []
-    if (res?.pagination) {
-      auditPagination.value = res.pagination
-    }
-  } catch (e) {
-    console.error(e)
-  } finally {
-    auditLoading.value = false
-  }
-}
-
-// Diagnostics State
-const diagnostics = ref<any>(null)
-async function loadDiagnostics() {
-  try {
-    const res = await request<{ data: any }>('/settings/diagnostics')
-    diagnostics.value = res?.data || null
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-watch(activeTab, (tab) => {
-  if (tab === 'config') loadSettings()
-  if (tab === 'audit') loadAuditLogs()
-  if (tab === 'status') loadDiagnostics()
+const pw = reactive({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
+const pwSaving = ref(false)
+const pwError = computed(() => {
+  if (pw.newPassword && pw.newPassword.length < 8) return 'Minimal 8 karakter.'
+  if (pw.confirmNewPassword && pw.confirmNewPassword !== pw.newPassword) return 'Konfirmasi tidak sama.'
+  return ''
 })
-
-// Unified onMounted
-onMounted(() => {
-  const saved = localStorage.getItem('scanner_settings')
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved)
-      if (typeof parsed.soundVolume === 'string') parsed.soundVolume = Number(parsed.soundVolume)
-      Object.assign(scannerSettings, parsed)
-    } catch {
-      // Ignore
-    }
-  }
-})
-
-async function updateProfile() {
-  profileLoading.value = true
-  try {
-    await request('/auth/profile', { method: 'PATCH', body: profileForm })
-    toast.add({ title: 'Profil Anda berhasil diperbarui.', color: 'success' })
-    if (user.value) {
-      user.value.name = profileForm.name
-      user.value.email = profileForm.email
-    }
-  } catch (e) {
-    toast.add({ title: 'Gagal memperbarui profil.', color: 'error' })
-  } finally {
-    profileLoading.value = false
-  }
-}
-
 async function changePassword() {
-  if (passwordForm.newPassword.length < 8) {
-    toast.add({ title: 'Kata sandi baru minimal 8 karakter.', color: 'error' })
-    return
-  }
-  if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-    toast.add({ title: 'Konfirmasi kata sandi tidak sesuai.', color: 'error' })
-    return
-  }
-  passwordLoading.value = true
+  if (!pw.currentPassword || !pw.newPassword || pwError.value) return
+  pwSaving.value = true
   try {
-    await request('/auth/change-password', { method: 'PATCH', body: passwordForm })
-    toast.add({ title: 'Kata sandi berhasil diubah.', color: 'success' })
-    passwordForm.currentPassword = ''
-    passwordForm.newPassword = ''
-    passwordForm.confirmNewPassword = ''
-  } catch (e: any) {
-    toast.add({
-      title: e?.data?.message || 'Gagal mengubah kata sandi. Pastikan kata sandi saat ini benar.',
-      color: 'error'
-    })
+    await request('/auth/change-password', { method: 'PATCH', body: { ...pw } })
+    // The backend revokes every session on password change; sign in again now
+    // instead of being logged out unexpectedly when the access token expires.
+    toast.add({ title: 'Kata sandi diubah', description: 'Silakan masuk kembali dengan kata sandi baru.', color: 'success' })
+    await logout()
+  } catch (err) {
+    toast.add({ title: 'Kata sandi gagal diubah', description: apiErrorMessage(err), color: 'error' })
   } finally {
-    passwordLoading.value = false
+    pwSaving.value = false
   }
 }
+
+// Scanner
+const { prefs, save: savePrefs } = useScannerPrefs()
+function storePrefs() {
+  toast.add(savePrefs()
+    ? { title: 'Preferensi scanner disimpan di perangkat ini', color: 'success' }
+    : { title: 'Browser memblokir penyimpanan lokal', color: 'error' })
+}
+
+// Platform
+const settings = ref<SystemSettings | null>(null)
+const settingsError = ref('')
+const settingsSaving = ref(false)
+// Last persisted value, to confirm only when maintenance is being switched on.
+const savedMaintenance = ref(false)
+async function loadSettings() {
+  settingsError.value = ''
+  try {
+    settings.value = (await request<{ data: SystemSettings }>('/settings/system')).data
+    savedMaintenance.value = settings.value.maintenanceMode
+  } catch (err) {
+    settingsError.value = apiErrorMessage(err, 'Pengaturan gagal dimuat.')
+  }
+}
+async function saveSettings() {
+  const s = settings.value
+  if (!s) return
+  if (s.maintenanceMode && !savedMaintenance.value) {
+    const ok = await confirm({
+      title: 'Aktifkan mode pemeliharaan?',
+      description: 'Pelanggan tidak bisa membuat pesanan baru sampai mode ini dimatikan. Tiket yang sudah dibeli tetap bisa diakses.',
+      confirmLabel: 'Aktifkan',
+      danger: true
+    })
+    if (!ok) return
+  }
+  settingsSaving.value = true
+  try {
+    const body = {
+      defaultMaxTicketsPerOrder: s.defaultMaxTicketsPerOrder,
+      pendingOrderExpiryMinutes: s.pendingOrderExpiryMinutes,
+      supportEmail: s.supportEmail.trim(),
+      supportWhatsapp: s.supportWhatsapp.trim(),
+      maintenanceMode: s.maintenanceMode
+    }
+    settings.value = (await request<{ data: SystemSettings }>('/settings/system', { method: 'PATCH', body })).data
+    savedMaintenance.value = settings.value.maintenanceMode
+    toast.add({ title: 'Pengaturan platform disimpan', color: 'success' })
+  } catch (err) {
+    toast.add({ title: 'Pengaturan gagal disimpan', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    settingsSaving.value = false
+  }
+}
+
+// Audit log
+const auditMethod = ref('all')
+const audit = usePaginatedList<AuditLog>('/settings/audit-logs', {
+  searchParam: 'search',
+  immediate: false,
+  query: () => ({ method: auditMethod.value === 'all' ? undefined : auditMethod.value })
+})
+const auditColumns: TableColumn<AuditLog>[] = [
+  { accessorKey: 'createdAt', header: 'Waktu' },
+  { accessorKey: 'userEmail', header: 'Pengguna' },
+  { accessorKey: 'path', header: 'Aksi' },
+  { accessorKey: 'statusCode', header: 'Hasil' },
+  { accessorKey: 'ip', header: 'IP' }
+]
+const methodColor = (m: string) => (m === 'DELETE' ? 'error' : m === 'POST' ? 'success' : 'info')
+
+// Diagnostics
+const diag = ref<Diagnostics | null>(null)
+const diagLoading = ref(false)
+async function loadDiag() {
+  diagLoading.value = true
+  try {
+    diag.value = (await request<{ data: Diagnostics }>('/settings/diagnostics')).data
+  } catch {
+    diag.value = null
+  } finally {
+    diagLoading.value = false
+  }
+}
+function uptime(s: number) {
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return [d && `${d} hari`, h && `${h} jam`, `${m} menit`].filter(Boolean).join(' ')
+}
+const healthy = (status: string) => ['healthy', 'configured', 'ok', 'connected'].includes(status)
+
+watch(tab, (t) => {
+  if (t === 'platform' && !settings.value) loadSettings()
+  if (t === 'audit') audit.refresh()
+  if (t === 'status') loadDiag()
+}, { immediate: true })
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header Page -->
-    <div>
-      <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-        Pengaturan Sistem
-      </h1>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-        Kelola profil akun pribadi, preferensi pemindai tiket, konfigurasi bisnis, dan log aktivitas platform.
-      </p>
-    </div>
-
-    <!-- Navigation Pills / Custom Tabs Switcher -->
-    <div class="flex flex-wrap gap-2 p-1.5 rounded-xl bg-gray-100 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/80 w-fit">
-      <button
-        v-for="t in tabs"
-        :key="t.value"
-        type="button"
-        :class="[
-          'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
-          activeTab === t.value
-            ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-xs'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-        ]"
-        @click="activeTab = t.value"
-      >
-        <UIcon :name="t.icon" class="w-4 h-4" />
-        <span>{{ t.label }}</span>
-      </button>
-    </div>
-
-    <!-- TAB 1: PROFIL & KEAMANAN -->
-    <div v-if="activeTab === 'profile'" key="profile" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 space-y-6">
-        <!-- Form Profile -->
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-5 sm:p-6 shadow-xs">
-          <div class="mb-4">
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Informasi Profil</h3>
-            <p class="text-xs text-gray-500">Perbarui identitas dan alamat email yang terdaftar.</p>
-          </div>
-          <form @submit.prevent="updateProfile" class="space-y-4 text-xs">
-            <UFormField label="Nama Lengkap" required>
-              <UInput v-model="profileForm.name" size="sm" class="w-full text-xs" />
-            </UFormField>
-            <UFormField label="Alamat Email" required>
-              <UInput v-model="profileForm.email" type="email" size="sm" class="w-full text-xs" />
-            </UFormField>
-            <div class="flex justify-end pt-2">
-              <UButton type="submit" :loading="profileLoading" size="sm" class="bg-[#1B1330] hover:bg-[#2A1F49] text-white">
-                Simpan Profil
-              </UButton>
-            </div>
-          </form>
-        </div>
-
-        <!-- Form Password -->
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-5 sm:p-6 shadow-xs">
-          <div class="mb-4">
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Ganti Kata Sandi</h3>
-            <p class="text-xs text-gray-500">Pastikan akun Anda menggunakan kata sandi yang kuat.</p>
-          </div>
-          <form @submit.prevent="changePassword" class="space-y-4 text-xs">
-            <UFormField label="Kata Sandi Saat Ini" required>
-              <UInput v-model="passwordForm.currentPassword" type="password" placeholder="••••••••" size="sm" class="w-full text-xs" />
-            </UFormField>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <UFormField label="Kata Sandi Baru" required>
-                <UInput v-model="passwordForm.newPassword" type="password" placeholder="Minimal 8 karakter" size="sm" class="w-full text-xs" />
-              </UFormField>
-              <UFormField label="Konfirmasi Kata Sandi Baru" required>
-                <UInput v-model="passwordForm.confirmNewPassword" type="password" placeholder="Ulangi kata sandi baru" size="sm" class="w-full text-xs" />
-              </UFormField>
-            </div>
-            <div class="flex justify-end pt-2">
-              <UButton type="submit" :loading="passwordLoading" color="error" variant="soft" size="sm">
-                Perbarui Kata Sandi
-              </UButton>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Profile Identity Summary Card -->
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-6 shadow-xs h-fit">
-        <div class="flex flex-col items-center text-center">
-          <UAvatar
-            size="3xl"
-            :alt="user?.name || 'Admin'"
-            class="mb-3.5 ring-4 ring-[#F2A93B]/20 font-bold text-base"
-          />
-          <h4 class="font-bold text-base text-gray-900 dark:text-white">{{ user?.name || 'Admin GGTIX' }}</h4>
-          <p class="text-xs text-gray-500 mb-3">{{ user?.email || 'admin@ggtix.com' }}</p>
-          <UBadge
-            :color="user?.role === 'super_admin' ? 'warning' : user?.role === 'admin' ? 'primary' : 'info'"
-            variant="soft"
-            size="sm"
-            class="font-bold px-2.5 py-0.5 text-[11px] tracking-wide rounded-md shadow-2xs"
-          >
-            {{ user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin Operasional' : 'Gate Staff' }}
-          </UBadge>
-
-          <div class="mt-6 w-full text-left space-y-2.5 text-xs text-gray-500 dark:text-gray-400">
-            <div class="flex justify-between border-b border-gray-100 dark:border-gray-800/80 pb-2">
-              <span>Admin ID</span>
-              <span class="font-mono text-gray-900 dark:text-white truncate max-w-35">{{ user?.id }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Platform</span>
-              <span class="font-medium text-gray-900 dark:text-white">GGTIX Internal Console</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: PREFERENSI SCANNER -->
-    <div v-if="activeTab === 'scanner'" key="scanner" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-6 shadow-xs max-w-2xl">
-      <div class="space-y-6 text-xs">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Audio Feedback Beep</h3>
-            <p class="text-xs text-gray-500">Aktifkan efek suara otomatis saat verifikasi QR code berhasil di scan.</p>
-          </div>
-          <USwitch v-model="scannerSettings.soundEnabled" />
-        </div>
-
-        <div v-if="scannerSettings.soundEnabled" class="space-y-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-          <div class="flex justify-between text-xs font-semibold">
-            <span>Volume Suara Beep</span>
-            <span class="text-primary-600 dark:text-primary-400">{{ scannerSettings.soundVolume }}%</span>
-          </div>
-          <USlider v-model="scannerSettings.soundVolume" :min="0" :max="100" />
-          <div class="flex justify-end pt-1">
-            <UButton label="Uji Coba Suara (Test Beep)" variant="outline" size="xs" icon="i-lucide-volume-2" @click="testBeep" />
-          </div>
-        </div>
-
-        <USeparator />
-
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Continuous Scanning Mode</h3>
-            <p class="text-xs text-gray-500">Kamera bersiap memindai tiket berikutnya dalam jeda 2 detik tanpa perlu klik tombol lagi.</p>
-          </div>
-          <USwitch v-model="scannerSettings.continuousMode" />
-        </div>
-
-        <USeparator />
-
-        <UFormField label="Orientasi Kamera Default">
-          <USelect
-            v-model="scannerSettings.cameraFacing"
-            :items="[
-              { label: 'Kamera Belakang (Environment / Disarankan)', value: 'environment' },
-              { label: 'Kamera Depan (User)', value: 'user' }
-            ]"
-            size="sm"
-            class="w-full text-xs"
-          />
-        </UFormField>
-
-        <div class="pt-4 flex justify-end">
-          <UButton size="sm" class="bg-[#1B1330] hover:bg-[#2A1F49] text-white" @click="saveScannerSettings">
-            Simpan Preferensi Scanner
-          </UButton>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 3: KONFIGURASI PLATFORM -->
-    <div v-if="activeTab === 'config'" key="config" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-6 shadow-xs max-w-2xl space-y-6">
-      <div>
-        <h3 class="text-sm font-bold text-gray-900 dark:text-white">Parameter Bisnis Global</h3>
-        <p class="text-xs text-gray-500">Konfigurasi batasan transaksi pesanan dan kontak customer service resmi.</p>
-      </div>
-
-      <form @submit.prevent="saveSettings" class="space-y-5 text-xs">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Maksimal Tiket / Order" description="Batas standar tiket per transaksi (1-10)">
-            <UInput v-model.number="systemSettings.defaultMaxTicketsPerOrder" type="number" :min="1" :max="10" size="sm" class="w-full text-xs" />
-          </UFormField>
-
-          <UFormField label="Batas Waktu Bayar (Menit)" description="Timeout pesanan pending sebelum hangus">
-            <UInput v-model.number="systemSettings.pendingOrderExpiryMinutes" type="number" :min="5" :max="120" size="sm" class="w-full text-xs" />
-          </UFormField>
-        </div>
-
-        <UFormField label="Email Customer Support" description="Ditampilkan pada tiket digital untuk komplain">
-          <UInput v-model="systemSettings.supportEmail" type="email" placeholder="support@ggtix.id" size="sm" class="w-full text-xs" />
-        </UFormField>
-
-        <UFormField label="WhatsApp Helpdesk Venue" description="Kontak cepat darurat penonton di venue">
-          <UInput v-model="systemSettings.supportWhatsapp" placeholder="+6281234567890" size="sm" class="w-full text-xs" />
-        </UFormField>
-
-        <USeparator />
-
-        <div class="flex items-center justify-between p-4 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-200 dark:border-rose-900/60">
-          <div>
-            <h4 class="text-xs font-bold text-rose-700 dark:text-rose-400">Mode Pemeliharaan (Maintenance Mode)</h4>
-            <p class="text-[11px] text-rose-600/80 dark:text-rose-400/80">Aktifkan untuk menonaktifkan transaksi publik sementara saat maintenance server.</p>
-          </div>
-          <USwitch v-model="systemSettings.maintenanceMode" color="error" />
-        </div>
-
-        <div class="pt-2 flex justify-end">
-          <UButton type="submit" :loading="settingsLoading" size="sm" class="bg-[#1B1330] hover:bg-[#2A1F49] text-white">
-            Simpan Konfigurasi Platform
-          </UButton>
-        </div>
-      </form>
-    </div>
-
-    <!-- TAB 4: AUDIT TRAIL & AKTIVITAS -->
-    <div v-if="activeTab === 'audit'" key="audit" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 shadow-xs overflow-hidden">
-      <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <UInput v-model="auditSearch" placeholder="Cari path / email / ID..." size="sm" class="w-64 text-xs" icon="i-lucide-search" @keydown.enter="loadAuditLogs" />
-          <USelect
-            v-model="auditMethod"
-            :items="[
-              { label: 'Semua Method', value: 'ALL' },
-              { label: 'POST', value: 'POST' },
-              { label: 'PUT', value: 'PUT' },
-              { label: 'PATCH', value: 'PATCH' },
-              { label: 'DELETE', value: 'DELETE' }
-            ]"
-            size="sm"
-            class="w-36 text-xs"
-            @update:model-value="loadAuditLogs"
-          />
-        </div>
-        <UButton icon="i-lucide-refresh-cw" size="sm" variant="outline" :loading="auditLoading" @click="loadAuditLogs">
-          Segarkan Data
-        </UButton>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-xs">
-          <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[11px]">
-            <tr>
-              <th class="px-4 py-3">Waktu Eksekusi</th>
-              <th class="px-4 py-3">Admin / User</th>
-              <th class="px-4 py-3">Metode</th>
-              <th class="px-4 py-3">Resource Path</th>
-              <th class="px-4 py-3">Status</th>
-              <th class="px-4 py-3 text-right">IP Address</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
-            <template v-if="auditLoading">
-              <tr>
-                <td colspan="6" class="px-4 py-8 text-center text-gray-400 text-xs">
-                  <UIcon name="i-lucide-loader" class="animate-spin w-4 h-4 mx-auto mb-1.5" />
-                  Memuat riwayat audit log...
-                </td>
-              </tr>
-            </template>
-            <template v-else-if="auditLogs.length === 0">
-              <tr>
-                <td colspan="6" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
-                  Belum ada aktivitas audit log yang tercatat.
-                </td>
-              </tr>
-            </template>
-            <template v-else>
-              <tr v-for="log in auditLogs" :key="log.id" class="hover:bg-gray-50/50 dark:hover:bg-gray-800/25 transition-colors">
-                <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                  {{ new Date(log.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' }) }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <div class="font-medium text-gray-900 dark:text-white">{{ log.userName || log.userEmail || (log.userId ? 'Admin (' + log.userId.slice(0, 8) + '...)' : 'System') }}</div>
-                  <div class="text-[10px] text-gray-400">
-                    <span v-if="log.userName && log.userEmail" class="mr-1">{{ log.userEmail }} •</span>
-                    <span class="capitalize">{{ log.userRole || 'Admin' }}</span>
-                  </div>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <UBadge
-                    :color="log.method === 'POST' ? 'success' : log.method === 'PUT' || log.method === 'PATCH' ? 'warning' : 'error'"
-                    variant="subtle"
-                    size="xs"
-                    class="font-mono text-[10px] font-bold"
-                  >
-                    {{ log.method }}
-                  </UBadge>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-gray-600 dark:text-gray-300 max-w-50 truncate">
-                  {{ log.path }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <UBadge
-                    :color="log.statusCode < 300 ? 'success' : log.statusCode < 500 ? 'warning' : 'error'"
-                    variant="soft"
-                    size="xs"
-                    class="font-bold font-mono text-[10px]"
-                  >
-                    {{ log.statusCode }}
-                  </UBadge>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-right font-mono text-gray-500 text-xs">
-                  {{ log.ip }}
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center text-xs text-gray-500">
-        <span>Total: {{ auditPagination.totalCount }} entri</span>
-        <UPagination
-          v-if="auditPagination.totalCount > 0"
-          v-model:page="auditPagination.page"
-          :items-per-page="15"
-          :total="auditPagination.totalCount"
+  <UDashboardPanel id="settings">
+    <template #header>
+      <UDashboardNavbar title="Pengaturan">
+        <template #leading>
+          <UDashboardSidebarCollapse />
+        </template>
+      </UDashboardNavbar>
+      <UDashboardToolbar>
+        <UTabs
+          v-model="tab"
+          :items="tabs"
+          :content="false"
+          variant="link"
           size="sm"
-          @update:page="loadAuditLogs"
         />
-      </div>
-    </div>
+      </UDashboardToolbar>
+    </template>
 
-    <!-- TAB 5: STATUS SISTEM & DIAGNOSTIK -->
-    <div v-if="activeTab === 'status'" key="status" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-5 shadow-xs flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider">Database</h3>
-            <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
-              <UIcon name="i-lucide-database" class="w-4 h-4" />
+    <template #body>
+      <div
+        class="w-full max-w-3xl"
+        :class="{ 'max-w-none': tab === 'audit' }"
+      >
+        <!-- Profile -->
+        <div
+          v-if="tab === 'profile'"
+          class="space-y-4"
+        >
+          <UCard>
+            <template #header>
+              <p class="font-medium text-highlighted">
+                Profil
+              </p>
+              <p class="text-xs text-muted">
+                Nama dan email yang tampil di log audit.
+              </p>
+            </template>
+            <form
+              class="grid sm:grid-cols-2 gap-4"
+              @submit.prevent="saveProfile"
+            >
+              <UFormField label="Nama">
+                <UInput
+                  v-model="profile.name"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Email">
+                <UInput
+                  v-model="profile.email"
+                  type="email"
+                  class="w-full"
+                />
+              </UFormField>
+              <div class="sm:col-span-2 flex items-center justify-between">
+                <UBadge
+                  :label="user ? ROLE_LABELS[user.role] : ''"
+                  color="neutral"
+                  variant="subtle"
+                />
+                <UButton
+                  type="submit"
+                  label="Simpan profil"
+                  :loading="profileSaving"
+                />
+              </div>
+            </form>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <p class="font-medium text-highlighted">
+                Kata sandi
+              </p>
+              <p class="text-xs text-muted">
+                Mengganti kata sandi akan mengeluarkan Anda dari semua perangkat.
+              </p>
+            </template>
+            <form
+              class="space-y-4"
+              @submit.prevent="changePassword"
+            >
+              <UFormField label="Kata sandi saat ini">
+                <UInput
+                  v-model="pw.currentPassword"
+                  type="password"
+                  autocomplete="current-password"
+                  class="w-full"
+                />
+              </UFormField>
+              <div class="grid sm:grid-cols-2 gap-4">
+                <UFormField
+                  label="Kata sandi baru"
+                  hint="Min. 8 karakter"
+                >
+                  <UInput
+                    v-model="pw.newPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Ulangi kata sandi baru"
+                  :error="pwError || undefined"
+                >
+                  <UInput
+                    v-model="pw.confirmNewPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    class="w-full"
+                  />
+                </UFormField>
+              </div>
+              <div class="flex justify-end">
+                <UButton
+                  type="submit"
+                  label="Ganti kata sandi"
+                  :loading="pwSaving"
+                  :disabled="!pw.currentPassword || !pw.newPassword || !pw.confirmNewPassword || !!pwError"
+                />
+              </div>
+            </form>
+          </UCard>
+        </div>
+
+        <!-- Scanner -->
+        <UCard v-else-if="tab === 'scanner'">
+          <template #header>
+            <p class="font-medium text-highlighted">
+              Preferensi scanner
+            </p>
+            <p class="text-xs text-muted">
+              Disimpan di perangkat ini dan langsung dipakai halaman Scan Check-In.
+            </p>
+          </template>
+          <div class="space-y-5">
+            <USwitch
+              v-model="prefs.soundEnabled"
+              label="Bunyi umpan balik"
+              description="Nada berbeda untuk tiket valid, sudah dipakai, dan tidak valid."
+            />
+            <UFormField
+              label="Volume"
+              :hint="`${prefs.soundVolume}%`"
+            >
+              <div class="flex items-center gap-3">
+                <USlider
+                  v-model="prefs.soundVolume"
+                  :min="0"
+                  :max="100"
+                  :disabled="!prefs.soundEnabled"
+                  class="flex-1"
+                />
+                <UButton
+                  label="Tes"
+                  icon="i-lucide-volume-2"
+                  color="neutral"
+                  variant="outline"
+                  :disabled="!prefs.soundEnabled"
+                  @click="playTone('success', prefs.soundVolume)"
+                />
+              </div>
+            </UFormField>
+            <USwitch
+              v-model="prefs.continuousMode"
+              label="Mode berkelanjutan"
+              description="Kamera tetap aktif setelah setiap scan. Matikan untuk berhenti setelah satu tiket."
+            />
+            <UFormField label="Kamera default">
+              <USelect
+                v-model="prefs.cameraFacing"
+                :items="[{ label: 'Kamera belakang', value: 'environment' }, { label: 'Kamera depan', value: 'user' }]"
+                class="w-56"
+              />
+            </UFormField>
+            <div class="flex justify-end">
+              <UButton
+                label="Simpan preferensi"
+                @click="storePrefs"
+              />
             </div>
           </div>
-          <div class="text-xl font-bold tracking-tight text-gray-900 dark:text-white capitalize">
-            {{ diagnostics?.database?.status === 'healthy' ? 'Terhubung' : 'Offline' }}
-          </div>
-        </div>
-        <p class="text-[11px] text-gray-400 mt-2 font-mono">Ping: {{ diagnostics?.database?.latencyMs ?? 0 }}ms</p>
-      </div>
+        </UCard>
 
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-5 shadow-xs flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider">Storage Bucket</h3>
-            <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
-              <UIcon name="i-lucide-hard-drive" class="w-4 h-4" />
-            </div>
-          </div>
-          <div class="text-xl font-bold tracking-tight text-gray-900 dark:text-white capitalize">
-            {{ diagnostics?.storage?.status === 'configured' ? 'Dikonfigurasi (koneksi belum diuji)' : 'Belum dikonfigurasi' }}
-          </div>
-        </div>
-        <p class="text-[11px] text-gray-400 mt-2">{{ diagnostics?.storage?.provider || 'Backblaze B2' }}</p>
-      </div>
+        <!-- Platform -->
+        <template v-else-if="tab === 'platform'">
+          <UAlert
+            v-if="settingsError"
+            color="error"
+            variant="subtle"
+            :title="settingsError"
+            :actions="[{ label: 'Coba lagi', onClick: loadSettings }]"
+          />
+          <USkeleton
+            v-else-if="!settings"
+            class="h-80 w-full"
+          />
+          <UCard v-else>
+            <template #header>
+              <p class="font-medium text-highlighted">
+                Konfigurasi platform
+              </p>
+              <p class="text-xs text-muted">
+                Berlaku untuk seluruh pelanggan di aplikasi.
+              </p>
+            </template>
+            <form
+              class="space-y-5"
+              @submit.prevent="saveSettings"
+            >
+              <div class="grid sm:grid-cols-2 gap-4">
+                <UFormField
+                  label="Default maks. tiket per pesanan"
+                  hint="1–10"
+                >
+                  <UInputNumber
+                    v-model="settings.defaultMaxTicketsPerOrder"
+                    :min="1"
+                    :max="10"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Batas waktu pembayaran (menit)"
+                  hint="5–120"
+                >
+                  <UInputNumber
+                    v-model="settings.pendingOrderExpiryMinutes"
+                    :min="5"
+                    :max="120"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField label="Email dukungan">
+                  <UInput
+                    v-model="settings.supportEmail"
+                    type="email"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField label="WhatsApp dukungan">
+                  <UInput
+                    v-model="settings.supportWhatsapp"
+                    placeholder="+62…"
+                    class="w-full"
+                  />
+                </UFormField>
+              </div>
+              <div
+                class="rounded-lg border p-4"
+                :class="settings.maintenanceMode ? 'border-warning/50 bg-warning/5' : 'border-default'"
+              >
+                <USwitch
+                  v-model="settings.maintenanceMode"
+                  color="warning"
+                  label="Mode pemeliharaan"
+                  description="Menutup pembuatan pesanan baru di aplikasi pelanggan."
+                />
+              </div>
+              <div class="flex justify-end">
+                <UButton
+                  type="submit"
+                  label="Simpan konfigurasi"
+                  :loading="settingsSaving"
+                />
+              </div>
+            </form>
+          </UCard>
+        </template>
 
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-5 shadow-xs flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider">Payment Gateway</h3>
-            <div class="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 flex items-center justify-center">
-              <UIcon name="i-lucide-credit-card" class="w-4 h-4" />
-            </div>
+        <!-- Audit -->
+        <div
+          v-else-if="tab === 'audit'"
+          class="space-y-3"
+        >
+          <div class="flex flex-wrap gap-2">
+            <UInput
+              v-model="audit.search.value"
+              icon="i-lucide-search"
+              placeholder="Cari path atau pengguna…"
+              class="w-72"
+            />
+            <USelect
+              v-model="auditMethod"
+              :items="[{ label: 'Semua aksi', value: 'all' }, 'POST', 'PUT', 'PATCH', 'DELETE']"
+              class="w-36"
+            />
           </div>
-          <div class="text-xl font-bold tracking-tight text-gray-900 dark:text-white capitalize">
-            {{ diagnostics?.paymentGateway?.status === 'configured' ? 'Dikonfigurasi (koneksi belum diuji)' : 'Belum dikonfigurasi' }}
+          <UAlert
+            v-if="audit.error.value"
+            color="error"
+            variant="subtle"
+            :title="audit.error.value"
+          />
+          <UCard :ui="{ body: 'p-0 sm:p-0' }">
+            <UTable
+              :data="audit.items.value"
+              :columns="auditColumns"
+              :loading="audit.loading.value"
+              class="min-h-64"
+              :ui="{ th: 'text-xs font-medium text-muted', td: 'py-2.5 text-xs' }"
+            >
+              <template #createdAt-cell="{ row }">
+                <span class="whitespace-nowrap text-muted">{{ formatDateTime(row.original.createdAt) }}</span>
+              </template>
+              <template #userEmail-cell="{ row }">
+                <p class="text-highlighted">
+                  {{ row.original.userName ?? row.original.userEmail ?? '—' }}
+                </p>
+                <p class="text-muted">
+                  {{ row.original.userRole }}
+                </p>
+              </template>
+              <template #path-cell="{ row }">
+                <div class="flex items-center gap-2">
+                  <UBadge
+                    :label="row.original.method"
+                    :color="methodColor(row.original.method)"
+                    variant="subtle"
+                    size="sm"
+                    class="font-mono"
+                  />
+                  <span class="font-mono truncate max-w-80">{{ row.original.path }}</span>
+                </div>
+              </template>
+              <template #statusCode-cell="{ row }">
+                <UBadge
+                  :label="String(row.original.statusCode)"
+                  :color="row.original.statusCode < 400 ? 'success' : row.original.statusCode < 500 ? 'warning' : 'error'"
+                  variant="soft"
+                  size="sm"
+                />
+                <span
+                  v-if="row.original.durationMs !== null"
+                  class="ml-1.5 text-dimmed"
+                >{{ row.original.durationMs }} ms</span>
+              </template>
+              <template #ip-cell="{ row }">
+                <span class="font-mono text-muted">{{ row.original.ip }}</span>
+              </template>
+              <template #empty>
+                <UEmpty
+                  icon="i-lucide-scroll-text"
+                  title="Belum ada aktivitas tercatat"
+                  description="Setiap perubahan oleh admin akan tercatat di sini."
+                  variant="naked"
+                />
+              </template>
+            </UTable>
+          </UCard>
+          <div
+            v-if="audit.totalPages.value > 1"
+            class="flex justify-end"
+          >
+            <UPagination
+              v-model:page="audit.page.value"
+              :total="audit.totalCount.value"
+              :items-per-page="audit.limit"
+            />
           </div>
         </div>
-        <p class="text-[11px] text-gray-400 mt-2 capitalize">Mode: {{ diagnostics?.paymentGateway?.environment || 'Sandbox' }}</p>
-      </div>
 
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 p-5 shadow-xs flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider">Runtime & Server</h3>
-            <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
-              <UIcon name="i-lucide-server" class="w-4 h-4" />
-            </div>
+        <!-- Status -->
+        <div
+          v-else-if="tab === 'status'"
+          class="space-y-3"
+        >
+          <div class="flex justify-end">
+            <UButton
+              icon="i-lucide-refresh-cw"
+              label="Periksa ulang"
+              color="neutral"
+              variant="outline"
+              :loading="diagLoading"
+              @click="loadDiag"
+            />
           </div>
-          <div class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-            {{ diagnostics?.runtime?.platform || 'Bun / Hono' }}
+          <div
+            v-if="diag"
+            class="grid sm:grid-cols-2 gap-3"
+          >
+            <UCard
+              v-for="item in [
+                { label: 'Database', icon: 'i-lucide-database', status: diag.database.status, detail: `Latensi ${diag.database.latencyMs} ms` },
+                { label: 'Penyimpanan gambar', icon: 'i-lucide-hard-drive', status: diag.storage.status, detail: diag.storage.provider },
+                { label: 'Payment gateway', icon: 'i-lucide-credit-card', status: diag.paymentGateway.status, detail: diag.paymentGateway.environment },
+                { label: 'Server', icon: 'i-lucide-server', status: 'healthy', detail: `${diag.runtime.nodeEnv} · aktif ${uptime(diag.runtime.uptimeSeconds)}` }
+              ]"
+              :key="item.label"
+            >
+              <div class="flex items-center gap-3">
+                <UIcon
+                  :name="item.icon"
+                  class="size-5 text-muted"
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-highlighted">
+                    {{ item.label }}
+                  </p>
+                  <p class="text-xs text-muted truncate">
+                    {{ item.detail }}
+                  </p>
+                </div>
+                <UBadge
+                  :label="item.status"
+                  :color="healthy(item.status) ? 'success' : 'error'"
+                  variant="subtle"
+                />
+              </div>
+            </UCard>
           </div>
+          <UAlert
+            v-else-if="!diagLoading"
+            color="error"
+            variant="subtle"
+            title="Status sistem gagal dimuat."
+          />
         </div>
-        <p class="text-[11px] text-gray-400 mt-2">
-          Uptime: {{ Math.floor((diagnostics?.runtime?.uptimeSeconds || 0) / 60) }} Menit
-        </p>
       </div>
-    </div>
-  </div>
+    </template>
+  </UDashboardPanel>
 </template>

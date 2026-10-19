@@ -1,137 +1,141 @@
 <script setup lang="ts">
-import * as v from 'valibot'
-import type { FormSubmitEvent } from '@nuxt/ui'
-
 definePageMeta({ layout: false })
+useHead({ title: 'Masuk' })
 
 const { login } = useAuth()
+const route = useRoute()
 
-const schema = v.object({
-  email: v.pipe(v.string(), v.email('Format email tidak valid')),
-  password: v.pipe(v.string(), v.minLength(6, 'Password minimal 6 karakter'))
-})
-type Schema = v.InferOutput<typeof schema>
-
-const state = reactive({
-  email: '',
-  password: ''
-})
-
+const state = reactive({ email: '', password: '' })
 const showPassword = ref(false)
-const isLoading = ref(false)
-const loginError = ref('')
+const loading = ref(false)
+const error = ref('')
 
-async function onSubmit(event: FormSubmitEvent<Schema>) {
-  isLoading.value = true
-  loginError.value = ''
+async function submit() {
+  error.value = ''
+  if (!/^\S+@\S+\.\S+$/.test(state.email.trim())) {
+    error.value = 'Masukkan email yang valid.'
+    return
+  }
+  if (!state.password) {
+    error.value = 'Masukkan kata sandi.'
+    return
+  }
+  loading.value = true
   try {
-    const user = await login(event.data.email, event.data.password)
-    if (user?.role === 'gate_staff') {
-      await navigateTo('/scanner')
-    } else {
-      await navigateTo('/')
-    }
-  } catch (err: any) {
-    loginError.value = err.data?.error || err.message || 'Email atau password salah'
+    const user = await login(state.email.trim(), state.password)
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : null
+    await navigateTo(user.role === 'gate_staff' ? '/scanner' : redirect ?? '/')
+  } catch (err) {
+    const status = apiErrorStatus(err)
+    error.value = status === 401
+      ? 'Email atau kata sandi salah.'
+      : apiErrorMessage(err, 'Tidak dapat masuk. Coba lagi.')
   } finally {
-    isLoading.value = false
+    loading.value = false
   }
 }
 </script>
 
 <template>
-  <div class="min-h-screen flex bg-white">
-    <!-- Left panel: brand identity -->
-    <div class="hidden lg:flex lg:w-[42%] relative overflow-hidden bg-[#1B1330] text-white flex-col justify-between px-12 py-14">
-
-      <div class="relative z-10">
-        <span class="text-xl font-bold tracking-[0.3em]">GGTIX</span>
+  <div class="min-h-dvh grid lg:grid-cols-2 bg-default">
+    <aside class="hidden lg:flex flex-col justify-between bg-brand-950 text-white p-12">
+      <div class="flex items-center gap-2.5">
+        <span class="size-9 rounded-lg bg-white/10 text-accent grid place-items-center">
+          <UIcon
+            name="i-lucide-ticket"
+            class="size-5"
+          />
+        </span>
+        <span class="font-semibold tracking-wide">GGTIX</span>
       </div>
-
-      <div class="relative z-10 space-y-5 max-w-xs">
-        <p class="text-xs uppercase tracking-[0.35em] text-[#F2A93B]">Admin console</p>
-        <h1 class="text-4xl font-bold leading-tight">
-          Manage every<br>show from<br>one stage.
+      <div class="max-w-sm space-y-4">
+        <h1 class="text-3xl font-semibold leading-tight text-balance">
+          Kelola setiap pertunjukan dari satu tempat.
         </h1>
-        <p class="text-white/60 text-sm">
-          Manage events, tickets, and orders for every concert you run.
+        <p class="text-white/60">
+          Event, penjualan tiket, voucher, dan check-in di gerbang — dalam satu konsol.
         </p>
       </div>
+      <p class="text-xs text-white/40">
+        © {{ new Date().getFullYear() }} GGTIX
+      </p>
+    </aside>
 
-      <p class="relative z-10 text-xs text-white/40">© 2026 GGTIX</p>
-    </div>
-
-    <!-- Ticket-tear divider -->
-    <div class="hidden lg:block w-px relative" aria-hidden="true">
-      <div
-        class="absolute inset-y-0 -left-3 w-6"
-        style="background-image: radial-gradient(circle, white 0 5px, transparent 5px); background-size: 24px 24px; background-repeat: repeat-y; background-position: center;"
-      />
-    </div>
-
-    <!-- Right panel: login form -->
-    <div class="flex-1 flex items-center justify-center px-6 py-14">
-      <div class="w-full max-w-sm">
-        <div class="lg:hidden mb-10 text-center">
-          <span class="text-lg font-bold tracking-[0.3em] text-[#1B1330]">GGTIX</span>
+    <main class="flex items-center justify-center p-6">
+      <div class="w-full max-w-sm space-y-6">
+        <div class="space-y-1">
+          <div class="lg:hidden mb-6 flex items-center gap-2.5">
+            <span class="size-9 rounded-lg bg-brand-950 text-accent grid place-items-center">
+              <UIcon
+                name="i-lucide-ticket"
+                class="size-5"
+              />
+            </span>
+            <span class="font-semibold tracking-wide text-highlighted">GGTIX</span>
+          </div>
+          <h2 class="text-2xl font-semibold text-highlighted">
+            Masuk ke konsol admin
+          </h2>
+          <p class="text-sm text-muted">
+            Gunakan akun yang diberikan oleh Super Admin.
+          </p>
         </div>
 
-        <h2 class="text-2xl font-medium text-gray-900">Sign in to admin panel</h2>
-        <p class="mt-1 text-sm text-gray-500">Enter your credentials to continue.</p>
-
-        <UAlert
-          v-if="loginError"
-          class="mt-6"
-          color="error"
-          variant="soft"
-          :title="loginError"
-        />
-
-        <UForm :schema="schema" :state="state" class="mt-8 space-y-5" @submit="onSubmit">
-          <UFormField label="Email" name="email">
+        <form
+          class="space-y-4"
+          novalidate
+          @submit.prevent="submit"
+        >
+          <UFormField label="Email">
             <UInput
               v-model="state.email"
               type="email"
-              placeholder="name@ggtix.com"
-              icon="i-lucide-mail"
+              autocomplete="username"
+              placeholder="nama@ggtix.com"
               size="lg"
               class="w-full"
+              autofocus
             />
           </UFormField>
-
-          <UFormField label="Password" name="password">
+          <UFormField label="Kata sandi">
             <UInput
               v-model="state.password"
               :type="showPassword ? 'text' : 'password'"
-              placeholder="••••••••"
-              icon="i-lucide-lock"
+              autocomplete="current-password"
               size="lg"
               class="w-full"
+              :ui="{ trailing: 'pe-1' }"
             >
               <template #trailing>
                 <UButton
                   color="neutral"
                   variant="link"
-                  size="sm"
                   :icon="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  :aria-label="showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                  :aria-pressed="showPassword"
                   @click="showPassword = !showPassword"
                 />
               </template>
             </UInput>
           </UFormField>
 
+          <UAlert
+            v-if="error"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-circle-alert"
+            :title="error"
+          />
+
           <UButton
             type="submit"
-            block
+            label="Masuk"
             size="lg"
-            :loading="isLoading"
-            class="bg-[#1B1330] hover:bg-[#2A1F49] text-white mt-5"
-          >
-            Sign in
-          </UButton>
-        </UForm>
+            block
+            :loading="loading"
+          />
+        </form>
       </div>
-    </div>
+    </main>
   </div>
 </template>

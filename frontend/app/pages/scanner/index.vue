@@ -1,672 +1,493 @@
 <script setup lang="ts">
 import { Html5Qrcode } from 'html5-qrcode'
 
-interface EventOption {
-  id: string
-  title: string
-  dateTime: string
-  venueName?: string
-  city?: string
-  status?: string
-}
+useHead({ title: 'Scan Check-In' })
 
-interface TicketStats {
-  eventId: string
-  eventTitle: string
+interface EventOption { id: string, title: string, dateTime: string, status: 'open' | 'closed', venue?: { name: string, city: string } | null }
+interface Stats {
   totalTickets: number
   checkedIn: number
   remaining: number
   checkedInPct: number
-  byCategory: Array<{
-    categoryName: string
-    total: number
-    checkedIn: number
-    remaining: number
-    checkedInPct: number
-  }>
+  byCategory: { categoryName: string, total: number, checkedIn: number, checkedInPct: number }[]
 }
-
+type Outcome = 'success' | 'used' | 'wrong_event' | 'invalid' | 'error'
 interface ScanResult {
-  status: 'SUCCESS' | 'ALREADY_CHECKED_IN' | 'WRONG_EVENT' | 'TICKET_NOT_FOUND' | 'ERROR'
-  message: string
-  ticket?: {
-    id: string
-    qrCodeValue: string
-    checkedIn: boolean
-    checkedInAt?: string | null
-  }
-  order?: {
-    customerName: string
-    categoryName: string
-    quantity: number
-  }
-  event?: {
-    title: string
-  }
-  timestamp: string
+  outcome: Outcome
+  code: string
+  title: string
+  detail: string
+  at: Date
 }
 
 const { request } = useApi()
+const { prefs } = useScannerPrefs()
+const EVENT_KEY = 'ggtix_scanner_event'
 
-// Event selection state
+// ---- Events -------------------------------------------------------------
 const events = ref<EventOption[]>([])
-const selectedEventId = ref<string>('')
-const isLoadingEvents = ref(false)
+const eventsError = ref('')
+const eventsLoading = ref(true)
+const eventId = ref('')
 
-// Scanner state
-const isScanning = ref(false)
-const scannerError = ref('')
-const manualQrCode = ref('')
-const isProcessing = ref(false)
-const cameraFacingMode = ref<'environment' | 'user'>('environment')
-let html5QrScanner: Html5Qrcode | null = null
-
-// Live check-in stats
-const stats = ref<TicketStats | null>(null)
-let statsInterval: any = null
-
-// Feedback state
-const currentFeedback = ref<ScanResult | null>(null)
-const scanHistory = ref<ScanResult[]>([])
-let feedbackTimer: any = null
-
-// Web Audio API Synthesis for Chime / Buzz (100% Reliable Offline)
-function playSound(type: 'success' | 'error' | 'warning') {
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
-
-    if (type === 'success') {
-      // Ascending two-tone chime (880Hz -> 1320Hz)
-      const now = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(880, now)
-      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.15)
-      gain.gain.setValueAtTime(0.3, now)
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35)
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(now)
-      osc.stop(now + 0.35)
-    } else {
-      // Low buzz tone (160Hz sawtooth)
-      const now = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sawtooth'
-      osc.frequency.setValueAtTime(160, now)
-      gain.gain.setValueAtTime(0.4, now)
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4)
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(now)
-      osc.stop(now + 0.4)
-    }
-  } catch {
-    // Ignore audio context autoplay errors
-  }
+/** Events closest to now first; upcoming shows win over past ones on the same distance. */
+function relevance(e: EventOption) {
+  const diff = Date.parse(e.dateTime) - Date.now()
+  return diff >= -12 * 3600000 ? Math.abs(diff) : Math.abs(diff) * 4
 }
 
-// Fetch Events List
-async function fetchEventsList() {
-  isLoadingEvents.value = true
+async function loadEvents() {
+  eventsLoading.value = true
+  eventsError.value = ''
   try {
-    const res = await request<{ data: any[] }>('/events')
-    if (res?.data && res.data.length > 0) {
-      events.value = res.data.map((e: any) => ({
-        id: e.id,
-        title: e.title,
-        dateTime: e.dateTime,
-        venueName: typeof e.venue === 'object' ? e.venue?.name : 'Venue Konser',
-        city: e.city || (typeof e.venue === 'object' ? e.venue?.city : 'Jakarta'),
-        status: e.status
-      }))
-      if (!selectedEventId.value && events.value.length > 0 && events.value[0]) {
-        selectedEventId.value = events.value[0].id
-      }
-    }
-  } catch {
-    // Fallback demo events
-    events.value = [
-      {
-        id: 'evt-001',
-        title: 'Wuthering Waves Live 2026',
-        dateTime: '2026-10-12T19:00:00.000Z',
-        venueName: 'Gelora Bung Karno',
-        city: 'Jakarta',
-        status: 'open'
-      },
-      {
-        id: 'evt-002',
-        title: 'Coldplay Music of the Spheres',
-        dateTime: '2026-11-15T20:00:00.000Z',
-        venueName: 'Stadion Utama GBK',
-        city: 'Jakarta',
-        status: 'open'
-      }
-    ]
-    if (!selectedEventId.value) {
-      selectedEventId.value = 'evt-001'
-    }
-  } finally {
-    isLoadingEvents.value = false
-  }
-}
-
-// Fetch Stats for selected event
-async function fetchEventStats() {
-  if (!selectedEventId.value) return
-  try {
-    const res = await request<{ data: TicketStats }>(`/tickets/stats/${selectedEventId.value}`)
-    if (res?.data) {
-      stats.value = res.data
-    }
-  } catch {
-    // Fallback demo stats
-    stats.value = {
-      eventId: selectedEventId.value,
-      eventTitle: currentSelectedEvent.value?.title || 'Konser Musik',
-      totalTickets: 500,
-      checkedIn: 342,
-      remaining: 158,
-      checkedInPct: 68.4,
-      byCategory: [
-        { categoryName: 'VVIP', total: 50, checkedIn: 48, remaining: 2, checkedInPct: 96.0 },
-        { categoryName: 'VIP', total: 150, checkedIn: 120, remaining: 30, checkedInPct: 80.0 },
-        { categoryName: 'Reguler', total: 300, checkedIn: 174, remaining: 126, checkedInPct: 58.0 }
-      ]
-    }
-  }
-}
-
-const currentSelectedEvent = computed(() => {
-  return events.value.find((e) => e.id === selectedEventId.value)
-})
-
-const eventSelectOptions = computed(() => {
-  return events.value.map((e) => ({
-    label: `${e.title} (${e.city || 'Jakarta'})`,
-    value: e.id
-  }))
-})
-
-// Camera Scanner Controls
-async function startScanner() {
-  if (!selectedEventId.value) {
-    scannerError.value = 'Pilih event konser terlebih dahulu.'
-    return
-  }
-
-  scannerError.value = ''
-  try {
-    if (!html5QrScanner) {
-      html5QrScanner = new Html5Qrcode('qr-video-reader')
-    }
-
-    const config = {
-      fps: 10,
-      qrbox: { width: 240, height: 240 },
-      aspectRatio: 1.0
-    }
-
-    await html5QrScanner.start(
-      { facingMode: cameraFacingMode.value },
-      config,
-      (decodedText) => {
-        handleQrDetected(decodedText)
-      },
-      () => {
-        // Ignore frame scan misses
-      }
-    )
-    isScanning.value = true
-  } catch (err: any) {
-    scannerError.value = err?.message || 'Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan.'
-    isScanning.value = false
-  }
-}
-
-async function stopScanner() {
-  if (html5QrScanner && isScanning.value) {
+    // Ticket sales are often closed on show day, so include closed events.
+    const res = await request<{ data: EventOption[] }>('/events', { query: { limit: 100 } })
+    events.value = [...res.data].sort((a, b) => relevance(a) - relevance(b))
+    let remembered: string | null = null
     try {
-      await html5QrScanner.stop()
-    } catch {
-      // Ignore
-    }
-    isScanning.value = false
-  }
-}
-
-async function toggleCamera() {
-  cameraFacingMode.value = cameraFacingMode.value === 'environment' ? 'user' : 'environment'
-  if (isScanning.value) {
-    await stopScanner()
-    await startScanner()
-  }
-}
-
-// Handle QR Scan / Check-In
-async function handleQrDetected(qrValue: string) {
-  if (isProcessing.value || !qrValue.trim()) return
-  isProcessing.value = true
-
-  const cleanQr = qrValue.trim()
-
-  try {
-    const res = await request<{ data: any }>('/tickets/check-in', {
-      method: 'POST',
-      body: {
-        qrCodeValue: cleanQr,
-        eventId: selectedEventId.value
-      }
-    })
-
-    const data = res?.data
-    const successResult: ScanResult = {
-      status: 'SUCCESS',
-      message: 'Tiket Valid — Check-in Berhasil!',
-      ticket: data?.ticket || { id: cleanQr, qrCodeValue: cleanQr, checkedIn: true, checkedInAt: new Date().toISOString() },
-      order: data?.order || { customerName: 'Pengunjung', categoryName: 'VIP', quantity: 1 },
-      event: data?.event || { title: currentSelectedEvent.value?.title || 'Event' },
-      timestamp: new Date().toLocaleTimeString('id-ID')
-    }
-
-    setFeedback(successResult)
-    playSound('success')
-
-    // Optimistic stats update
-    if (stats.value) {
-      stats.value.checkedIn += 1
-      stats.value.remaining = Math.max(0, stats.value.remaining - 1)
-      stats.value.checkedInPct = Math.min(100, Math.round((stats.value.checkedIn / stats.value.totalTickets) * 1000) / 10)
-    }
-    fetchEventStats()
-  } catch (err: any) {
-    const errCode = err?.data?.error || 'ERROR'
-    const errMsg = err?.data?.message || err?.message || 'Gagal memvalidasi tiket.'
-    const checkedInAt = err?.data?.checkedInAt
-
-    let statusType: ScanResult['status'] = 'ERROR'
-    let soundType: 'error' | 'warning' = 'error'
-
-    if (errCode === 'ALREADY_CHECKED_IN') {
-      statusType = 'ALREADY_CHECKED_IN'
-      soundType = 'warning'
-    } else if (errCode === 'WRONG_EVENT') {
-      statusType = 'WRONG_EVENT'
-      soundType = 'warning'
-    } else if (errCode === 'TICKET_NOT_FOUND') {
-      statusType = 'TICKET_NOT_FOUND'
-      soundType = 'error'
-    }
-
-    const failureResult: ScanResult = {
-      status: statusType,
-      message: errMsg + (checkedInAt ? ` (${new Date(checkedInAt).toLocaleTimeString('id-ID')})` : ''),
-      ticket: { id: cleanQr, qrCodeValue: cleanQr, checkedIn: true, checkedInAt },
-      timestamp: new Date().toLocaleTimeString('id-ID')
-    }
-
-    setFeedback(failureResult)
-    playSound(soundType)
+      remembered = localStorage.getItem(EVENT_KEY)
+    } catch { /* storage blocked */ }
+    eventId.value = events.value.find(e => e.id === remembered)?.id ?? events.value[0]?.id ?? ''
+  } catch (err) {
+    eventsError.value = apiErrorMessage(err, 'Daftar event gagal dimuat.')
   } finally {
-    setTimeout(() => {
-      isProcessing.value = false
-    }, 2000)
+    eventsLoading.value = false
   }
 }
 
-function handleManualSubmit() {
-  if (!manualQrCode.value.trim()) return
-  handleQrDetected(manualQrCode.value.trim())
-  manualQrCode.value = ''
+const eventItems = computed(() => events.value.map(e => ({
+  label: e.title,
+  value: e.id,
+  description: `${formatDateTime(e.dateTime)}${e.venue ? ` · ${e.venue.name}` : ''}`
+})))
+const currentEvent = computed(() => events.value.find(e => e.id === eventId.value))
+
+// ---- Live stats ---------------------------------------------------------
+const stats = ref<Stats | null>(null)
+const statsStale = ref(false)
+const statsUpdatedAt = ref<Date | null>(null)
+let statsTimer: ReturnType<typeof setInterval> | undefined
+
+async function loadStats() {
+  const id = eventId.value
+  if (!id || document.hidden) return
+  try {
+    const res = await request<{ data: Stats }>(`/tickets/stats/${id}`)
+    if (id !== eventId.value) return
+    stats.value = res.data
+    statsStale.value = false
+    statsUpdatedAt.value = new Date()
+  } catch {
+    // Keep the last real numbers and flag them; never show invented ones.
+    statsStale.value = true
+  }
 }
 
-function setFeedback(result: ScanResult) {
-  currentFeedback.value = result
-  scanHistory.value.unshift(result)
-  if (scanHistory.value.length > 10) scanHistory.value.pop()
+watch(eventId, (id) => {
+  stats.value = null
+  history.value = []
+  result.value = null
+  if (!id) return
+  try {
+    localStorage.setItem(EVENT_KEY, id)
+  } catch { /* storage blocked */ }
+  loadStats()
+  if (scanning.value) restartCamera()
+})
 
-  clearTimeout(feedbackTimer)
-  feedbackTimer = setTimeout(() => {
-    currentFeedback.value = null
-  }, 2500)
+// ---- Camera -------------------------------------------------------------
+const READER_ID = 'qr-reader'
+let scanner: Html5Qrcode | null = null
+const scanning = ref(false)
+const starting = ref(false)
+const cameraError = ref('')
+const facing = ref<'environment' | 'user'>(prefs.value.cameraFacing)
+
+async function startCamera() {
+  if (!eventId.value || starting.value) return
+  cameraError.value = ''
+  starting.value = true
+  try {
+    scanner ??= new Html5Qrcode(READER_ID, { verbose: false })
+    await scanner.start({ facingMode: facing.value }, { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 }, onDecoded, () => {})
+    scanning.value = true
+  } catch (err) {
+    const msg = String((err as Error)?.message ?? err)
+    cameraError.value = /permission|notallowed/i.test(msg)
+      ? 'Izin kamera ditolak. Izinkan akses kamera di pengaturan browser, lalu coba lagi.'
+      : /notfound|no camera|requested device/i.test(msg)
+        ? 'Kamera tidak ditemukan di perangkat ini. Gunakan input manual.'
+        : 'Kamera tidak dapat dibuka. Pastikan tidak dipakai aplikasi lain.'
+  } finally {
+    starting.value = false
+  }
 }
 
-watch(selectedEventId, (newId) => {
-  if (newId) {
-    fetchEventStats()
-    if (isScanning.value) {
-      stopScanner().then(() => startScanner())
+async function stopCamera() {
+  if (!scanner || !scanning.value) return
+  try {
+    await scanner.stop()
+  } catch { /* already stopped */ }
+  scanning.value = false
+}
+
+async function restartCamera() {
+  await stopCamera()
+  await startCamera()
+}
+
+async function flipCamera() {
+  facing.value = facing.value === 'environment' ? 'user' : 'environment'
+  if (scanning.value) await restartCamera()
+}
+
+// ---- Check-in -----------------------------------------------------------
+const result = ref<ScanResult | null>(null)
+const history = ref<ScanResult[]>([])
+const processing = ref(false)
+const manualCode = ref('')
+const recent = new Map<string, number>()
+const COOLDOWN_MS = 4000
+let clearTimer: ReturnType<typeof setTimeout> | undefined
+
+function onDecoded(text: string) {
+  const code = text.trim()
+  // The camera sees the same QR many times per second; ignore repeats briefly.
+  const last = recent.get(code)
+  if (!code || processing.value || (last && Date.now() - last < COOLDOWN_MS)) return
+  recent.set(code, Date.now())
+  void checkIn(code)
+}
+
+function submitManual() {
+  const code = manualCode.value.trim()
+  if (!code || processing.value) return
+  manualCode.value = ''
+  void checkIn(code)
+}
+
+async function checkIn(code: string) {
+  if (!eventId.value) return
+  processing.value = true
+  let outcome: ScanResult
+  try {
+    const res = await request<{ data: { order: { customerName: string, categoryName: string } } }>('/tickets/check-in', {
+      method: 'POST',
+      body: { qrCodeValue: code, eventId: eventId.value }
+    })
+    outcome = { outcome: 'success', code, title: 'Tiket valid', detail: `${res.data.order.customerName} · ${res.data.order.categoryName}`, at: new Date() }
+  } catch (err) {
+    const data = (err as { data?: { error?: string, checkedInAt?: string } }).data
+    const status = apiErrorStatus(err)
+    if (data?.error === 'ALREADY_CHECKED_IN') {
+      outcome = { outcome: 'used', code, title: 'Tiket sudah dipakai', detail: `Check-in pukul ${formatTime(data.checkedInAt)}`, at: new Date() }
+    } else if (data?.error === 'WRONG_EVENT') {
+      outcome = { outcome: 'wrong_event', code, title: 'Bukan untuk event ini', detail: 'Arahkan pengunjung ke gerbang event yang benar.', at: new Date() }
+    } else if (data?.error === 'TICKET_NOT_FOUND') {
+      outcome = { outcome: 'invalid', code, title: 'QR tidak dikenali', detail: 'Tiket tidak terdaftar di GGTIX.', at: new Date() }
+    } else {
+      // A network failure is not proof the ticket is fake; let staff retry.
+      outcome = { outcome: 'error', code, title: status ? 'Gagal memvalidasi' : 'Tidak ada koneksi', detail: apiErrorMessage(err), at: new Date() }
+      recent.delete(code)
     }
   }
-})
+  showResult(outcome)
+  processing.value = false
+  if (outcome.outcome === 'success') loadStats()
+  if (!prefs.value.continuousMode && outcome.outcome !== 'error') await stopCamera()
+}
+
+function showResult(r: ScanResult) {
+  result.value = r
+  history.value = [r, ...history.value].slice(0, 20)
+  if (prefs.value.soundEnabled) {
+    playTone(r.outcome === 'success' ? 'success' : r.outcome === 'used' || r.outcome === 'wrong_event' ? 'warning' : 'error', prefs.value.soundVolume)
+  }
+  clearTimeout(clearTimer)
+  clearTimer = setTimeout(() => {
+    result.value = null
+  }, 4000)
+}
+
+const OUTCOME_UI: Record<Outcome, { icon: string, cls: string, badge: 'success' | 'warning' | 'error' | 'neutral' }> = {
+  success: { icon: 'i-lucide-circle-check', cls: 'bg-success/10 border-success/40 text-success', badge: 'success' },
+  used: { icon: 'i-lucide-circle-alert', cls: 'bg-warning/10 border-warning/40 text-warning', badge: 'warning' },
+  wrong_event: { icon: 'i-lucide-circle-slash', cls: 'bg-warning/10 border-warning/40 text-warning', badge: 'warning' },
+  invalid: { icon: 'i-lucide-circle-x', cls: 'bg-error/10 border-error/40 text-error', badge: 'error' },
+  error: { icon: 'i-lucide-wifi-off', cls: 'bg-elevated border-default text-muted', badge: 'neutral' }
+}
+
+function onVisibility() {
+  if (!document.hidden) loadStats()
+}
 
 onMounted(async () => {
-  await fetchEventsList()
-  fetchEventStats()
-  // 5-second polling for live check-in stats
-  statsInterval = setInterval(fetchEventStats, 5000)
+  await loadEvents()
+  statsTimer = setInterval(loadStats, 5000)
+  document.addEventListener('visibilitychange', onVisibility)
 })
 
 onBeforeUnmount(() => {
-  clearInterval(statsInterval)
-  clearTimeout(feedbackTimer)
-  stopScanner()
+  clearInterval(statsTimer)
+  clearTimeout(clearTimer)
+  document.removeEventListener('visibilitychange', onVisibility)
+  void stopCamera()
 })
 </script>
 
 <template>
-  <div class="space-y-5">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div>
-        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Scanner QR Check-In Venue
-        </h1>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          Validasi tiket digital pengunjung & monitor statistik pintu masuk konser (/api/tickets/check-in)
-        </p>
-      </div>
+  <UDashboardPanel id="scanner">
+    <template #header>
+      <UDashboardNavbar title="Scan Check-In">
+        <template #leading>
+          <UDashboardSidebarCollapse />
+        </template>
+      </UDashboardNavbar>
+      <UDashboardToolbar>
+        <template #left>
+          <USelectMenu
+            v-model="eventId"
+            :items="eventItems"
+            value-key="value"
+            :loading="eventsLoading"
+            placeholder="Pilih event"
+            :search-input="{ placeholder: 'Cari event…' }"
+            class="w-full sm:w-96"
+            aria-label="Event yang sedang di-check-in"
+          />
+        </template>
+        <template #right>
+          <StatusBadge
+            v-if="currentEvent"
+            :status="currentEvent.status"
+          />
+        </template>
+      </UDashboardToolbar>
+    </template>
 
-      <!-- Active Event Badge -->
-      <UBadge
-        v-if="currentSelectedEvent"
-        color="primary"
-        variant="soft"
-        size="sm"
-        class="font-semibold text-[11px] px-3 py-1 rounded-md"
+    <template #body>
+      <UAlert
+        v-if="eventsError"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+        :title="eventsError"
+        description="Scanner tidak dapat dipakai tanpa daftar event."
+        :actions="[{ label: 'Coba lagi', color: 'error', variant: 'outline', onClick: loadEvents }]"
+      />
+      <UEmpty
+        v-else-if="!eventsLoading && !events.length"
+        icon="i-lucide-calendar-x"
+        title="Belum ada event"
+        description="Scanner aktif setelah ada event yang dibuat."
+      />
+
+      <div
+        v-else
+        class="grid grid-cols-1 lg:grid-cols-5 gap-4"
       >
-        <UIcon name="i-lucide-radio" class="w-3.5 h-3.5 mr-1 text-emerald-500 animate-pulse" />
-        {{ currentSelectedEvent.title }}
-      </UBadge>
-    </div>
-
-    <!-- Event Selector Card -->
-    <div class="p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5 flex-1">
-        <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-          <UIcon name="i-lucide-calendar" class="w-4.5 h-4.5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Pilih Event Konser</p>
-          <USelect
-            v-model="selectedEventId"
-            :items="eventSelectOptions"
-            placeholder="Pilih event untuk check-in..."
-            size="sm"
-            class="w-full sm:w-80 mt-1 text-xs"
-          />
-        </div>
-      </div>
-
-      <!-- Event Quick Info -->
-      <div v-if="currentSelectedEvent" class="text-left sm:text-right text-xs">
-        <p class="font-semibold text-gray-900 dark:text-white">{{ currentSelectedEvent.venueName }}</p>
-        <p class="text-[11px] text-gray-500">{{ currentSelectedEvent.city }} • {{ new Date(currentSelectedEvent.dateTime).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) }}</p>
-      </div>
-    </div>
-
-    <!-- Main Scanner & Stats Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-      <!-- Left Column: Camera Scanner Viewport & Manual Input (7 Cols) -->
-      <div class="lg:col-span-7 space-y-4">
-        <!-- Scanner Viewport Box -->
-        <div
-          :class="[
-            'p-4 rounded-xl bg-white dark:bg-gray-900 border shadow-xs transition-all duration-300 relative overflow-hidden',
-            currentFeedback?.status === 'SUCCESS'
-              ? 'border-emerald-500 ring-4 ring-emerald-500/20'
-              : currentFeedback?.status === 'ALREADY_CHECKED_IN' || currentFeedback?.status === 'WRONG_EVENT'
-              ? 'border-amber-500 ring-4 ring-amber-500/20'
-              : currentFeedback
-              ? 'border-red-500 ring-4 ring-red-500/20'
-              : 'border-gray-200/80 dark:border-gray-800'
-          ]"
-        >
-          <!-- Camera Controls Header -->
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
+        <div class="lg:col-span-3 space-y-4">
+          <UCard>
+            <div class="relative mx-auto aspect-square max-w-md overflow-hidden rounded-xl bg-neutral-950">
               <div
-                :class="[
-                  'w-2.5 h-2.5 rounded-full',
-                  isScanning ? 'bg-emerald-500 animate-ping' : 'bg-gray-400'
-                ]"
+                :id="READER_ID"
+                class="size-full [&_video]:object-cover"
               />
-              <span class="text-xs font-bold text-gray-900 dark:text-white">
-                {{ isScanning ? 'Kamera Scanner Aktif' : 'Kamera Siap' }}
-              </span>
-            </div>
-
-            <div class="flex items-center gap-1.5">
-              <UButton
-                v-if="isScanning"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                icon="i-lucide-switch-camera"
-                title="Ganti Kamera"
-                @click="toggleCamera"
-              />
-              <UButton
-                v-if="!isScanning"
-                color="primary"
-                size="sm"
-                icon="i-lucide-camera"
-                class="font-medium text-xs shadow-xs"
-                @click="startScanner"
-              >
-                Nyalakan Kamera
-              </UButton>
-              <UButton
-                v-else
-                color="error"
-                variant="soft"
-                size="sm"
-                icon="i-lucide-camera-off"
-                class="font-medium text-xs"
-                @click="stopScanner"
-              >
-                Matikan
-              </UButton>
-            </div>
-          </div>
-
-          <!-- Video Viewport Container -->
-          <div class="w-full aspect-4/3 rounded-xl bg-gray-950 flex items-center justify-center overflow-hidden relative">
-            <div id="qr-video-reader" class="w-full h-full object-cover" />
-
-            <!-- Scanner Idle State Placeholder -->
-            <div v-if="!isScanning && !currentFeedback" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gray-900/90 text-gray-400">
-              <div class="w-14 h-14 rounded-2xl bg-gray-800 text-amber-500 flex items-center justify-center mb-3">
-                <UIcon name="i-lucide-qr-code" class="w-8 h-8" />
-              </div>
-              <p class="text-xs font-semibold text-white">Scanner Belum Aktif</p>
-              <p class="text-[11px] text-gray-400 max-w-xs mt-1">
-                Klik tombol "Nyalakan Kamera" atau gunakan input manual di bawah untuk check-in tiket.
-              </p>
-            </div>
-
-            <!-- Visual Feedback Flash Overlay -->
-            <div
-              v-if="currentFeedback"
-              :class="[
-                'absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-20 transition-all duration-200 animate-in fade-in zoom-in-95',
-                currentFeedback.status === 'SUCCESS'
-                  ? 'bg-emerald-950/95 text-white'
-                  : currentFeedback.status === 'ALREADY_CHECKED_IN' || currentFeedback.status === 'WRONG_EVENT'
-                  ? 'bg-amber-950/95 text-white'
-                  : 'bg-red-950/95 text-white'
-              ]"
-            >
               <div
-                :class="[
-                  'w-16 h-16 rounded-full flex items-center justify-center mb-3 shadow-lg',
-                  currentFeedback.status === 'SUCCESS'
-                    ? 'bg-emerald-500 text-white'
-                    : currentFeedback.status === 'ALREADY_CHECKED_IN' || currentFeedback.status === 'WRONG_EVENT'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-red-500 text-white'
-                ]"
+                v-if="!scanning"
+                class="absolute inset-0 grid place-items-center text-center p-6"
               >
-                <UIcon
-                  :name="
-                    currentFeedback.status === 'SUCCESS'
-                      ? 'i-lucide-check-circle'
-                      : currentFeedback.status === 'ALREADY_CHECKED_IN'
-                      ? 'i-lucide-clock'
-                      : 'i-lucide-alert-triangle'
-                  "
-                  class="w-10 h-10"
-                />
-              </div>
-
-              <h2 class="text-base font-extrabold tracking-tight">
-                {{ currentFeedback.message }}
-              </h2>
-
-              <div v-if="currentFeedback.order" class="mt-2 text-xs text-gray-200 space-y-0.5">
-                <p class="font-bold text-sm text-white">{{ currentFeedback.order.customerName }}</p>
-                <p class="text-[11px] text-emerald-300 font-semibold">{{ currentFeedback.order.categoryName }} Class</p>
-              </div>
-
-              <p class="text-[10px] font-mono text-gray-400 mt-2">
-                {{ currentFeedback.ticket?.qrCodeValue }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Scanner Error Alert -->
-          <UAlert
-            v-if="scannerError"
-            color="error"
-            variant="soft"
-            icon="i-lucide-alert-circle"
-            :description="scannerError"
-            class="mt-3 text-xs"
-          />
-        </div>
-
-        <!-- Manual Input Fallback -->
-        <div class="p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs">
-          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Input Manual Kode Tiket (Fallback)</p>
-          <div class="flex items-center gap-2">
-            <UInput
-              v-model="manualQrCode"
-              placeholder="Ketik kode tiket (contoh: tix_a3f8b2c1...)"
-              size="sm"
-              class="flex-1 text-xs font-mono"
-              @keydown.enter="handleManualSubmit"
-            />
-            <UButton
-              color="primary"
-              size="sm"
-              icon="i-lucide-scan-line"
-              class="font-semibold text-xs shadow-xs"
-              :loading="isProcessing"
-              @click="handleManualSubmit"
-            >
-              Validasi
-            </UButton>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column: Live Check-In Statistics & Scan Log (5 Cols) -->
-      <div class="lg:col-span-5 space-y-4">
-        <!-- Live Check-In Progress Card -->
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Statistik Check-In Venue</p>
-            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-              <UIcon name="i-lucide-refresh-cw" class="w-3 h-3 animate-spin" />
-              Live 5s
-            </span>
-          </div>
-
-          <div class="flex items-baseline justify-between mt-1">
-            <h3 class="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-              {{ stats?.checkedIn || 0 }} <span class="text-xs text-gray-400 font-normal">/ {{ stats?.totalTickets || 0 }} tiket</span>
-            </h3>
-            <span class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-              {{ stats?.checkedInPct || 0 }}%
-            </span>
-          </div>
-
-          <!-- Main Progress Bar -->
-          <div class="w-full bg-gray-100 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden mt-2.5">
-            <div
-              class="bg-emerald-500 h-full rounded-full transition-all duration-500"
-              :style="{ width: `${stats?.checkedInPct || 0}%` }"
-            />
-          </div>
-
-          <!-- Category Breakdown Progress -->
-          <div class="mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800 space-y-2.5">
-            <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Berdasarkan Kategori</p>
-            <div v-for="cat in stats?.byCategory" :key="cat.categoryName" class="space-y-1">
-              <div class="flex items-center justify-between text-xs">
-                <span class="font-semibold text-gray-800 dark:text-gray-200">{{ cat.categoryName }}</span>
-                <span class="text-[11px] text-gray-500">{{ cat.checkedIn }} / {{ cat.total }} ({{ cat.checkedInPct }}%)</span>
-              </div>
-              <div class="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                <div
-                  class="bg-amber-500 h-full rounded-full transition-all duration-500"
-                  :style="{ width: `${cat.checkedInPct}%` }"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Recent Scan History Log -->
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs">
-          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Log Scan Terakhir (10 Data)</p>
-
-          <div v-if="scanHistory.length === 0" class="text-center py-6 text-gray-400 text-xs">
-            Belum ada aktivitas scan pada sesi ini.
-          </div>
-
-          <div v-else class="space-y-2 max-h-60 overflow-y-auto pr-1">
-            <div
-              v-for="(scan, idx) in scanHistory"
-              :key="idx"
-              class="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/60 flex items-center justify-between text-xs"
-            >
-              <div class="flex items-center gap-2 min-w-0">
-                <UIcon
-                  :name="
-                    scan.status === 'SUCCESS'
-                      ? 'i-lucide-check-circle'
-                      : scan.status === 'ALREADY_CHECKED_IN'
-                      ? 'i-lucide-clock'
-                      : 'i-lucide-x-circle'
-                  "
-                  :class="[
-                    'w-4 h-4 shrink-0',
-                    scan.status === 'SUCCESS'
-                      ? 'text-emerald-500'
-                      : scan.status === 'ALREADY_CHECKED_IN'
-                      ? 'text-amber-500'
-                      : 'text-red-500'
-                  ]"
-                />
-                <div class="truncate">
-                  <p class="font-semibold text-gray-900 dark:text-white truncate">
-                    {{ scan.order?.customerName || scan.ticket?.qrCodeValue || 'Scan' }}
+                <div>
+                  <UIcon
+                    name="i-lucide-scan-line"
+                    class="size-10 text-white/40"
+                  />
+                  <p class="mt-2 text-sm text-white/70">
+                    {{ cameraError || 'Kamera belum aktif' }}
                   </p>
-                  <p class="text-[10px] text-gray-500">{{ scan.order?.categoryName ? `${scan.order.categoryName} • ` : '' }}{{ scan.message }}</p>
                 </div>
               </div>
-
-              <span class="text-[10px] text-gray-400 shrink-0 font-mono">{{ scan.timestamp }}</span>
+              <Transition
+                enter-active-class="transition duration-150"
+                enter-from-class="opacity-0 scale-95"
+                leave-active-class="transition duration-200"
+                leave-to-class="opacity-0"
+              >
+                <div
+                  v-if="result"
+                  class="absolute inset-x-3 bottom-3 rounded-lg border p-3 backdrop-blur bg-default/90 flex items-center gap-3"
+                  :class="OUTCOME_UI[result.outcome].cls"
+                  role="status"
+                  aria-live="assertive"
+                >
+                  <UIcon
+                    :name="OUTCOME_UI[result.outcome].icon"
+                    class="size-8 shrink-0"
+                  />
+                  <div class="min-w-0">
+                    <p class="font-semibold">
+                      {{ result.title }}
+                    </p>
+                    <p class="text-sm text-toned truncate">
+                      {{ result.detail }}
+                    </p>
+                  </div>
+                </div>
+              </Transition>
             </div>
-          </div>
+
+            <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <UButton
+                v-if="!scanning"
+                icon="i-lucide-camera"
+                label="Mulai scan"
+                size="md"
+                :loading="starting"
+                :disabled="!eventId"
+                @click="startCamera"
+              />
+              <UButton
+                v-else
+                icon="i-lucide-camera-off"
+                label="Hentikan"
+                color="neutral"
+                variant="outline"
+                size="md"
+                @click="stopCamera"
+              />
+              <UButton
+                icon="i-lucide-switch-camera"
+                color="neutral"
+                variant="ghost"
+                size="md"
+                :label="facing === 'environment' ? 'Kamera belakang' : 'Kamera depan'"
+                @click="flipCamera"
+              />
+            </div>
+
+            <form
+              class="mt-4 flex gap-2"
+              @submit.prevent="submitManual"
+            >
+              <UInput
+                v-model="manualCode"
+                placeholder="Ketik kode tiket (tix_…)"
+                icon="i-lucide-keyboard"
+                class="flex-1 font-mono"
+                :disabled="!eventId"
+                aria-label="Kode tiket manual"
+              />
+              <UButton
+                type="submit"
+                label="Check-in"
+                :loading="processing"
+                :disabled="!manualCode.trim() || !eventId"
+              />
+            </form>
+          </UCard>
+        </div>
+
+        <div class="lg:col-span-2 space-y-4">
+          <UCard>
+            <template #header>
+              <div class="flex items-center justify-between">
+                <p class="font-medium text-highlighted">
+                  Kehadiran
+                </p>
+                <span
+                  class="text-xs"
+                  :class="statsStale ? 'text-warning' : 'text-dimmed'"
+                >
+                  {{ statsStale ? 'Tidak terbarui — memeriksa ulang…' : statsUpdatedAt ? `Diperbarui ${formatTime(statsUpdatedAt)}` : '' }}
+                </span>
+              </div>
+            </template>
+            <div
+              v-if="!stats"
+              class="space-y-3"
+            >
+              <USkeleton class="h-10 w-32" />
+              <USkeleton class="h-3 w-full" />
+            </div>
+            <template v-else>
+              <div class="flex items-end justify-between">
+                <p class="text-3xl font-semibold text-highlighted tabular-nums">
+                  {{ formatNumber(stats.checkedIn) }}<span class="text-base font-normal text-muted"> / {{ formatNumber(stats.totalTickets) }}</span>
+                </p>
+                <p class="text-sm text-muted tabular-nums">
+                  {{ stats.checkedInPct }}%
+                </p>
+              </div>
+              <UProgress
+                :model-value="stats.checkedInPct"
+                class="mt-2"
+              />
+              <p class="mt-1 text-xs text-muted">
+                {{ formatNumber(stats.remaining) }} tiket belum check-in
+              </p>
+              <ul
+                v-if="stats.byCategory.length"
+                class="mt-4 space-y-2.5"
+              >
+                <li
+                  v-for="c in stats.byCategory"
+                  :key="c.categoryName"
+                  class="text-sm"
+                >
+                  <div class="flex justify-between">
+                    <span class="text-toned">{{ c.categoryName }}</span>
+                    <span class="text-muted tabular-nums">{{ formatNumber(c.checkedIn) }} / {{ formatNumber(c.total) }}</span>
+                  </div>
+                  <UProgress
+                    :model-value="c.checkedInPct"
+                    size="xs"
+                    class="mt-1"
+                  />
+                </li>
+              </ul>
+            </template>
+          </UCard>
+
+          <UCard :ui="{ body: 'p-0 sm:p-0' }">
+            <template #header>
+              <p class="font-medium text-highlighted">
+                Riwayat scan
+              </p>
+            </template>
+            <p
+              v-if="!history.length"
+              class="px-4 py-6 text-center text-sm text-muted"
+            >
+              Belum ada scan di sesi ini.
+            </p>
+            <ul
+              v-else
+              class="divide-y divide-default max-h-96 overflow-y-auto"
+            >
+              <li
+                v-for="(h, i) in history"
+                :key="i"
+                class="flex items-center gap-3 px-4 py-2.5"
+              >
+                <UIcon
+                  :name="OUTCOME_UI[h.outcome].icon"
+                  class="size-5 shrink-0"
+                  :class="OUTCOME_UI[h.outcome].cls.split(' ').find(c => c.startsWith('text-'))"
+                />
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm text-highlighted">
+                    {{ h.title }}
+                  </p>
+                  <p class="text-xs text-muted truncate">
+                    {{ h.detail }}
+                  </p>
+                </div>
+                <span class="text-xs text-dimmed tabular-nums">{{ formatTime(h.at) }}</span>
+              </li>
+            </ul>
+          </UCard>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </UDashboardPanel>
 </template>

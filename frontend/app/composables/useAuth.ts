@@ -1,61 +1,53 @@
-interface AdminUser {
+export type AdminRole = 'super_admin' | 'admin' | 'gate_staff'
+
+export interface AdminUser {
   id: string
   name: string
   email: string
-  role: 'super_admin' | 'admin' | 'gate_staff' | string
+  role: AdminRole
 }
 
-interface LoginResponse {
-  data: {
-    token: string
-    refreshToken: string
-    user: AdminUser
-  }
+export const ROLE_LABELS: Record<AdminRole, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  gate_staff: 'Gate Staff'
 }
 
 export function useAuth() {
-  const { request, token, refreshToken } = useApi()
+  const { request, token, refreshToken, clearSession } = useApi()
   const user = useState<AdminUser | null>('auth_user', () => null)
 
   const isLoggedIn = computed(() => !!token.value)
+  const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
 
   async function login(email: string, password: string): Promise<AdminUser> {
-    const res = await request<LoginResponse>('/auth/admin/login', {
+    const res = await request<{ data: { token: string, refreshToken: string, user: AdminUser } }>('/auth/admin/login', {
       method: 'POST',
       body: { email, password }
     })
-
     token.value = res.data.token
     refreshToken.value = res.data.refreshToken
     user.value = res.data.user
-
     return res.data.user
   }
 
+  /** Loads the profile. Only an auth failure ends the session; a network blip does not. */
   async function fetchMe() {
-    if (!token.value) return null
+    if (!token.value && !refreshToken.value) return null
     try {
       const res = await request<{ data: AdminUser }>('/auth/me')
       user.value = res.data
       return res.data
-    } catch {
-      logout()
+    } catch (err) {
+      if (apiErrorStatus(err) === 401) clearSession()
       return null
     }
   }
 
   function logout() {
-    token.value = null
-    refreshToken.value = null
-    user.value = null
-    navigateTo('/login')
+    clearSession()
+    return navigateTo('/login')
   }
 
-  return {
-    user,
-    isLoggedIn,
-    login,
-    fetchMe,
-    logout
-  }
+  return { user, isLoggedIn, isSuperAdmin, login, fetchMe, logout }
 }

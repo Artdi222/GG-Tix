@@ -1,8 +1,9 @@
 <script setup lang="ts">
-export interface VoucherUsageItem {
+import type { TableColumn } from '@nuxt/ui'
+
+interface Usage {
   id: string
   orderId: string
-  customerId: string
   customerName: string
   customerEmail: string
   discountApplied: string
@@ -10,174 +11,84 @@ export interface VoucherUsageItem {
   createdAt: string
 }
 
-const props = defineProps<{
-  open: boolean
-  voucherId?: string | null
-  voucherCode?: string | null
-}>()
+const props = defineProps<{ voucherId: string, voucherCode: string }>()
+const open = defineModel<boolean>('open', { default: false })
 
-const emit = defineEmits<{
-  'update:open': [value: boolean]
-}>()
+const list = usePaginatedList<Usage>(() => `/vouchers/${props.voucherId}/usages`, { limit: 10, immediate: false })
+watch([open, () => props.voucherId], ([isOpen]) => {
+  if (!isOpen) return
+  if (list.page.value !== 1) list.page.value = 1
+  else list.refresh()
+})
 
-const { request } = useApi()
-
-const isLoading = ref(false)
-const usages = ref<VoucherUsageItem[]>([])
-const page = ref(1)
-const totalPages = ref(1)
-const totalCount = ref(0)
-
-function formatRupiah(val: string | number) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0
-  }).format(Number(val) || 0)
-}
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-async function fetchUsages(targetPage = 1) {
-  if (!props.voucherId) return
-  isLoading.value = true
-  try {
-    const res = await request<{
-      data: VoucherUsageItem[]
-      pagination: { page: number; totalPages: number; totalCount: number }
-    }>(`/vouchers/${props.voucherId}/usages?page=${targetPage}&limit=10`)
-    if (res?.data) {
-      usages.value = res.data
-      page.value = res.pagination.page
-      totalPages.value = res.pagination.totalPages
-      totalCount.value = res.pagination.totalCount
-    }
-  } catch {
-    usages.value = []
-  } finally {
-    isLoading.value = false
-  }
-}
-
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen && props.voucherId) {
-      page.value = 1
-      fetchUsages(1)
-    } else {
-      usages.value = []
-    }
-  }
-)
+const columns: TableColumn<Usage>[] = [
+  { accessorKey: 'customerName', header: 'Pelanggan' },
+  { accessorKey: 'orderId', header: 'Pesanan' },
+  { accessorKey: 'discountApplied', header: () => h('span', { class: 'block text-right' }, 'Potongan') },
+  { accessorKey: 'status', header: 'Status' },
+  { accessorKey: 'createdAt', header: 'Waktu' }
+]
 </script>
 
 <template>
   <UModal
-    :open="open"
-    :title="`Riwayat Pemakaian Voucher: ${voucherCode || ''}`"
-    description="Daftar transaksi order yang berhasil menggunakan kupon promo ini."
-    @update:open="emit('update:open', $event)"
+    v-model:open="open"
+    :title="`Pemakaian ${voucherCode}`"
+    :description="list.totalCount.value ? `${formatNumber(list.totalCount.value)} transaksi` : undefined"
+    :ui="{ content: 'sm:max-w-3xl' }"
   >
     <template #body>
-      <div class="space-y-4">
-        <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>Total transaksi: <strong>{{ totalCount }} kali</strong></span>
-          <span v-if="totalPages > 1">Halaman {{ page }} dari {{ totalPages }}</span>
-        </div>
-
-        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-left text-xs">
-            <thead class="bg-gray-50 dark:bg-gray-800/60 font-semibold text-gray-600 dark:text-gray-300">
-              <tr>
-                <th class="px-3 py-2">Customer</th>
-                <th class="px-3 py-2">Order ID</th>
-                <th class="px-3 py-2">Potongan</th>
-                <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2 text-right">Waktu Transaksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-              <tr v-if="isLoading">
-                <td colspan="5" class="px-4 py-8 text-center text-gray-400 text-xs">
-                  <UIcon name="i-lucide-loader" class="animate-spin w-4 h-4 mx-auto mb-1.5" />
-                  Memuat riwayat pemakaian...
-                </td>
-              </tr>
-              <tr v-else-if="usages.length === 0">
-                <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-xs">
-                  Belum ada riwayat transaksi yang menggunakan voucher ini.
-                </td>
-              </tr>
-              <tr v-for="item in usages" :key="item.id" class="hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
-                <td class="px-3 py-2">
-                  <div class="font-medium text-gray-900 dark:text-white">{{ item.customerName }}</div>
-                  <div class="text-[11px] text-gray-400">{{ item.customerEmail }}</div>
-                </td>
-                <td class="px-3 py-2 font-mono text-[11px] text-gray-500">
-                  {{ item.orderId.substring(0, 8) }}...
-                </td>
-                <td class="px-3 py-2 font-semibold text-emerald-600 dark:text-emerald-400">
-                  -{{ formatRupiah(item.discountApplied) }}
-                </td>
-                <td class="px-3 py-2 whitespace-nowrap">
-                  <span
-                    v-if="item.status === 'active'"
-                    class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                  >
-                    Diterapkan
-                  </span>
-                  <span
-                    v-else
-                    class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                  >
-                    Dikembalikan
-                  </span>
-                </td>
-                <td class="px-3 py-2 text-right text-gray-500 dark:text-gray-400 text-[11px] whitespace-nowrap">
-                  {{ formatDate(item.createdAt) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div v-if="totalPages > 1" class="flex justify-between items-center pt-2">
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="xs"
-            :disabled="page <= 1 || isLoading"
-            @click="fetchUsages(page - 1)"
-          >
-            Sebelumnya
-          </UButton>
-          <span class="text-xs text-gray-500">Halaman {{ page }} dari {{ totalPages }}</span>
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="xs"
-            :disabled="page >= totalPages || isLoading"
-            @click="fetchUsages(page + 1)"
-          >
-            Berikutnya
-          </UButton>
-        </div>
-
-        <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
-          <UButton color="neutral" variant="outline" size="sm" @click="emit('update:open', false)">
-            Tutup
-          </UButton>
-        </div>
+      <UAlert
+        v-if="list.error.value"
+        color="error"
+        variant="subtle"
+        :title="list.error.value"
+        class="mb-3"
+      />
+      <UTable
+        :data="list.items.value"
+        :columns="columns"
+        :loading="list.loading.value"
+        :ui="{ th: 'text-xs font-medium text-muted' }"
+      >
+        <template #customerName-cell="{ row }">
+          <p class="text-highlighted">
+            {{ row.original.customerName }}
+          </p>
+          <p class="text-xs text-muted">
+            {{ row.original.customerEmail }}
+          </p>
+        </template>
+        <template #orderId-cell="{ row }">
+          <span class="font-mono text-xs">#{{ row.original.orderId.slice(0, 8).toUpperCase() }}</span>
+        </template>
+        <template #discountApplied-cell="{ row }">
+          <span class="block text-right tabular-nums">{{ formatIDR(row.original.discountApplied) }}</span>
+        </template>
+        <template #status-cell="{ row }">
+          <StatusBadge :status="row.original.status" />
+        </template>
+        <template #createdAt-cell="{ row }">
+          <span class="whitespace-nowrap text-muted">{{ formatDateTime(row.original.createdAt) }}</span>
+        </template>
+        <template #empty>
+          <UEmpty
+            icon="i-lucide-ticket-percent"
+            title="Belum pernah dipakai"
+            variant="naked"
+            size="sm"
+          />
+        </template>
+      </UTable>
+      <div
+        v-if="list.totalPages.value > 1"
+        class="mt-3 flex justify-end"
+      >
+        <UPagination
+          v-model:page="list.page.value"
+          :total="list.totalCount.value"
+          :items-per-page="list.limit"
+        />
       </div>
     </template>
   </UModal>

@@ -1,44 +1,34 @@
+import type { AdminRole } from '~/composables/useAuth'
+
+declare module '#app' {
+  interface PageMeta {
+    /** Roles allowed on this page. Omit to allow every signed-in admin role. */
+    roles?: AdminRole[]
+  }
+}
+
+function homeFor(role: AdminRole) {
+  return role === 'gate_staff' ? '/scanner' : '/'
+}
+
 export default defineNuxtRouteMiddleware(async (to) => {
-  const { token } = useApi()
-  const { fetchMe, user } = useAuth()
+  const { token, refreshToken } = useApi()
+  const { user, fetchMe } = useAuth()
+  // The access cookie lasts 1h; a valid refresh token still means "signed in".
+  const hasSession = !!(token.value || refreshToken.value)
 
-  // 1. Redirect already logged-in users away from /login
   if (to.path === '/login') {
-    if (token.value) {
-      if (user.value?.role === 'gate_staff') {
-        return navigateTo('/scanner')
-      }
-      return navigateTo('/')
-    }
-    return
+    if (!hasSession) return
+    if (!user.value) await fetchMe()
+    return user.value ? navigateTo(homeFor(user.value.role)) : undefined
   }
 
-  // 2. Redirect unauthenticated visitors to /login
-  if (!token.value) {
-    return navigateTo('/login')
-  }
+  if (!hasSession) return navigateTo({ path: '/login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : {} })
+  if (!user.value) await fetchMe()
+  if (!user.value) return navigateTo('/login')
 
-  // 3. Fetch user profile if token exists but user state is empty
-  if (token.value && !user.value) {
-    await fetchMe()
-    if (!user.value) {
-      return navigateTo('/login')
-    }
-  }
-
-  // 4. Gate Staff RBAC: Force redirect to /scanner & block all other routes
-  if (user.value?.role === 'gate_staff') {
-    if (to.path !== '/scanner') {
-      return navigateTo('/scanner')
-    }
-    return
-  }
-
-  // 5. Super Admin RBAC Route Guards
-  if (to.path.startsWith('/users') && to.query.tab === 'admins') {
-    const isSuperAdmin = user.value?.role === 'super_admin'
-    if (!isSuperAdmin) {
-      return navigateTo('/')
-    }
+  const allowed = to.meta.roles
+  if (allowed && !allowed.includes(user.value.role)) {
+    return navigateTo(homeFor(user.value.role))
   }
 })

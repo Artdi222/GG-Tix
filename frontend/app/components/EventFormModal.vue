@@ -1,386 +1,307 @@
 <script setup lang="ts">
-import * as v from 'valibot'
-import type { FormSubmitEvent } from '@nuxt/ui'
-
-export interface ArtistOption {
+export interface EventRow {
   id: string
-  name: string
-}
-
-export interface VenueOption {
-  id: string
-  name: string
-  city: string
-  imageUrl?: string | null
-}
-
-export interface EventItem {
-  id?: string
   title: string
   artistId: string
   publisherName: string
-  venueId: string
+  venueId: string | null
   dateTime: string
-  endDateTime?: string | null
-  description?: string | null
-  maxTicketsPerOrder?: number | null
-  tags?: string[]
-  seatmapUrl?: string | null
-  sortOrder?: number
+  endDateTime: string | null
+  description: string | null
+  maxTicketsPerOrder: number | null
+  tags: string[]
+  seatmapUrl: string | null
+  sortOrder: number
   status: 'open' | 'closed'
-  imageUrl?: string | null
-  artist?: { id: string; name: string; bio?: string; photoUrl?: string }
-  venue?: { id: string; name: string; city: string; address?: string; imageUrl?: string | null } | string
-  city?: string
+  imageUrl: string | null
+  artist?: { id: string, name: string } | null
+  venue?: { id: string, name: string, city: string } | null
 }
 
-const props = defineProps<{
-  eventData?: EventItem | null
-  artists?: ArtistOption[]
-  venues?: VenueOption[]
-}>()
+export interface Option { label: string, value: string }
 
-const emit = defineEmits<{
-  saved: [eventData: EventItem]
-}>()
+const props = withDefaults(defineProps<{
+  eventData?: EventRow | null
+  artists: Option[]
+  venues: Option[]
+}>(), { eventData: null })
 
-const { request } = useApi()
-
+const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 
-const isEditMode = computed(() => !!props.eventData?.id)
+const { request } = useApi()
+const toast = useToast()
 
-const schema = v.object({
-  title: v.pipe(v.string(), v.minLength(3, 'Judul event minimal 3 karakter')),
-  artistId: v.pipe(v.string(), v.minLength(1, 'Pilih artis')),
-  publisherName: v.pipe(v.string(), v.minLength(2, 'Nama publisher/promoter wajib diisi')),
-  venueId: v.pipe(v.string(), v.minLength(1, 'Pilih venue')),
-  dateTime: v.pipe(v.string(), v.minLength(1, 'Tanggal & waktu wajib diisi')),
-  status: v.picklist(['open', 'closed'])
-})
-type Schema = v.InferOutput<typeof schema>
-
-function defaultState() {
+function blank() {
+  const start = new Date(Date.now() + 30 * 86400000)
+  start.setHours(19, 0, 0, 0)
   return {
     title: '',
     artistId: '',
     publisherName: '',
     venueId: '',
-    dateTime: new Date().toISOString().slice(0, 16),
+    dateTime: toDatetimeLocal(start),
     endDateTime: '',
     description: '',
-    maxTicketsPerOrder: null as number | null,
-    tagInput: '',
+    maxTicketsPerOrder: undefined as number | undefined,
     tags: [] as string[],
     seatmapUrl: '',
     sortOrder: 0,
-    status: 'open' as Schema['status'],
+    status: 'open' as 'open' | 'closed',
     imageUrl: ''
   }
 }
 
-const state = reactive(defaultState())
-const isSaving = ref(false)
-const isUploading = ref(false)
-const isUploadingSeatmap = ref(false)
-const uploadError = ref('')
-const fileInput = ref<HTMLInputElement | null>(null)
-const seatmapFileInput = ref<HTMLInputElement | null>(null)
-
-const statusOptions = [
-  { label: 'Open (Aktif)', value: 'open' },
-  { label: 'Closed (Tutup)', value: 'closed' }
-]
+const state = reactive(blank())
+const saving = ref(false)
+const formError = ref('')
+const isEdit = computed(() => !!props.eventData)
 
 watch(open, (isOpen) => {
   if (!isOpen) return
-  uploadError.value = ''
-  if (props.eventData) {
-    state.title = props.eventData.title || ''
-    state.artistId = props.eventData.artistId || ((props.eventData as any).artist?.id) || ''
-    state.publisherName = props.eventData.publisherName || ''
-    state.venueId = props.eventData.venueId || ((props.eventData as any).venue?.id) || ((props.eventData as any).venue) || ''
-    state.dateTime = props.eventData.dateTime ? new Date(props.eventData.dateTime).toISOString().slice(0, 16) : ''
-    state.endDateTime = props.eventData.endDateTime ? new Date(props.eventData.endDateTime).toISOString().slice(0, 16) : ''
-    state.description = props.eventData.description || ''
-    state.maxTicketsPerOrder = props.eventData.maxTicketsPerOrder ?? null
-    state.tags = props.eventData.tags ? [...props.eventData.tags] : []
-    state.seatmapUrl = props.eventData.seatmapUrl || ''
-    state.sortOrder = props.eventData.sortOrder || 0
-    state.status = props.eventData.status || 'open'
-    state.imageUrl = props.eventData.imageUrl || ''
-  } else {
-    Object.assign(state, defaultState())
-  }
+  formError.value = ''
+  const e = props.eventData
+  Object.assign(state, e
+    ? {
+        title: e.title,
+        artistId: e.artistId,
+        publisherName: e.publisherName,
+        venueId: e.venueId ?? '',
+        dateTime: toDatetimeLocal(e.dateTime),
+        endDateTime: toDatetimeLocal(e.endDateTime),
+        description: e.description ?? '',
+        maxTicketsPerOrder: e.maxTicketsPerOrder ?? undefined,
+        tags: [...(e.tags ?? [])],
+        seatmapUrl: e.seatmapUrl ?? '',
+        sortOrder: e.sortOrder ?? 0,
+        status: e.status,
+        imageUrl: e.imageUrl ?? ''
+      }
+    : blank())
 })
 
-function addTag() {
-  const t = state.tagInput.trim()
-  if (t && !state.tags.includes(t)) {
-    state.tags.push(t)
-    state.tagInput = ''
+function validate() {
+  if (state.title.trim().length < 3) return 'Judul event minimal 3 karakter.'
+  if (!state.artistId) return 'Pilih artis.'
+  if (!state.publisherName.trim()) return 'Isi nama promotor.'
+  if (!state.venueId) return 'Pilih venue.'
+  if (!fromDatetimeLocal(state.dateTime)) return 'Isi tanggal dan waktu mulai.'
+  if (state.endDateTime && state.endDateTime <= state.dateTime) return 'Waktu selesai harus setelah waktu mulai.'
+  const max = state.maxTicketsPerOrder
+  if (max !== undefined && (!Number.isInteger(max) || max < 1 || max > 10)) return 'Batas tiket per pesanan harus 1–10.'
+  return ''
+}
+
+async function submit() {
+  formError.value = validate()
+  if (formError.value) return
+  saving.value = true
+  const body = {
+    title: state.title.trim(),
+    artistId: state.artistId,
+    publisherName: state.publisherName.trim(),
+    venueId: state.venueId,
+    dateTime: fromDatetimeLocal(state.dateTime),
+    endDateTime: fromDatetimeLocal(state.endDateTime),
+    description: state.description.trim() || null,
+    maxTicketsPerOrder: state.maxTicketsPerOrder ?? null,
+    tags: state.tags,
+    seatmapUrl: state.seatmapUrl || null,
+    sortOrder: Number(state.sortOrder) || 0,
+    status: state.status,
+    imageUrl: state.imageUrl || null
   }
-}
-
-function removeTag(index: number) {
-  state.tags.splice(index, 1)
-}
-
-async function onSeatmapSelected(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-
-  uploadError.value = ''
-  isUploadingSeatmap.value = true
-
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('kind', 'venue')
-
-    const res = await request<{ data: { url: string } }>('/uploads', {
-      method: 'POST',
-      body: formData
-    })
-
-    if (res?.data?.url) {
-      state.seatmapUrl = res.data.url
-    }
-  } catch (err: any) {
-    uploadError.value = err?.data?.error || 'Gagal mengunggah seatmap event.'
-  } finally {
-    isUploadingSeatmap.value = false
-  }
-}
-
-async function onImageSelected(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-
-  uploadError.value = ''
-  isUploading.value = true
-
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('kind', 'banner') // UPL-03: banner ratio 16:9
-
-    const res = await request<{ data: { url: string; thumbUrl: string; key: string } }>('/uploads', {
-      method: 'POST',
-      body: formData
-    })
-
-    if (res?.data?.url) {
-      state.imageUrl = res.data.url
-    }
-  } catch (err: any) {
-    uploadError.value = err?.data?.error || 'Gagal mengunggah banner event.'
-  } finally {
-    isUploading.value = false
-  }
-}
-
-async function onSave() {
-  if (!state.title.trim() || !state.artistId || !state.publisherName.trim() || !state.venueId || !state.dateTime) {
-    uploadError.value = 'Harap lengkapi semua field yang wajib diisi.'
-    return
-  }
-
-  if (state.endDateTime && new Date(state.endDateTime) < new Date(state.dateTime)) {
-    uploadError.value = 'Waktu selesai tidak boleh sebelum waktu mulai.'
-    return
-  }
-
-  isSaving.value = true
-  uploadError.value = ''
-  try {
-    const payload: EventItem = {
-      id: props.eventData?.id,
-      title: state.title.trim(),
-      artistId: state.artistId,
-      publisherName: state.publisherName.trim(),
-      venueId: state.venueId,
-      dateTime: state.dateTime ? new Date(state.dateTime).toISOString() : new Date().toISOString(),
-      endDateTime: state.endDateTime ? new Date(state.endDateTime).toISOString() : null,
-      description: state.description.trim() || null,
-      maxTicketsPerOrder: state.maxTicketsPerOrder ? Number(state.maxTicketsPerOrder) : null,
-      tags: state.tags,
-      seatmapUrl: state.seatmapUrl || null,
-      sortOrder: Number(state.sortOrder) || 0,
-      status: state.status,
-      imageUrl: state.imageUrl || null
-    }
-    emit('saved', payload)
+    if (props.eventData) await request(`/events/${props.eventData.id}`, { method: 'PUT', body })
+    else await request('/events', { method: 'POST', body })
+    toast.add({ title: isEdit.value ? 'Event diperbarui' : 'Event dibuat', color: 'success' })
     open.value = false
-  } catch (err: any) {
-    uploadError.value = err?.message || 'Gagal menyimpan event.'
+    emit('saved')
+  } catch (err) {
+    formError.value = apiErrorMessage(err, 'Event gagal disimpan.')
   } finally {
-    isSaving.value = false
+    saving.value = false
   }
 }
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="isEditMode ? 'Edit Event Konser' : 'Buat Event Konser Baru'">
+  <UModal
+    v-model:open="open"
+    :title="isEdit ? 'Edit event' : 'Buat event'"
+    :description="isEdit ? eventData?.title : 'Event baru langsung tampil di aplikasi jika statusnya dibuka.'"
+    :dismissible="!saving"
+    :ui="{ content: 'sm:max-w-2xl', footer: 'justify-end' }"
+  >
     <template #body>
-      <div class="space-y-4">
-        <UAlert
-          v-if="uploadError"
-          color="error"
-          variant="soft"
-          icon="i-lucide-circle-alert"
-          :description="uploadError"
-        />
-
-        <UFormField label="Judul Event" name="title">
-          <UInput v-model="state.title" placeholder="Contoh: Wuthering Waves Live 2026" class="w-full" />
+      <form
+        id="event-form"
+        class="space-y-4"
+        @submit.prevent="submit"
+      >
+        <UFormField
+          label="Judul event"
+          required
+        >
+          <UInput
+            v-model="state.title"
+            placeholder="Contoh: Wuthering Waves Live 2026"
+            class="w-full"
+          />
         </UFormField>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Artis / Performer" name="artistId">
-            <USelect
-              v-model="state.artistId"
-              :items="(props.artists || []).map(a => ({ label: a.name, value: a.id }))"
-              placeholder="Pilih Artis"
-              class="w-full"
-            />
-          </UFormField>
-
-          <UFormField label="Promoter / Publisher" name="publisherName">
-            <UInput v-model="state.publisherName" placeholder="Contoh: Kuro Games / Live Nation" class="w-full" />
-          </UFormField>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Venue Master" name="venueId">
-            <USelect
-              v-model="state.venueId"
-              :items="(props.venues || []).map(v => ({ label: `${v.name} (${v.city})`, value: v.id }))"
-              placeholder="Pilih Venue"
-              class="w-full"
-            />
-          </UFormField>
-
+        <div class="grid sm:grid-cols-2 gap-4">
           <UFormField
-            label="Batas Pembelian per Order"
-            description="Kosongkan untuk mengikuti pengaturan sistem."
-            name="maxTicketsPerOrder"
+            label="Artis"
+            required
           >
-            <UInput v-model.number="state.maxTicketsPerOrder" type="number" min="1" max="10" class="w-full" />
+            <USelectMenu
+              v-model="state.artistId"
+              :items="artists"
+              value-key="value"
+              placeholder="Pilih artis"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Promotor"
+            required
+          >
+            <UInput
+              v-model="state.publisherName"
+              placeholder="Contoh: Live Nation"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Venue"
+            required
+          >
+            <USelectMenu
+              v-model="state.venueId"
+              :items="venues"
+              value-key="value"
+              placeholder="Pilih venue"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Maks. tiket per pesanan"
+            hint="1–10, kosong = default"
+          >
+            <UInputNumber
+              v-model="state.maxTicketsPerOrder"
+              :min="1"
+              :max="10"
+              placeholder="Default"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Mulai"
+            required
+          >
+            <UInput
+              v-model="state.dateTime"
+              type="datetime-local"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Selesai"
+            hint="Opsional"
+          >
+            <UInput
+              v-model="state.endDateTime"
+              type="datetime-local"
+              :min="state.dateTime"
+              class="w-full"
+            />
           </UFormField>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Tanggal & Waktu Mulai" name="dateTime">
-            <UInput v-model="state.dateTime" type="datetime-local" class="w-full" />
-          </UFormField>
+        <UFormField label="Deskripsi">
+          <UTextarea
+            v-model="state.description"
+            :rows="3"
+            autoresize
+            class="w-full"
+          />
+        </UFormField>
 
-          <UFormField label="Tanggal & Waktu Selesai (Opsional)" name="endDateTime">
-            <UInput v-model="state.endDateTime" type="datetime-local" class="w-full" />
+        <UFormField
+          label="Tag"
+          hint="Tekan Enter untuk menambah"
+        >
+          <UInputTags
+            v-model="state.tags"
+            placeholder="J-Pop, Anime…"
+            class="w-full"
+          />
+        </UFormField>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <UFormField label="Status penjualan">
+            <USelect
+              v-model="state.status"
+              :items="[{ label: 'Dibuka', value: 'open' }, { label: 'Ditutup', value: 'closed' }]"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Urutan tampil"
+            hint="Angka kecil tampil lebih dulu"
+          >
+            <UInputNumber
+              v-model="state.sortOrder"
+              :min="0"
+              class="w-full"
+            />
           </UFormField>
         </div>
 
-        <UFormField label="Deskripsi Event" name="description">
-          <UTextarea v-model="state.description" placeholder="Deskripsi lengkap event untuk mobile app..." class="w-full" />
-        </UFormField>
-
-        <UFormField label="Tags / Kategori (Tekan Enter untuk tambah)">
-          <div class="flex flex-wrap gap-2 mb-2" v-if="state.tags.length">
-            <span v-for="(tag, idx) in state.tags" :key="idx" class="bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full text-xs flex items-center gap-1">
-              {{ tag }}
-              <button type="button" @click="removeTag(idx)" class="text-gray-400 hover:text-red-500">×</button>
-            </span>
-          </div>
-          <UInput v-model="state.tagInput" placeholder="Contoh: Genshin, Anime, J-Pop (Tekan Enter)" @keydown.enter.prevent="addTag" class="w-full" />
-        </UFormField>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Status Event" name="status">
-            <USelect v-model="state.status" :items="statusOptions" class="w-full" />
+        <div class="grid sm:grid-cols-2 gap-4">
+          <UFormField label="Banner (16:9)">
+            <ImageField
+              v-model="state.imageUrl"
+              kind="banner"
+            />
           </UFormField>
-
-          <UFormField label="Urutan Tampil (Sort Order)">
-            <UInput v-model.number="state.sortOrder" type="number" class="w-full" />
+          <UFormField
+            label="Seatmap"
+            hint="Opsional"
+          >
+            <ImageField
+              v-model="state.seatmapUrl"
+              kind="venue"
+            />
           </UFormField>
         </div>
 
-        <UFormField label="Banner Gambar Event (Rasio 16:9)">
-          <div class="flex items-start gap-4">
-            <div class="w-36 h-20 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
-              <img v-if="state.imageUrl" :src="state.imageUrl" alt="Preview Banner" class="w-full h-full object-cover">
-              <UIcon v-else name="i-lucide-image" class="w-6 h-6 text-gray-300 dark:text-gray-600" />
-            </div>
-            <div class="space-y-1.5">
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                icon="i-lucide-upload"
-                :loading="isUploading"
-                @click="fileInput?.click()"
-              >
-                {{ state.imageUrl ? 'Ganti Banner' : 'Upload Banner' }}
-              </UButton>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                class="hidden"
-                @change="onImageSelected"
-              >
-              <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB).</p>
-            </div>
-          </div>
-        </UFormField>
-
-        <UFormField label="Seatmap Custom per Event (Opsional)">
-          <p class="text-xs text-gray-400 mb-2">Jika kosong, akan otomatis fallback ke gambar default venue.</p>
-          <div class="flex items-start gap-4">
-            <div class="w-28 h-40 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
-              <img v-if="state.seatmapUrl" :src="state.seatmapUrl" alt="Preview Seatmap" class="w-full h-full object-cover">
-              <UIcon v-else name="i-lucide-image" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
-            </div>
-            <div class="space-y-2">
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                icon="i-lucide-upload"
-                :loading="isUploadingSeatmap"
-                @click="seatmapFileInput?.click()"
-              >
-                {{ state.seatmapUrl ? 'Ganti Seatmap' : 'Upload Seatmap' }}
-              </UButton>
-              <input
-                ref="seatmapFileInput"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                class="hidden"
-                @change="onSeatmapSelected"
-              >
-              <p class="text-xs text-gray-400">Rasio 9:16 recommended.</p>
-            </div>
-          </div>
-        </UFormField>
-      </div>
+        <UAlert
+          v-if="formError"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="formError"
+        />
+      </form>
     </template>
 
     <template #footer>
-      <div class="flex items-center justify-end gap-2 w-full">
-        <UButton color="neutral" variant="outline" @click="open = false">
-          Batal
-        </UButton>
-        <UButton
-          type="button"
-          :loading="isSaving"
-          class="bg-[#1B1330] hover:bg-[#2A1F49] text-white"
-          @click="onSave"
-        >
-          {{ isEditMode ? 'Simpan Perubahan' : 'Buat Event' }}
-        </UButton>
-      </div>
+      <UButton
+        label="Batal"
+        color="neutral"
+        variant="outline"
+        :disabled="saving"
+        @click="open = false"
+      />
+      <UButton
+        type="submit"
+        form="event-form"
+        :label="isEdit ? 'Simpan perubahan' : 'Buat event'"
+        :loading="saving"
+      />
     </template>
   </UModal>
 </template>

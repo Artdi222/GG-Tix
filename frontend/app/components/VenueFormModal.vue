@@ -1,204 +1,139 @@
 <script setup lang="ts">
 export interface Venue {
-  id?: string
+  id: string
   name: string
   address: string
   city: string
   imageUrl: string | null
-  sortOrder?: number
+  sortOrder: number
 }
 
-const props = defineProps<{
-  open: boolean
-  venue?: Venue | null
-}>()
-
-const emit = defineEmits<{
-  'update:open': [value: boolean]
-  saved: [venue: Venue]
-}>()
+const props = withDefaults(defineProps<{ venue?: Venue | null }>(), { venue: null })
+const emit = defineEmits<{ saved: [] }>()
+const open = defineModel<boolean>('open', { default: false })
 
 const { request } = useApi()
+const toast = useToast()
+const state = reactive({ name: '', address: '', city: '', sortOrder: 0 as number | undefined, imageUrl: '' })
+const saving = ref(false)
+const formError = ref('')
 
-const isEdit = computed(() => !!props.venue?.id)
-
-const state = reactive({
-  name: '',
-  address: '',
-  city: '',
-  sortOrder: 0,
-  imageUrl: ''
+watch(open, (isOpen) => {
+  if (!isOpen) return
+  formError.value = ''
+  const v = props.venue
+  Object.assign(state, v
+    ? { name: v.name, address: v.address, city: v.city, sortOrder: v.sortOrder, imageUrl: v.imageUrl ?? '' }
+    : { name: '', address: '', city: '', sortOrder: 0, imageUrl: '' })
 })
 
-const isSaving = ref(false)
-const isUploading = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
-const uploadError = ref('')
-
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (!isOpen) return
-    uploadError.value = ''
-    if (props.venue) {
-      state.name = props.venue.name
-      state.address = props.venue.address
-      state.city = props.venue.city || ''
-      state.sortOrder = props.venue.sortOrder || 0
-      state.imageUrl = props.venue.imageUrl || ''
-    } else {
-      state.name = ''
-      state.address = ''
-      state.city = ''
-      state.sortOrder = 0
-      state.imageUrl = ''
-    }
-  }
-)
-
-async function onImageSelected(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-
-  uploadError.value = ''
-  isUploading.value = true
-
+async function submit() {
+  formError.value = !state.name.trim() ? 'Nama venue wajib diisi.' : !state.address.trim() ? 'Alamat wajib diisi.' : !state.city.trim() ? 'Kota wajib diisi.' : ''
+  if (formError.value) return
+  saving.value = true
+  const body = { name: state.name.trim(), address: state.address.trim(), city: state.city.trim(), sortOrder: state.sortOrder ?? 0, imageUrl: state.imageUrl || null }
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('kind', 'venue') // UPL-03: venue ratio 9:16
-
-    const res = await request<{ data: { url: string; thumbUrl: string; key: string } }>('/uploads', {
-      method: 'POST',
-      body: formData
-    })
-
-    if (res?.data?.url) {
-      state.imageUrl = res.data.url
-    }
-  } catch (err: any) {
-    uploadError.value = err?.data?.error || 'Gagal mengunggah gambar denah venue.'
+    if (props.venue) await request(`/venues/${props.venue.id}`, { method: 'PUT', body })
+    else await request('/venues', { method: 'POST', body })
+    toast.add({ title: props.venue ? 'Venue diperbarui' : 'Venue ditambahkan', color: 'success' })
+    open.value = false
+    emit('saved')
+  } catch (err) {
+    formError.value = apiErrorMessage(err, 'Venue gagal disimpan.')
   } finally {
-    isUploading.value = false
-  }
-}
-
-async function onSubmit() {
-  if (!state.name.trim() || !state.address.trim() || !state.city.trim()) return
-  isSaving.value = true
-  uploadError.value = ''
-
-  try {
-    const payload = {
-      name: state.name.trim(),
-      address: state.address.trim(),
-      city: state.city.trim(),
-      sortOrder: Number(state.sortOrder) || 0,
-      imageUrl: state.imageUrl || ''
-    }
-
-    if (props.venue?.id) {
-      const res = await request<{ data: Venue }>(`/venues/${props.venue.id}`, {
-        method: 'PUT',
-        body: payload
-      })
-      emit('saved', res?.data || {
-        id: props.venue.id,
-        ...payload
-      })
-    } else {
-      const res = await request<{ data: Venue }>('/venues', {
-        method: 'POST',
-        body: payload
-      })
-      emit('saved', res?.data || {
-        id: `venue-${Date.now()}`,
-        ...payload
-      })
-    }
-    emit('update:open', false)
-  } catch (err: any) {
-    uploadError.value = err?.data?.error || 'Gagal menyimpan data venue.'
-  } finally {
-    isSaving.value = false
+    saving.value = false
   }
 }
 </script>
 
 <template>
   <UModal
-    :open="open"
-    :title="isEdit ? 'Edit Venue Konser' : 'Tambah Venue Konser Baru'"
-    :description="isEdit ? 'Perbarui informasi venue & denah lokasi.' : 'Tambahkan data master venue & denah area konser.'"
-    @update:open="emit('update:open', $event)"
+    v-model:open="open"
+    :title="venue ? 'Edit venue' : 'Tambah venue'"
+    :dismissible="!saving"
+    :ui="{ footer: 'justify-end' }"
   >
     <template #body>
-      <form class="space-y-4" @submit.prevent="onSubmit">
-        <UAlert
-          v-if="uploadError"
-          color="error"
-          variant="soft"
-          icon="i-lucide-circle-alert"
-          :description="uploadError"
-        />
-
-        <UFormField label="Nama Venue" required>
-          <UInput v-model="state.name" placeholder="Contoh: Gelora Bung Karno" class="w-full" />
+      <form
+        id="venue-form"
+        class="space-y-4"
+        @submit.prevent="submit"
+      >
+        <UFormField
+          label="Nama venue"
+          required
+        >
+          <UInput
+            v-model="state.name"
+            maxlength="200"
+            placeholder="Istora Senayan"
+            class="w-full"
+          />
         </UFormField>
-
-        <UFormField label="Alamat Lengkap" required>
-          <UInput v-model="state.address" placeholder="Jl. Pintu Satu Senayan, Jakarta" class="w-full" />
+        <UFormField
+          label="Alamat"
+          required
+        >
+          <UTextarea
+            v-model="state.address"
+            :rows="2"
+            autoresize
+            class="w-full"
+          />
         </UFormField>
-
         <div class="grid grid-cols-2 gap-4">
-          <UFormField label="Kota" required>
-            <UInput v-model="state.city" placeholder="Contoh: Jakarta" class="w-full" />
+          <UFormField
+            label="Kota"
+            required
+          >
+            <UInput
+              v-model="state.city"
+              maxlength="100"
+              placeholder="Jakarta"
+              class="w-full"
+            />
           </UFormField>
-          <UFormField label="Urutan Tampil (Sort Order)">
-            <UInput v-model.number="state.sortOrder" type="number" placeholder="0" class="w-full" />
+          <UFormField label="Urutan tampil">
+            <UInputNumber
+              v-model="state.sortOrder"
+              :min="0"
+              class="w-full"
+            />
           </UFormField>
         </div>
-
-        <UFormField label="Gambar / Denah Area Venue (Rasio 9:16)">
-          <p class="text-xs text-gray-400 mb-2">Denah layout tempat duduk & zona tiket untuk memudahkan customer.</p>
-          <div class="flex items-start gap-4">
-            <div class="w-28 h-40 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
-              <img v-if="state.imageUrl" :src="state.imageUrl" alt="Preview Denah Venue" class="w-full h-full object-cover">
-              <UIcon v-else name="i-lucide-image" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
-            </div>
-            <div class="space-y-2">
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                icon="i-lucide-upload"
-                :loading="isUploading"
-                @click="fileInput?.click()"
-              >
-                {{ state.imageUrl ? 'Ganti Denah' : 'Upload Denah' }}
-              </UButton>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                class="hidden"
-                @change="onImageSelected"
-              >
-              <p class="text-xs text-gray-400">PNG, JPG, atau WebP (Maksimal 10 MB). Di-crop otomatis ke rasio 9:16.</p>
-            </div>
-          </div>
+        <UFormField
+          label="Denah / foto venue"
+          hint="Opsional"
+        >
+          <ImageField
+            v-model="state.imageUrl"
+            kind="venue"
+            aspect="aspect-[4/3]"
+          />
         </UFormField>
-
-        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-          <UButton color="neutral" variant="outline" @click="emit('update:open', false)">
-            Batal
-          </UButton>
-          <UButton type="submit" :loading="isSaving" class="bg-[#1B1330] hover:bg-[#2A1F49] text-white">
-            {{ isEdit ? 'Simpan Perubahan' : 'Buat Venue' }}
-          </UButton>
-        </div>
+        <UAlert
+          v-if="formError"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="formError"
+        />
       </form>
+    </template>
+    <template #footer>
+      <UButton
+        label="Batal"
+        color="neutral"
+        variant="outline"
+        :disabled="saving"
+        @click="open = false"
+      />
+      <UButton
+        type="submit"
+        form="venue-form"
+        :label="venue ? 'Simpan perubahan' : 'Tambah venue'"
+        :loading="saving"
+      />
     </template>
   </UModal>
 </template>
