@@ -427,16 +427,16 @@ export default function HomeScreen() {
 
             <View style={styles.sectionBlock}>
               <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleRow}>
+                <View style={[styles.sectionTitleRow, { flex: 1, minWidth: 0, marginRight: 12 }]}>
                   <View style={styles.accentIndicator} />
-                  <Text style={styles.sectionTitle}>Jelajahi Berdasarkan Kota</Text>
+                  <Text style={[styles.sectionTitle, { flexShrink: 1 }]} numberOfLines={1}>Jelajahi per Kota</Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => setCityModalVisible(true)}
                   accessibilityRole="button"
                   accessibilityLabel="Lihat semua pilihan kota"
                 >
-                  <Text style={styles.sectionActionLink}>Semua Kota →</Text>
+                  <Text style={styles.sectionActionLink}>Lihat semua</Text>
                 </TouchableOpacity>
               </View>
 
@@ -774,14 +774,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cityCardActive: {
-    backgroundColor: '#1A1A22',
+    backgroundColor: BRAND_COLORS.accentGlow,
     borderColor: BRAND_COLORS.accent,
   },
   cityCardIconWrap: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#18181D',
+    backgroundColor: '#F4F4F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#0E0E12',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -934,7 +934,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: '#16161C',
+    backgroundColor: '#F6F6F8',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 14,
@@ -942,7 +942,7 @@ const styles = StyleSheet.create({
     borderColor: '#EBEBEF',
   },
   modalCityCardActive: {
-    backgroundColor: '#1E1E28',
+    backgroundColor: BRAND_COLORS.accentGlow,
     borderColor: BRAND_COLORS.accent,
   },
   modalCityText: {

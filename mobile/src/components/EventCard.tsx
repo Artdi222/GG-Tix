@@ -251,7 +251,7 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
             {event.venue?.city ? (
               <View style={styles.cityLocationRow}>
                 <Ionicons name="location-outline" size={11} color="#71717A" />
-                <Text style={styles.rowCityText}>{event.venue.city}</Text>
+                <Text style={styles.rowCityText} numberOfLines={1}>{event.venue.city}</Text>
               </View>
             ) : null}
           </View>
@@ -278,15 +278,19 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
           <View style={styles.rowBottom}>
             <View>
               <Text style={styles.pricePrefix}>Mulai dari</Text>
-              <Text style={styles.rowPrice}>{lowestPrice}</Text>
+              <Text style={styles.rowPrice} numberOfLines={1}>{lowestPrice}</Text>
             </View>
 
-            <View style={[styles.actionButton, isSoldOut && styles.actionButtonSold]}>
-              <Text style={[styles.actionButtonText, isSoldOut && styles.actionButtonTextSold]}>
-                {isSoldOut ? 'Habis' : 'Pilih Kursi'}
-              </Text>
-              {!isSoldOut && <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />}
-            </View>
+            {/* A compact chevron leaves the price room on narrow phones; the whole card is the tap target. */}
+            {isSoldOut ? (
+              <View style={[styles.actionButton, styles.actionButtonSold]}>
+                <Text style={[styles.actionButtonText, styles.actionButtonTextSold]}>Habis</Text>
+              </View>
+            ) : (
+              <View style={styles.actionChevron}>
+                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+              </View>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -436,8 +440,10 @@ const styles = StyleSheet.create({
   },
   rowHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    columnGap: 10,
+    rowGap: 2,
     marginBottom: 4,
   },
   rowDatePill: {
@@ -487,7 +493,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
+    gap: 8,
     marginTop: 4,
+  },
+  actionChevron: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pricePrefix: {
     fontSize: 9,
