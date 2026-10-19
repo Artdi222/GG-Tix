@@ -119,21 +119,22 @@ function MorphingPaginationDot({ index, scrollX }: PaginationDotProps) {
     const width = interpolate(
       scrollX.value,
       inputRange,
-      [5, 20, 5],
+      [6, 20, 6],
       Extrapolation.CLAMP
     );
 
     const opacity = interpolate(
       scrollX.value,
       inputRange,
-      [0.35, 1, 0.35],
+      [0.55, 1, 0.55],
       Extrapolation.CLAMP
     );
 
     return {
       width,
       opacity,
-      backgroundColor: opacity > 0.6 ? BRAND_COLORS.accent : '#18181B',
+      // Inactive dots sit on the dark scrim, so they stay white.
+      backgroundColor: opacity > 0.75 ? BRAND_COLORS.accent : '#FFFFFF',
     };
   });
 
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   heroDot: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 3,
   },
 });
