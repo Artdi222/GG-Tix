@@ -11,7 +11,7 @@ export async function findTicketsByOrderId(orderId: string, withQrImage = false)
       event: {
         columns: { id: true, title: true, dateTime: true },
         with: {
-          venue: { columns: { name: true } },
+          venue: { columns: { name: true, timezone: true } },
         },
       },
       category: { columns: { id: true, name: true } },
@@ -47,6 +47,7 @@ export async function findTicketsByOrderId(orderId: string, withQrImage = false)
       eventTitle: order.event.title,
       eventDate: order.event.dateTime,
       venueName: order.event.venue?.name ?? "",
+      venueTimezone: order.event.venue?.timezone ?? "Asia/Jakarta",
       categoryName: order.category.name,
       quantity: order.quantity,
       status: order.status,

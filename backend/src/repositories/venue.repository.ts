@@ -81,6 +81,7 @@ export async function createVenue(data: {
   name: string;
   address: string;
   city: string;
+  timezone?: string;
   imageUrl?: string | null;
   sortOrder?: number;
 }) {
@@ -90,6 +91,7 @@ export async function createVenue(data: {
       name: data.name.trim(),
       address: data.address.trim(),
       city: data.city.trim(),
+      timezone: data.timezone ?? "Asia/Jakarta",
       imageUrl: data.imageUrl ? data.imageUrl.trim() : null,
       sortOrder: data.sortOrder ?? 0,
     })
@@ -103,6 +105,7 @@ export async function updateVenue(
     name?: string;
     address?: string;
     city?: string;
+    timezone?: string;
     imageUrl?: string | null;
     sortOrder?: number;
     isActive?: boolean;
@@ -112,6 +115,7 @@ export async function updateVenue(
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.address !== undefined) updateData.address = data.address.trim();
   if (data.city !== undefined) updateData.city = data.city.trim();
+  if (data.timezone !== undefined) updateData.timezone = data.timezone;
   if (data.imageUrl !== undefined)
     updateData.imageUrl = data.imageUrl ? data.imageUrl.trim() : null;
   if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;

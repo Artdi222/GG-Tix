@@ -31,6 +31,7 @@ interface OrderDetailResponse {
     eventTitle: string;
     categoryName: string;
     venueName?: string;
+    venueTimezone?: string;
     eventDate?: string;
     quantity: number;
     status: string;
@@ -183,6 +184,7 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
             categoryName={data.order.categoryName}
             venueName={data.order.venueName}
             eventDate={data.order.eventDate}
+            eventTimezone={data.order.venueTimezone}
           />
         ) : (
           <Text style={styles.errorText}>Data tiket tidak valid.</Text>

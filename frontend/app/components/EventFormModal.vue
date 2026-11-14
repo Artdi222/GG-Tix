@@ -17,14 +17,15 @@ export interface EventRow {
   sortOrder: number
   status: 'open' | 'closed'
   imageUrl: string | null
+  posterUrl: string | null
   artist?: { id: string, name: string } | null
-  venue?: { id: string, name: string, city: string } | null
+  venue?: { id: string, name: string, city: string, timezone?: string } | null
   /** Ticket totals across categories (list endpoint only). */
   capacity?: number
   sold?: number
 }
 
-export interface Option { label: string, value: string, archived?: boolean }
+export interface Option { label: string, value: string, archived?: boolean, timezone?: string }
 
 const props = withDefaults(defineProps<{
   eventData?: EventRow | null
@@ -54,7 +55,8 @@ function blank() {
     seatmapUrl: '',
     sortOrder: 0,
     status: 'open' as 'open' | 'closed',
-    imageUrl: ''
+    imageUrl: '',
+    posterUrl: ''
   }
 }
 
@@ -62,6 +64,7 @@ const state = reactive(blank())
 const saving = ref(false)
 const formError = ref('')
 const isEdit = computed(() => !!props.eventData)
+const venueTz = computed(() => props.venues.find(v => v.value === state.venueId)?.timezone || props.eventData?.venue?.timezone || undefined)
 const venueFormOpen = ref(false)
 const artistFormOpen = ref(false)
 
@@ -92,15 +95,17 @@ watch(open, (isOpen) => {
         artistId: e.artistId,
         publisherName: e.publisherName,
         venueId: e.venueId ?? '',
-        dateTime: toDatetimeLocal(e.dateTime),
-        endDateTime: toDatetimeLocal(e.endDateTime),
+        // Times are edited in the venue's local zone, not the admin's browser zone.
+        dateTime: toDatetimeLocal(e.dateTime, e.venue?.timezone),
+        endDateTime: toDatetimeLocal(e.endDateTime, e.venue?.timezone),
         description: e.description ?? '',
         maxTicketsPerOrder: e.maxTicketsPerOrder ?? undefined,
         tags: [...(e.tags ?? [])],
         seatmapUrl: e.seatmapUrl ?? '',
         sortOrder: e.sortOrder ?? 0,
         status: e.status,
-        imageUrl: e.imageUrl ?? ''
+        imageUrl: e.imageUrl ?? '',
+        posterUrl: e.posterUrl ?? ''
       }
     : blank())
 })
@@ -110,7 +115,7 @@ function validate() {
   if (!state.artistId) return 'Pilih artis.'
   if (!state.publisherName.trim()) return 'Isi nama promotor.'
   if (!state.venueId) return 'Pilih venue.'
-  if (!fromDatetimeLocal(state.dateTime)) return 'Isi tanggal dan waktu mulai.'
+  if (!fromDatetimeLocal(state.dateTime, venueTz.value)) return 'Isi tanggal dan waktu mulai.'
   if (state.endDateTime && state.endDateTime <= state.dateTime) return 'Waktu selesai harus setelah waktu mulai.'
   const max = state.maxTicketsPerOrder
   if (max !== undefined && (!Number.isInteger(max) || max < 1 || max > 10)) return 'Batas tiket per pesanan harus 1–10.'
@@ -126,15 +131,16 @@ async function submit() {
     artistId: state.artistId,
     publisherName: state.publisherName.trim(),
     venueId: state.venueId,
-    dateTime: fromDatetimeLocal(state.dateTime),
-    endDateTime: fromDatetimeLocal(state.endDateTime),
+    dateTime: fromDatetimeLocal(state.dateTime, venueTz.value),
+    endDateTime: fromDatetimeLocal(state.endDateTime, venueTz.value),
     description: state.description.trim() || null,
     maxTicketsPerOrder: state.maxTicketsPerOrder ?? null,
     tags: state.tags,
     seatmapUrl: state.seatmapUrl || null,
     sortOrder: Number(state.sortOrder) || 0,
     status: state.status,
-    imageUrl: state.imageUrl || null
+    imageUrl: state.imageUrl || null,
+    posterUrl: state.posterUrl || null
   }
   try {
     if (props.eventData) await request(`/events/${props.eventData.id}`, { method: 'PUT', body })
@@ -245,6 +251,7 @@ async function submit() {
           <UFormField
             label="Mulai"
             required
+            :help="venueTz ? `Waktu lokal venue (${venueTz})` : undefined"
           >
             <UInput
               v-model="state.dateTime"
@@ -305,10 +312,23 @@ async function submit() {
         </div>
 
         <div class="grid sm:grid-cols-2 gap-4">
-          <UFormField label="Banner (16:9)">
+          <UFormField
+            label="Banner (16:9)"
+            help="Carousel beranda dan latar detail event"
+          >
             <ImageField
               v-model="state.imageUrl"
               kind="banner"
+            />
+          </UFormField>
+          <UFormField
+            label="Poster (2:3)"
+            help="Kartu event dan thumbnail tiket"
+          >
+            <ImageField
+              v-model="state.posterUrl"
+              kind="poster"
+              aspect="aspect-[2/3]"
             />
           </UFormField>
           <UFormField

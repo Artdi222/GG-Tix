@@ -18,6 +18,11 @@ const listQuerySchema = z.object({
   limit: limitQuery(10),
 });
 
+// Must be a zone the runtime knows, e.g. "Asia/Jakarta" or "Europe/Paris".
+const timezoneSchema = z.string().max(64).refine((tz) => {
+  try { new Intl.DateTimeFormat("en", { timeZone: tz }); return true; } catch { return false; }
+}, "Zona waktu tidak dikenal");
+
 const createVenueSchema = z.object({
   name: z
     .string()
@@ -25,6 +30,7 @@ const createVenueSchema = z.object({
     .max(200, "Nama venue maksimum 200 karakter"),
   address: z.string().min(1, "Alamat wajib diisi"),
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter"),
+  timezone: timezoneSchema.optional(),
   imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
 });
@@ -37,6 +43,7 @@ const updateVenueSchema = z.object({
     .optional(),
   address: z.string().min(1, "Alamat wajib diisi").optional(),
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter").optional(),
+  timezone: timezoneSchema.optional(),
   imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),

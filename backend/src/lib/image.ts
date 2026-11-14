@@ -1,12 +1,13 @@
 import sharp from "sharp";
 import { AppError } from "./errors";
 
-export type UploadKind = "profile" | "banner" | "venue";
+export type UploadKind = "profile" | "banner" | "venue" | "poster";
 
 const KIND_CONFIG: Record<UploadKind, { width: number; height: number }> = {
   profile: { width: 800, height: 800 },
   banner: { width: 1600, height: 900 },
   venue: { width: 900, height: 1600 },
+  poster: { width: 1000, height: 1500 },
 };
 
 export function parseKind(formValue: string | null | undefined): UploadKind {

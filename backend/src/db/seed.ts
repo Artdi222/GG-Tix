@@ -74,13 +74,13 @@ async function seed() {
   const insertedVenues = await db
     .insert(venues)
     .values([
-      { name: "Le Grand Rex", address: "1 Boulevard Poissonnière, 75002 Paris, Prancis", city: "Paris", sortOrder: 0 },
-      { name: "Tokyo International Forum Hall A", address: "3-5-1 Marunouchi, Chiyoda-ku, Tokyo 100-0005, Jepang", city: "Tokyo", sortOrder: 1 },
-      { name: "Mercedes-Benz Arena", address: "1200 Shibo Avenue, Pudong New Area, Shanghai, Tiongkok", city: "Shanghai", sortOrder: 2 },
-      { name: "The Symphony Hall", address: "2-3-3 Oyodominami, Kita-ku, Osaka 531-0076, Jepang", city: "Osaka", sortOrder: 3 },
-      { name: "Zepp DiverCity (Tokyo)", address: "Diver City Tokyo Plaza, 1-1-10 Aomi, Koto-ku, Tokyo 135-0064, Jepang", city: "Tokyo", sortOrder: 4 },
-      { name: "Esplanade Theatre", address: "1 Esplanade Drive, Singapura 038981", city: "Singapura", sortOrder: 5 },
-      { name: "Royal Albert Hall", address: "Kensington Gore, South Kensington, London SW7 2AP, Inggris", city: "London", sortOrder: 6 },
+      { name: "Le Grand Rex", address: "1 Boulevard Poissonnière, 75002 Paris, Prancis", city: "Paris", timezone: "Europe/Paris", sortOrder: 0 },
+      { name: "Tokyo International Forum Hall A", address: "3-5-1 Marunouchi, Chiyoda-ku, Tokyo 100-0005, Jepang", city: "Tokyo", timezone: "Asia/Tokyo", sortOrder: 1 },
+      { name: "Mercedes-Benz Arena", address: "1200 Shibo Avenue, Pudong New Area, Shanghai, Tiongkok", city: "Shanghai", timezone: "Asia/Shanghai", sortOrder: 2 },
+      { name: "The Symphony Hall", address: "2-3-3 Oyodominami, Kita-ku, Osaka 531-0076, Jepang", city: "Osaka", timezone: "Asia/Tokyo", sortOrder: 3 },
+      { name: "Zepp DiverCity (Tokyo)", address: "Diver City Tokyo Plaza, 1-1-10 Aomi, Koto-ku, Tokyo 135-0064, Jepang", city: "Tokyo", timezone: "Asia/Tokyo", sortOrder: 4 },
+      { name: "Esplanade Theatre", address: "1 Esplanade Drive, Singapura 038981", city: "Singapura", timezone: "Asia/Singapore", sortOrder: 5 },
+      { name: "Royal Albert Hall", address: "Kensington Gore, South Kensington, London SW7 2AP, Inggris", city: "London", timezone: "Europe/London", sortOrder: 6 },
     ])
     .returning();
   console.log(`  ${insertedVenues.length} venues created`);

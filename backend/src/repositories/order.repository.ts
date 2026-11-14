@@ -233,7 +233,7 @@ export async function findOrdersByCustomerId(
     limit,
     offset,
     with: {
-      event: { columns: { id: true, title: true, dateTime: true, imageUrl: true }, with: { venue: { columns: { name: true, city: true } } } },
+      event: { columns: { id: true, title: true, dateTime: true, imageUrl: true, posterUrl: true }, with: { venue: { columns: { name: true, city: true, timezone: true } } } },
       category: { columns: { name: true } },
     },
   });

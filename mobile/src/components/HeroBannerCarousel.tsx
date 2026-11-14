@@ -20,7 +20,7 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { BRAND_COLORS } from '../constants/config';
-import { EventItem, formatEventDate, getPosterImage } from './EventCard';
+import { EventItem, eventTz, formatEventDate, getBannerImage } from './EventCard';
 import { LinearGradient } from './LinearGradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -63,7 +63,7 @@ function HeroSlideItem({ item, index, scrollX, onPress }: SlideItemProps) {
       <View style={styles.imageOverflowWrap}>
         <Animated.View style={[styles.imageContainer, imageAnimatedStyle]}>
           <Image
-            source={{ uri: getPosterImage(item) }}
+            source={{ uri: getBannerImage(item) }}
             style={styles.heroImage}
             contentFit="cover"
             transition={200}
@@ -85,7 +85,7 @@ function HeroSlideItem({ item, index, scrollX, onPress }: SlideItemProps) {
           <View style={styles.heroUrgentBadge}>
             <Ionicons name="calendar" size={11} color="#18181B" />
             <Text style={styles.heroUrgentText}>
-              {formatEventDate(item.dateTime).day} {formatEventDate(item.dateTime).month}
+              {formatEventDate(item.dateTime, eventTz(item)).day} {formatEventDate(item.dateTime, eventTz(item)).month}
             </Text>
           </View>
           {item.venue?.city ? (

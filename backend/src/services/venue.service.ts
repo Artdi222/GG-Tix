@@ -9,6 +9,7 @@ export interface CreateVenueDTO {
   name: string;
   address: string;
   city: string;
+  timezone?: string;
   imageUrl?: string | null;
   sortOrder?: number;
 }
@@ -17,6 +18,7 @@ export interface UpdateVenueDTO {
   name?: string;
   address?: string;
   city?: string;
+  timezone?: string;
   imageUrl?: string | null;
   sortOrder?: number;
   isActive?: boolean;

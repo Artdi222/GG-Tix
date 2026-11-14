@@ -78,6 +78,13 @@
       "when": 1794631671415,
       "tag": "0010_venue_active_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794637268392,
+      "tag": "0011_event_poster_venue_timezone",
+      "breakpoints": true
     }
   ]
 }

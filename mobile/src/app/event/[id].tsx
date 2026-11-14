@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiFetch } from '../../services/api';
 import { useAuthStore } from '../../store/auth-store';
-import { formatRupiah, getPosterImage, isEventOver } from '../../components/EventCard';
+import { eventTz, formatRupiah, getBannerImage, getPosterImage, isEventOver, tzShort } from '../../components/EventCard';
 import type { TicketCategoryItem } from '../../components/CategoryCard';
 import { LinearGradient } from '../../components/LinearGradient';
 
@@ -32,12 +32,13 @@ export interface EventDetailData {
   endDateTime?: string | null;
   seatmapUrl?: string | null;
   imageUrl?: string | null;
+  posterUrl?: string | null;
   maxTicketsPerOrder?: number;
   maintenanceMode?: boolean;
   tags?: string[];
   status: 'open' | 'closed';
   artist?: { id: string; name: string; bio?: string | null; photoUrl?: string | null } | null;
-  venue?: { id: string; name: string; city: string; address: string } | null;
+  venue?: { id: string; name: string; city: string; address: string; timezone?: string } | null;
   ticketCategories?: TicketCategoryItem[];
 }
 
@@ -50,8 +51,8 @@ const tap = (style: 'light' | 'select' = 'select') => {
   (style === 'light' ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) : Haptics.selectionAsync()).catch(() => {});
 };
 
-const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) =>
-  new Date(iso).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', ...opts });
+const fmt = (iso: string, timeZone: string, opts: Intl.DateTimeFormatOptions) =>
+  new Date(iso).toLocaleString('id-ID', { timeZone, ...opts });
 
 function durationLabel(start: string, end?: string | null) {
   if (!end) return null;
@@ -131,7 +132,9 @@ export default function EventDetailScreen() {
     );
   }
 
-  const poster = getPosterImage(event as any);
+  const poster = getPosterImage(event);
+  const banner = getBannerImage(event);
+  const tz = eventTz(event);
   const isOver = isEventOver(event);
   const closedReason = isOver
     ? 'Acara ini sudah berlangsung'
@@ -177,7 +180,7 @@ export default function EventDetailScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 110 }} showsVerticalScrollIndicator={false}>
         {/* Backdrop: the poster blurred behind a sharp thumbnail, title and quick facts. */}
         <View style={styles.hero}>
-          <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={24} />
+          <Image source={{ uri: banner }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={24} />
           <LinearGradient
             // Dark only behind the top buttons; the title sits on near-white so any poster stays readable.
             colors={['rgba(9,9,11,0.55)', 'rgba(255,255,255,0.88)', 'rgba(255,255,255,1)']}
@@ -215,10 +218,10 @@ export default function EventDetailScreen() {
 
         {/* Plain label / value pairs, no boxes. */}
         <View style={styles.facts}>
-          <Fact label="Tanggal" value={`${fmt(event.dateTime, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`} />
+          <Fact label="Tanggal" value={`${fmt(event.dateTime, tz, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`} />
           <Fact
             label="Waktu"
-            value={`${fmt(event.dateTime, { hour: '2-digit', minute: '2-digit' })}${event.endDateTime ? ` – ${fmt(event.endDateTime, { hour: '2-digit', minute: '2-digit' })}` : ''} WIB`}
+            value={`${fmt(event.dateTime, tz, { hour: '2-digit', minute: '2-digit' })}${event.endDateTime ? ` – ${fmt(event.endDateTime, tz, { hour: '2-digit', minute: '2-digit' })}` : ''} ${tzShort(event.dateTime, tz)}`}
           />
           {event.venue ? <Fact label="Venue" value={event.venue.name} sub={event.venue.address} /> : null}
           {event.artist ? <Fact label="Penampil" value={event.artist.name} sub={event.artist.bio || undefined} /> : null}

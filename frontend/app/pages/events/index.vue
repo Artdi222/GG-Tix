@@ -24,10 +24,10 @@ async function loadOptions() {
   try {
     const [a, v] = await Promise.all([
       fetchAll<{ id: string, name: string }>('/artists'),
-      fetchAll<{ id: string, name: string, city: string, isActive: boolean }>('/venues')
+      fetchAll<{ id: string, name: string, city: string, isActive: boolean, timezone: string }>('/venues')
     ])
     artists.value = a.map(x => ({ label: x.name, value: x.id }))
-    venues.value = v.map(x => ({ label: `${x.name} — ${x.city}`, value: x.id, archived: !x.isActive }))
+    venues.value = v.map(x => ({ label: `${x.name} — ${x.city}`, value: x.id, archived: !x.isActive, timezone: x.timezone }))
   } catch (err) {
     optionsError.value = apiErrorMessage(err, 'Daftar artis dan venue gagal dimuat; form event tidak bisa dipakai.')
   }
@@ -198,7 +198,7 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
           </template>
           <template #dateTime-cell="{ row }">
             <p class="text-highlighted whitespace-nowrap">
-              {{ formatDateTime(row.original.dateTime) }}
+              {{ formatDateTime(row.original.dateTime, row.original.venue?.timezone) }}
             </p>
             <p
               v-if="isPast(row.original.dateTime)"
@@ -299,7 +299,7 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
         :venues="venues"
         @saved="list.refresh()"
         @artist-created="a => artists.unshift({ label: a.name, value: a.id })"
-        @venue-created="v => venues.unshift({ label: `${v.name} — ${v.city}`, value: v.id })"
+        @venue-created="v => venues.unshift({ label: `${v.name} — ${v.city}`, value: v.id, timezone: v.timezone })"
       />
       <CategoryManagerModal
         v-if="categoriesFor"

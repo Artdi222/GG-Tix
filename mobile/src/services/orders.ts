@@ -2,7 +2,7 @@ import { apiEnvelope, apiFetch } from './api';
 export interface OrderItem {
   id: string; eventId: string; quantity: number; totalPrice: string | number;
   status: 'pending' | 'verified' | 'rejected' | 'expired'; createdAt: string;
-  event?: { id: string; title: string; dateTime: string; imageUrl?: string | null; venue?: { name: string; city: string } };
+  event?: { id: string; title: string; dateTime: string; imageUrl?: string | null; posterUrl?: string | null; venue?: { name: string; city: string; timezone?: string } };
   category?: { name: string };
 }
 export interface OrderSummary { totalOrders: number; activeTickets: number; verified: number; pending: number; rejected: number; expired: number }

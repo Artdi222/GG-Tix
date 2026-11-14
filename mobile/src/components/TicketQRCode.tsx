@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { tzShort } from './EventCard';
 import { StyleSheet, Text, View, Platform, Dimensions } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Brightness from 'expo-brightness';
@@ -26,6 +27,8 @@ interface TicketQRCodeProps {
   categoryName: string;
   venueName?: string;
   eventDate?: string;
+  /** Venue IANA zone; the date is shown in the venue's local time. */
+  eventTimezone?: string;
 }
 
 export function TicketQRCode({
@@ -34,6 +37,7 @@ export function TicketQRCode({
   categoryName,
   venueName,
   eventDate,
+  eventTimezone = 'Asia/Jakarta',
 }: TicketQRCodeProps) {
   const [openedAt] = useState(() => Date.now());
   const shimmerTranslateX = useSharedValue(-SCREEN_WIDTH);
@@ -79,7 +83,7 @@ export function TicketQRCode({
     if (!iso) return '';
     try {
       return new Date(iso).toLocaleDateString('id-ID', {
-        timeZone: 'Asia/Jakarta',
+        timeZone: eventTimezone,
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -100,7 +104,7 @@ export function TicketQRCode({
           <Text style={styles.eventTitle} numberOfLines={2}>
             {eventTitle}
           </Text>
-          {eventDate && <Text style={styles.eventDate}>{formatDate(eventDate)} WIB</Text>}
+          {eventDate && <Text style={styles.eventDate}>{formatDate(eventDate)} {tzShort(eventDate, eventTimezone)}</Text>}
           {venueName && <Text style={styles.venueName}>{venueName}</Text>}
 
           <View style={styles.badgeRow}>

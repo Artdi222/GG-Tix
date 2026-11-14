@@ -31,6 +31,7 @@ export interface CreateEventParams {
   createdBy: string;
   status?: "open" | "closed";
   imageUrl?: string | null;
+  posterUrl?: string | null;
 }
 
 export interface UpdateEventParams {
@@ -47,6 +48,7 @@ export interface UpdateEventParams {
   sortOrder?: number;
   status?: "open" | "closed";
   imageUrl?: string | null;
+  posterUrl?: string | null;
 }
 
 export async function createEvent(params: CreateEventParams) {
@@ -138,6 +140,9 @@ export async function updateEvent(id: string, params: UpdateEventParams) {
   ) {
     await deleteAssetsByUrl(existingEvent.imageUrl);
   }
+  if (params.posterUrl !== undefined && existingEvent.posterUrl && params.posterUrl !== existingEvent.posterUrl) {
+    await deleteAssetsByUrl(existingEvent.posterUrl);
+  }
 
   return updated;
 }
@@ -171,5 +176,8 @@ export async function deleteEvent(id: string) {
   // UPL-09: hapus event → hapus banner B2 (best-effort)
   if (existingEvent.imageUrl) {
     await deleteAssetsByUrl(existingEvent.imageUrl);
+  }
+  if (existingEvent.posterUrl) {
+    await deleteAssetsByUrl(existingEvent.posterUrl);
   }
 }

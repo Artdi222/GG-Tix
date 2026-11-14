@@ -18,6 +18,7 @@ export interface CreateEventInput {
   createdBy: string;
   status?: "open" | "closed";
   imageUrl?: string | null;
+  posterUrl?: string | null;
 }
 
 export interface UpdateEventInput {
@@ -34,6 +35,7 @@ export interface UpdateEventInput {
   sortOrder?: number;
   status?: "open" | "closed";
   imageUrl?: string | null;
+  posterUrl?: string | null;
 }
 
 export interface EventQueryFilters {
@@ -63,6 +65,7 @@ export async function createEvent(data: CreateEventInput) {
       createdBy: data.createdBy,
       status: data.status || "open",
       imageUrl: data.imageUrl ? data.imageUrl.trim() : null,
+      posterUrl: data.posterUrl ? data.posterUrl.trim() : null,
     })
     .returning();
   return newEvent;
@@ -174,6 +177,8 @@ export async function updateEvent(id: string, data: UpdateEventInput) {
   if (data.status !== undefined) updateData.status = data.status;
   if (data.imageUrl !== undefined)
     updateData.imageUrl = data.imageUrl ? data.imageUrl.trim() : null;
+  if (data.posterUrl !== undefined)
+    updateData.posterUrl = data.posterUrl ? data.posterUrl.trim() : null;
 
   if (Object.keys(updateData).length === 0) {
     return await findEventById(id);

@@ -22,7 +22,7 @@ import { AppTopBar, PageHeader } from '../../components/layout';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
 import { StatusBadge } from '../../components/StatusBadge';
-import { getPosterImage } from '../../components/EventCard';
+import { getPosterImage, eventTz, tzShort } from '../../components/EventCard';
 
 interface OrderItem {
   id: string;
@@ -36,9 +36,11 @@ interface OrderItem {
     title: string;
     dateTime: string;
     imageUrl?: string | null;
+    posterUrl?: string | null;
     venue?: {
       name: string;
       city: string;
+      timezone?: string;
     };
   };
   category?: {
@@ -77,11 +79,12 @@ function OrderCardItem({ item, onPress }: OrderCardProps) {
     onPress();
   };
 
+  const tz = eventTz(item.event);
   const formatDate = (isoString?: string) => {
     if (!isoString) return '';
     try {
       return new Date(isoString).toLocaleDateString('id-ID', {
-        timeZone: 'Asia/Jakarta',
+        timeZone: tz,
         weekday: 'short',
         day: 'numeric',
         month: 'short',
@@ -146,7 +149,7 @@ function OrderCardItem({ item, onPress }: OrderCardProps) {
             {item.event?.dateTime ? (
               <View style={styles.metaRow}>
                 <Ionicons name="calendar-outline" size={12} color={BRAND_COLORS.accent} />
-                <Text style={styles.metaText}>{formatDate(item.event.dateTime)} WIB</Text>
+                <Text style={styles.metaText}>{formatDate(item.event.dateTime)} {tzShort(item.event.dateTime, tz)}</Text>
               </View>
             ) : null}
             {item.event?.venue ? (

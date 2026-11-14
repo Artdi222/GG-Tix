@@ -21,7 +21,10 @@ export interface EventItem {
   dateTime: string;
   endDateTime?: string | null;
   seatmapUrl?: string | null;
+  /** 16:9 banner (carousel, detail backdrop). */
   imageUrl?: string | null;
+  /** 2:3 poster (cards, thumbnails). */
+  posterUrl?: string | null;
   maxTicketsPerOrder?: number;
   tags?: string[];
   status: 'open' | 'closed';
@@ -36,6 +39,8 @@ export interface EventItem {
     name: string;
     city: string;
     address?: string;
+    /** IANA zone; event times are shown in the venue's local time. */
+    timezone?: string;
   } | null;
   /** List endpoint only: totals and starting price across categories. */
   capacity?: number;
@@ -68,10 +73,20 @@ const FALLBACK_POSTERS = [
   'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop&q=80',
 ];
 
-export function getPosterImage(event: EventItem): string {
-  if (event.imageUrl && event.imageUrl.trim().startsWith('http')) {
-    return event.imageUrl.trim();
-  }
+type ImageSource = Pick<EventItem, 'id' | 'title'> & { imageUrl?: string | null; posterUrl?: string | null };
+const http = (u?: string | null) => (u && u.trim().startsWith('http') ? u.trim() : null);
+
+/** Portrait art for cards and thumbnails: poster, else banner, else a stock photo. */
+export function getPosterImage(event: ImageSource): string {
+  return http(event.posterUrl) ?? http(event.imageUrl) ?? fallbackImage(event);
+}
+
+/** Wide art for the carousel and detail backdrop: banner, else poster, else a stock photo. */
+export function getBannerImage(event: ImageSource): string {
+  return http(event.imageUrl) ?? http(event.posterUrl) ?? fallbackImage(event);
+}
+
+function fallbackImage(event: ImageSource): string {
   // Hash the id so neighbouring events don't all land on the same stock photo.
   let hash = 0;
   for (const ch of event.id ?? event.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
@@ -85,18 +100,36 @@ export function formatRupiah(val?: string | number | null): string {
   return `Rp ${num.toLocaleString('id-ID')}`;
 }
 
-export function formatEventDate(isoString?: string): { day: string; month: string; time: string; full: string; weekday: string } {
+export const DEFAULT_TZ = 'Asia/Jakarta';
+
+/** Zone of an event's venue, defaulting to WIB for older data. */
+export const eventTz = (e?: { venue?: { timezone?: string } | null } | null) => e?.venue?.timezone || DEFAULT_TZ;
+
+/** Short zone label for a moment, e.g. "WIB", "GMT+1", "GMT+9". */
+export function tzShort(isoString: string | undefined, timeZone = DEFAULT_TZ): string {
+  if (!isoString) return '';
+  try {
+    const part = new Intl.DateTimeFormat('id-ID', { timeZone, timeZoneName: 'short' })
+      .formatToParts(new Date(isoString))
+      .find((p) => p.type === 'timeZoneName');
+    return part?.value ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function formatEventDate(isoString?: string, timeZone = DEFAULT_TZ): { day: string; month: string; time: string; full: string; weekday: string } {
   if (!isoString) return { day: '-', month: '-', time: '', full: '-', weekday: '-' };
   try {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return { day: '-', month: '-', time: '', full: '-', weekday: '-' };
 
-    const day = d.toLocaleDateString('id-ID', { day: '2-digit', timeZone: 'Asia/Jakarta' });
-    const month = d.toLocaleDateString('id-ID', { month: 'short', timeZone: 'Asia/Jakarta' }).toUpperCase();
-    const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
-    const weekday = d.toLocaleDateString('id-ID', { weekday: 'short', timeZone: 'Asia/Jakarta' }).toUpperCase();
+    const day = d.toLocaleDateString('id-ID', { day: '2-digit', timeZone });
+    const month = d.toLocaleDateString('id-ID', { month: 'short', timeZone }).toUpperCase();
+    const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone });
+    const weekday = d.toLocaleDateString('id-ID', { weekday: 'short', timeZone }).toUpperCase();
     const full = d.toLocaleDateString('id-ID', {
-      timeZone: 'Asia/Jakarta',
+      timeZone,
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -134,7 +167,7 @@ export function EventCard({ event, variant = 'portrait', style, rank, width = 16
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const dateInfo = formatEventDate(event.dateTime);
+  const dateInfo = formatEventDate(event.dateTime, eventTz(event));
   const lowestPrice = getLowestPrice(event);
   const posterUri = imageError ? FALLBACK_POSTERS[0] : getPosterImage(event);
   const isSoldOut =

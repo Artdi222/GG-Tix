@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { apiFetch } from '../../services/api';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
-import { getPosterImage } from '../../components/EventCard';
+import { eventTz, getPosterImage, tzShort } from '../../components/EventCard';
 import { PageHeader } from '../../components/layout';
 
 export default function CheckoutScreen() {
@@ -138,7 +138,7 @@ export default function CheckoutScreen() {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Asia/Jakarta',
+        timeZone: eventTz(eventData),
       });
     } catch {
       return isoString;
@@ -268,7 +268,7 @@ export default function CheckoutScreen() {
             <Text style={styles.eventTitle} numberOfLines={2}>
               {eventData?.title || (loadError ? 'Detail konser gagal dimuat' : 'Memuat…')}
             </Text>
-            {eventData?.dateTime ? <Text style={styles.meta}>{formatDate(eventData.dateTime)} WIB</Text> : null}
+            {eventData?.dateTime ? <Text style={styles.meta}>{formatDate(eventData.dateTime)} {tzShort(eventData.dateTime, eventTz(eventData))}</Text> : null}
             {eventData?.venue ? <Text style={styles.meta} numberOfLines={1}>{eventData.venue.name}, {eventData.venue.city}</Text> : null}
           </View>
         </View>

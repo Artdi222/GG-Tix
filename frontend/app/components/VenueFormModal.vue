@@ -4,6 +4,7 @@ export interface Venue {
   name: string
   address: string
   city: string
+  timezone: string
   imageUrl: string | null
   sortOrder: number
   isActive: boolean
@@ -15,7 +16,15 @@ const open = defineModel<boolean>('open', { default: false })
 
 const { request } = useApi()
 const toast = useToast()
-const state = reactive({ name: '', address: '', city: '', sortOrder: 0 as number | undefined, imageUrl: '', isActive: true })
+const state = reactive({ name: '', address: '', city: '', timezone: 'Asia/Jakarta', sortOrder: 0 as number | undefined, imageUrl: '', isActive: true })
+// Every IANA zone the browser knows; event times at this venue are shown in it.
+const timezones: string[] = (() => {
+  try {
+    return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf('timeZone')
+  } catch {
+    return ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
+  }
+})()
 const saving = ref(false)
 const formError = ref('')
 const cities = ref<string[]>([])
@@ -41,8 +50,8 @@ watch(open, (isOpen) => {
   loadCities()
   const v = props.venue
   Object.assign(state, v
-    ? { name: v.name, address: v.address, city: v.city, sortOrder: v.sortOrder, imageUrl: v.imageUrl ?? '', isActive: v.isActive }
-    : { name: '', address: '', city: '', sortOrder: 0, imageUrl: '', isActive: true })
+    ? { name: v.name, address: v.address, city: v.city, timezone: v.timezone || 'Asia/Jakarta', sortOrder: v.sortOrder, imageUrl: v.imageUrl ?? '', isActive: v.isActive }
+    : { name: '', address: '', city: '', timezone: 'Asia/Jakarta', sortOrder: 0, imageUrl: '', isActive: true })
 })
 
 async function submit() {
@@ -53,6 +62,7 @@ async function submit() {
     name: state.name.trim(),
     address: state.address.trim(),
     city: state.city.trim(),
+    timezone: state.timezone,
     sortOrder: state.sortOrder ?? 0,
     imageUrl: state.imageUrl || null,
     ...(props.venue ? { isActive: state.isActive } : {})
@@ -129,6 +139,16 @@ async function submit() {
             />
           </UFormField>
         </div>
+        <UFormField
+          label="Zona waktu"
+          help="Jam event di venue ini ditampilkan dalam waktu lokal ini."
+        >
+          <USelectMenu
+            v-model="state.timezone"
+            :items="timezones"
+            class="w-full"
+          />
+        </UFormField>
         <UFormField
           label="Foto venue"
           help="Denah kursi dan poster diunggah per event, bukan di sini."

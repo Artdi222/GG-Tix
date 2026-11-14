@@ -25,6 +25,7 @@ const createEventSchema = z.object({
   sortOrder: z.number().int().optional(),
   status: z.enum(["open", "closed"]).optional(),
   imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
+  posterUrl: z.string().url("Invalid poster URL format").optional().nullable().or(z.literal("")),
 });
 
 const updateEventSchema = createEventSchema.partial();

@@ -102,6 +102,8 @@ export const venues = pgTable(
     name: varchar("name", { length: 200 }).notNull(),
     address: text("address").notNull(),
     city: varchar("city", { length: 100 }).notNull().default("Jakarta"),
+    // IANA zone of the venue; event times are shown in this local time.
+    timezone: varchar("timezone", { length: 64 }).notNull().default("Asia/Jakarta"),
     imageUrl: text("image_url"),
     sortOrder: integer("sort_order").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
@@ -130,6 +132,8 @@ export const events = pgTable(
     maxTicketsPerOrder: integer("max_tickets_per_order"),
     tags: text("tags").array().notNull().default([]),
     seatmapUrl: text("seatmap_url"),
+    // Portrait 2:3 poster for cards; imageUrl stays the 16:9 banner.
+    posterUrl: text("poster_url"),
     sortOrder: integer("sort_order").notNull().default(0),
     imageUrl: text("image_url"),
     status: eventStatusEnum("status").notNull().default("open"),
