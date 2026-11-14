@@ -135,7 +135,7 @@ const greeting = computed(() => {
 const todayLabel = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 // Categorical tier colors: brand first, then distinct hues that stay legible together.
-const TIER_COLORS = ['#6d28d9', '#a78bfa', '#f2a93b', '#0ea5e9', '#10b981', '#a1a1aa']
+const TIER_COLORS = ['#f5a524', '#b4630a', '#0e7490', '#15803d', '#475569', '#94a3b8']
 
 // Category rows are per event; the same tier name (VIP, Reguler…) is merged across events.
 const tiers = computed(() => {
@@ -167,6 +167,26 @@ function daysUntil(iso: string) {
   const days = Math.ceil((Date.parse(iso) - Date.now()) / 86400000)
   return days <= 0 ? 'Hari ini' : days === 1 ? 'Besok' : `${days} hari lagi`
 }
+
+// ---- kehadiran (donut) & okupansi (gauge), gabungan event yang dibuka ----
+const live = computed(() => events.value.filter(e => e.status === 'open'))
+const totals = computed(() => live.value.reduce(
+  (a, e) => ({ sold: a.sold + e.sold, capacity: a.capacity + e.capacity, checkedIn: a.checkedIn + e.checkedIn }),
+  { sold: 0, capacity: 0, checkedIn: 0 }
+))
+const attendancePct = computed(() => totals.value.sold ? Math.round(totals.value.checkedIn / totals.value.sold * 100) : 0)
+const R = 52
+const C = 2 * Math.PI * R
+const attendanceDash = computed(() => `${attendancePct.value / 100 * C} ${C}`)
+
+const capPct = computed(() => totals.value.capacity ? Math.min(100, Math.round(totals.value.sold / totals.value.capacity * 100)) : 0)
+const cap = computed(() => capPct.value >= 90
+  ? { color: 'error' as const, label: 'Hampir habis', stroke: '#e11d48' }
+  : capPct.value >= 60
+    ? { color: 'warning' as const, label: 'Laris', stroke: '#d97706' }
+    : { color: 'primary' as const, label: 'Tersedia', stroke: '#f5a524' })
+const GA = Math.PI * 70
+const gaugeDash = computed(() => `${capPct.value / 100 * GA} ${GA}`)
 
 function occupancyColor(pct: number) {
   return pct >= 90 ? 'error' : pct >= 60 ? 'warning' : 'primary'
@@ -250,16 +270,75 @@ function occupancyColor(pct: number) {
         :actions="[{ label: 'Coba lagi', color: 'error', variant: 'outline', onClick: load }]"
       />
 
-      <div>
-        <h1 class="text-xl font-semibold tracking-tight text-highlighted">
-          {{ greeting }}
-        </h1>
-        <p class="mt-0.5 text-sm text-muted">
-          {{ todayLabel }} · performa penjualan {{ periodLabel.toLowerCase() }}
-        </p>
-      </div>
+      <!-- Hero -->
+      <section class="relative overflow-hidden rounded-xl bg-ink p-6 text-white shadow-(--shadow-card) sm:p-8">
+        <div class="relative flex flex-wrap items-end justify-between gap-6">
+          <div class="min-w-0 max-w-2xl">
+            <span class="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/80">
+              {{ todayLabel }}
+            </span>
+            <h1 class="mt-3 text-balance font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+              {{ greeting }}
+            </h1>
+            <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/70">
+              <span class="inline-flex items-center gap-1.5">
+                <UIcon
+                  name="i-lucide-calendar-range"
+                  class="size-4"
+                />Performa {{ periodLabel.toLowerCase() }}
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <UIcon
+                  name="i-lucide-calendar-check"
+                  class="size-4"
+                />{{ formatNumber(summary?.overview.openCount ?? 0) }} event dibuka
+              </span>
+            </p>
+          </div>
+          <div class="flex flex-col items-start gap-3 sm:items-end">
+            <div class="sm:text-right">
+              <p class="text-xs font-medium uppercase tracking-wide text-white/60">
+                Pendapatan periode ini
+              </p>
+              <USkeleton
+                v-if="loading && !summary"
+                class="mt-1 h-12 w-56 bg-white/10"
+              />
+              <p
+                v-else
+                class="font-display text-4xl font-bold tracking-tight text-accent tabular-nums sm:text-5xl"
+              >
+                {{ formatIDR(summary?.overview.totalRevenue ?? 0, true) }}
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                to="/events"
+                icon="i-lucide-plus"
+                color="neutral"
+                variant="solid"
+                class="bg-white text-ink hover:bg-white/90"
+              >
+                Kelola event
+              </UButton>
+              <UButton
+                to="/orders"
+                icon="i-lucide-receipt-text"
+                color="neutral"
+                variant="ghost"
+                class="text-white ring-1 ring-white/30 hover:bg-white/10 hover:text-white"
+              >
+                Pesanan
+              </UButton>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <h2 class="font-display text-lg font-bold text-highlighted">
+        Ringkasan penjualan
+      </h2>
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Pendapatan"
           :value="formatIDR(summary?.overview.totalRevenue ?? 0)"
@@ -274,6 +353,7 @@ function occupancyColor(pct: number) {
           :delta="deltas.tickets"
           :hint="`Rata-rata ${formatIDR(avgOrder)} / tiket`"
           icon="i-lucide-ticket"
+          tone="info"
           :loading="loading && !summary"
         />
         <StatCard
@@ -282,6 +362,7 @@ function occupancyColor(pct: number) {
           hint="Semua periode"
           icon="i-lucide-hourglass"
           tone="warning"
+          to="/orders"
           :loading="loading && !summary"
         />
         <StatCard
@@ -290,12 +371,162 @@ function occupancyColor(pct: number) {
           :hint="summary ? `${formatNumber(summary.overview.closedCount)} sudah ditutup` : undefined"
           icon="i-lucide-calendar-check"
           tone="success"
+          to="/events"
           :loading="loading && !summary"
         />
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
-        <UCard class="xl:col-span-2">
+      <!-- Okupansi + kehadiran -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <UCard
+          class="rounded-xl"
+          :ui="{ body: 'p-5 sm:p-6' }"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h3 class="font-semibold text-highlighted">
+                Okupansi tiket
+              </h3>
+              <p class="text-xs text-muted">
+                Gabungan event yang dibuka
+              </p>
+            </div>
+            <UBadge
+              v-if="totals.capacity"
+              :color="cap.color"
+              variant="subtle"
+            >
+              {{ cap.label }}
+            </UBadge>
+          </div>
+          <USkeleton
+            v-if="loading && !events.length"
+            class="mx-auto mt-4 h-32 w-56"
+          />
+          <template v-else-if="totals.capacity">
+            <div class="relative mx-auto mt-4 w-56">
+              <svg
+                viewBox="0 0 160 90"
+                class="w-full"
+                role="img"
+                :aria-label="`Okupansi ${capPct}%`"
+              >
+                <path
+                  d="M10 80 A70 70 0 0 1 150 80"
+                  fill="none"
+                  stroke="var(--ui-bg-accented)"
+                  stroke-width="14"
+                  stroke-linecap="round"
+                />
+                <path
+                  v-if="capPct > 0"
+                  d="M10 80 A70 70 0 0 1 150 80"
+                  fill="none"
+                  :stroke="cap.stroke"
+                  stroke-width="14"
+                  stroke-linecap="round"
+                  :stroke-dasharray="gaugeDash"
+                  class="transition-all duration-700"
+                />
+              </svg>
+              <div class="absolute inset-x-0 bottom-0 text-center">
+                <span class="text-3xl font-bold tabular-nums text-highlighted">{{ capPct }}%</span>
+              </div>
+            </div>
+            <p class="mt-3 text-center text-sm text-muted">
+              <span class="font-semibold text-highlighted">{{ formatNumber(totals.sold) }}</span>
+              dari {{ formatNumber(totals.capacity) }} tiket terjual · sisa {{ formatNumber(Math.max(0, totals.capacity - totals.sold)) }}
+            </p>
+          </template>
+          <p
+            v-else
+            class="mt-8 text-center text-sm text-muted"
+          >
+            Belum ada event yang dibuka.
+          </p>
+        </UCard>
+
+        <UCard
+          class="rounded-xl"
+          :ui="{ body: 'flex h-full flex-col p-5 sm:p-6' }"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h3 class="font-semibold text-highlighted">
+                Kehadiran
+              </h3>
+              <p class="text-xs text-muted">
+                Tiket yang sudah check-in
+              </p>
+            </div>
+            <UButton
+              to="/scanner"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              trailing-icon="i-lucide-arrow-right"
+            >
+              Scanner
+            </UButton>
+          </div>
+          <div class="mt-4 flex flex-1 flex-wrap items-center justify-center gap-6">
+            <div class="relative size-36 shrink-0">
+              <svg
+                viewBox="0 0 120 120"
+                class="size-full -rotate-90"
+                role="img"
+                :aria-label="`Tingkat kehadiran ${attendancePct}%`"
+              >
+                <circle
+                  cx="60"
+                  cy="60"
+                  :r="R"
+                  fill="none"
+                  stroke="var(--ui-bg-accented)"
+                  stroke-width="12"
+                />
+                <circle
+                  v-if="attendancePct > 0"
+                  cx="60"
+                  cy="60"
+                  :r="R"
+                  fill="none"
+                  stroke="#15803d"
+                  stroke-width="12"
+                  stroke-linecap="round"
+                  :stroke-dasharray="attendanceDash"
+                  class="transition-all duration-700"
+                />
+              </svg>
+              <div class="absolute inset-0 grid place-content-center text-center">
+                <span class="text-3xl font-bold tabular-nums text-highlighted">{{ attendancePct }}%</span>
+                <span class="text-xs text-muted">hadir</span>
+              </div>
+            </div>
+            <dl class="grid min-w-36 gap-3 text-center">
+              <div class="rounded-xl bg-emerald-50 px-4 py-2">
+                <dt class="text-xs text-emerald-800">
+                  Sudah check-in
+                </dt>
+                <dd class="text-xl font-bold tabular-nums text-emerald-900">
+                  {{ formatNumber(totals.checkedIn) }}
+                </dd>
+              </div>
+              <div class="rounded-xl bg-elevated px-4 py-2">
+                <dt class="text-xs text-muted">
+                  Belum hadir
+                </dt>
+                <dd class="text-xl font-bold tabular-nums text-highlighted">
+                  {{ formatNumber(Math.max(0, totals.sold - totals.checkedIn)) }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </UCard>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <UCard class="rounded-xl xl:col-span-2">
           <template #header>
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -343,7 +574,7 @@ function occupancyColor(pct: number) {
           />
         </UCard>
 
-        <UCard>
+        <UCard class="rounded-xl">
           <template #header>
             <p class="font-medium text-highlighted">
               Pendapatan per tier tiket
@@ -405,9 +636,9 @@ function occupancyColor(pct: number) {
         </UCard>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <UCard
-          class="xl:col-span-2"
+          class="rounded-xl xl:col-span-2"
           :ui="{ body: 'p-0 sm:p-0' }"
         >
           <template #header>
@@ -452,14 +683,14 @@ function occupancyColor(pct: number) {
             class="w-full text-sm"
           >
             <thead>
-              <tr class="text-xs text-muted border-b border-default">
-                <th class="text-left font-medium px-4 py-2.5">
+              <tr class="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-toned">
+                <th class="text-left px-5 py-3">
                   Event
                 </th>
-                <th class="text-left font-medium px-4 py-2.5 w-[35%]">
+                <th class="text-left px-5 py-3 w-[35%]">
                   Terjual / kapasitas
                 </th>
-                <th class="text-right font-medium px-4 py-2.5">
+                <th class="text-right px-5 py-3">
                   Pendapatan
                 </th>
               </tr>
@@ -468,11 +699,12 @@ function occupancyColor(pct: number) {
               <tr
                 v-for="ev in summary.byEvent.slice(0, 8)"
                 :key="ev.eventId"
+                class="transition-colors even:bg-slate-50/70 hover:bg-gold-50"
               >
-                <td class="px-4 py-3 text-highlighted max-w-0 truncate">
+                <td class="px-5 py-3.5 text-highlighted max-w-0 truncate">
                   {{ ev.title }}
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-5 py-3.5">
                   <div class="flex items-center gap-3">
                     <UProgress
                       :model-value="Math.min(ev.occupancyPct, 100)"
@@ -483,7 +715,7 @@ function occupancyColor(pct: number) {
                     <span class="text-xs text-muted tabular-nums whitespace-nowrap">{{ formatNumber(ev.ticketsSold) }} / {{ formatNumber(ev.capacity) }}</span>
                   </div>
                 </td>
-                <td class="px-4 py-3 text-right tabular-nums text-highlighted whitespace-nowrap">
+                <td class="px-5 py-3.5 text-right tabular-nums text-highlighted whitespace-nowrap">
                   {{ formatIDR(ev.revenue) }}
                 </td>
               </tr>
@@ -491,7 +723,10 @@ function occupancyColor(pct: number) {
           </table>
         </UCard>
 
-        <UCard :ui="{ body: 'p-0 sm:p-0' }">
+        <UCard
+          class="rounded-xl"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
           <template #header>
             <p class="font-medium text-highlighted">
               Event mendatang
@@ -526,7 +761,7 @@ function occupancyColor(pct: number) {
             <li
               v-for="ev in upcoming"
               :key="ev.id"
-              class="px-4 py-3"
+              class="px-5 py-3.5"
             >
               <div class="flex items-start gap-3">
                 <div class="w-11 shrink-0 overflow-hidden rounded-lg ring ring-default text-center">

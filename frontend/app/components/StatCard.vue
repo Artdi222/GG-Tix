@@ -5,12 +5,24 @@ const props = defineProps<{
   icon: string
   hint?: string
   loading?: boolean
-  tone?: 'default' | 'warning' | 'success'
+  tone?: 'default' | 'warning' | 'success' | 'info' | 'error'
   /** Percent change vs the previous period; null hides the chip. */
   delta?: number | null
   /** Set when a decrease is the good direction (e.g. pending orders). */
   invertDelta?: boolean
+  /** Makes the whole card a link (drill-down). */
+  to?: string
 }>()
+
+// Literal classes so Tailwind generates them.
+const TILES = {
+  default: 'bg-gold-100 text-gold-700',
+  warning: 'bg-amber-100 text-amber-700',
+  success: 'bg-green-100 text-green-700',
+  info: 'bg-sky-100 text-sky-700',
+  error: 'bg-red-100 text-red-700'
+} as const
+const tile = computed(() => TILES[props.tone ?? 'default'])
 
 const deltaState = computed(() => {
   const d = props.delta
@@ -26,38 +38,25 @@ const deltaState = computed(() => {
 </script>
 
 <template>
-  <UCard :ui="{ body: 'p-4 sm:p-5' }">
-    <div class="flex items-center gap-2 text-muted">
-      <UIcon
-        :name="icon"
-        class="size-4 shrink-0"
-        :class="{
-          'text-primary': !tone || tone === 'default',
-          'text-warning': tone === 'warning',
-          'text-success': tone === 'success'
-        }"
-      />
-      <p class="text-[13px] font-medium truncate">
-        {{ label }}
-      </p>
-    </div>
-    <USkeleton
-      v-if="loading"
-      class="mt-3 h-8 w-28"
-    />
-    <p
-      v-else
-      class="mt-2 text-lg sm:text-[26px] leading-tight font-semibold tracking-tight text-highlighted tabular-nums truncate"
-    >
-      {{ value }}
-    </p>
-    <div
-      v-if="!loading && (deltaState || hint)"
-      class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-xs"
-    >
+  <component
+    :is="to ? resolveComponent('NuxtLink') : 'div'"
+    :to="to"
+    class="group block min-w-0 rounded-xl bg-default p-4 sm:p-5 shadow-(--shadow-card) ring ring-default transition"
+    :class="to ? 'hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-primary' : ''"
+  >
+    <div class="flex items-center justify-between gap-2">
       <span
-        v-if="deltaState"
-        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium tabular-nums shrink-0"
+        class="grid size-9 shrink-0 place-items-center rounded-full"
+        :class="tile"
+      >
+        <UIcon
+          :name="icon"
+          class="size-4.5"
+        />
+      </span>
+      <span
+        v-if="!loading && deltaState"
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium tabular-nums shrink-0"
         :class="deltaState.class"
       >
         <UIcon
@@ -66,10 +65,30 @@ const deltaState = computed(() => {
         />
         {{ deltaState.text }}
       </span>
-      <span
-        v-if="hint"
-        class="text-dimmed truncate max-w-full"
-      >{{ hint }}</span>
+      <UIcon
+        v-else-if="to"
+        name="i-lucide-arrow-up-right"
+        class="size-4 text-muted opacity-0 transition group-hover:opacity-100"
+      />
     </div>
-  </UCard>
+    <USkeleton
+      v-if="loading"
+      class="mt-4 h-8 w-28"
+    />
+    <p
+      v-else
+      class="mt-3 font-display text-xl sm:text-[28px] leading-tight font-bold tracking-tight text-highlighted tabular-nums truncate"
+    >
+      {{ value }}
+    </p>
+    <p class="mt-0.5 text-sm text-muted truncate">
+      {{ label }}
+    </p>
+    <p
+      v-if="!loading && hint"
+      class="mt-1 text-xs text-dimmed truncate"
+    >
+      {{ hint }}
+    </p>
+  </component>
 </template>
