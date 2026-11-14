@@ -147,7 +147,7 @@ function getQrImageSrc(ticket: TicketItem) {
                   size="sm"
                   class="font-bold px-2 py-0.5 text-[10px] rounded-md"
                 >
-                  {{ ticket.checkedIn ? '✅ Sudah Check-In' : '🎟️ Belum Check-In' }}
+                  {{ ticket.checkedIn ? 'Sudah check-in' : 'Belum check-in' }}
                 </UBadge>
               </div>
 

@@ -16,7 +16,7 @@ export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
 
   switch (status) {
     case 'verified':
-      label = 'Berhasil ✓';
+      label = 'Berhasil';
       dotColor = '#059669';
       badgeStyle = styles.badgeGreen;
       textColor = '#059669';

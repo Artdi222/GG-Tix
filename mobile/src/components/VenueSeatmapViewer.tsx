@@ -141,7 +141,7 @@ export function VenueSeatmapViewer({
             </Text>
           </View>
           <Text style={styles.positionDescription}>
-            📍 {getCategoryPositionDescription(selectedCategory.name)}
+            {getCategoryPositionDescription(selectedCategory.name)}
           </Text>
         </View>
       )}

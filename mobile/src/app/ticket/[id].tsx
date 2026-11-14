@@ -167,7 +167,7 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
                         isActive && styles.switcherTabTextActive,
                       ]}
                     >
-                      Tiket {idx + 1} {t.checkedIn ? '✓' : ''}
+                      Tiket {idx + 1}{t.checkedIn ? ' · Masuk' : ''}
                     </Text>
                   </TouchableOpacity>
                 );
