@@ -33,7 +33,7 @@ export async function createOrder(data: CreateOrderInput) {
   return await db.transaction(async (tx) => {
     // 1. Check event status
     const [event] = await tx
-      .select({ id: events.id, status: events.status, maxTicketsPerOrder: events.maxTicketsPerOrder })
+      .select({ id: events.id, status: events.status, maxTicketsPerOrder: events.maxTicketsPerOrder, dateTime: events.dateTime, endDateTime: events.endDateTime })
       .from(events)
       .where(eq(events.id, data.eventId))
       .limit(1);
@@ -43,6 +43,10 @@ export async function createOrder(data: CreateOrderInput) {
     }
     if (event.status === "closed") {
       throw new AppError("Ticket sales are closed for this event", 403);
+    }
+    // Admins often forget to close sales after the show; a past event must not sell tickets.
+    if ((event.endDateTime ?? event.dateTime) < new Date()) {
+      throw new AppError("Acara ini sudah berlangsung, tiket tidak lagi dijual.", 403);
     }
 
     const [settings] = await tx.select().from(systemSettings).where(eq(systemSettings.id, 'default')).limit(1);
