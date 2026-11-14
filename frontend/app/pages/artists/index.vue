@@ -155,7 +155,7 @@ const columns: TableColumn<Artist>[] = [
       <ArtistFormModal
         v-model:open="formOpen"
         :artist="editing"
-        @saved="list.refresh()"
+        @saved="() => list.refresh()"
       />
     </template>
   </UDashboardPanel>

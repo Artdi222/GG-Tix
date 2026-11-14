@@ -24,6 +24,7 @@ const open = defineModel<boolean>('open', { default: false })
 
 const { request } = useApi()
 const toast = useToast()
+const fetchAll = useFetchAll()
 
 const events = ref<{ label: string, value: string }[]>([])
 const saving = ref(false)
@@ -73,8 +74,8 @@ watch(open, async (isOpen) => {
     : blank())
   if (!events.value.length) {
     try {
-      const res = await request<{ data: { id: string, title: string }[] }>('/events', { query: { limit: 100 } })
-      events.value = res.data.map(e => ({ label: e.title, value: e.id }))
+      const res = await fetchAll<{ id: string, title: string }>('/events')
+      events.value = res.map(e => ({ label: e.title, value: e.id }))
     } catch {
       // Event scoping stays "all events" if the list cannot load.
     }

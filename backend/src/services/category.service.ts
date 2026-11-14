@@ -18,12 +18,22 @@ export interface UpdateCategoryDTO {
   sortOrder?: number;
 }
 
+async function assertUniqueCategoryName(eventId: string, name: string, excludeId?: string) {
+  const existing = await categoryRepo.findCategoriesByEventId(eventId);
+  const target = name.trim().toLowerCase();
+  if (existing.some((c) => c.id !== excludeId && c.name.trim().toLowerCase() === target)) {
+    throw new AppError(`Kategori "${name.trim()}" sudah ada di event ini.`, 409);
+  }
+}
+
 export async function createCategory(eventId: string, data: CreateCategoryDTO) {
   // Validate event existence
   const event = await eventRepo.findEventById(eventId);
   if (!event) {
     throw new AppError("Event not found", 404);
   }
+
+  await assertUniqueCategoryName(eventId, data.name);
 
   return await categoryRepo.createCategory({
     eventId,
@@ -44,15 +54,16 @@ export async function updateCategory(id: string, data: UpdateCategoryDTO) {
   if (!existing) {
     throw new AppError("Category not found", 404);
   }
+  if (data.name !== undefined) await assertUniqueCategoryName(existing.eventId, data.name, id);
 
   const result = await categoryRepo.updateCategory(id, data);
 
   // Handle quota-below-sold error from the repository
   if (result && typeof result === "object" && "error" in result && result.error === "QUOTA_BELOW_SOLD") {
     throw new AppError(
-      `Cannot reduce quota below already-sold count (${result.sold} sold)`,
+      `Kuota tidak bisa di bawah jumlah tiket yang sudah terjual (${result.sold} tiket).`,
       409,
-      { quotaTotal: `At least ${result.sold} tickets have already been sold` }
+      { quotaTotal: `Minimal ${result.sold} tiket sudah terjual` }
     );
   }
 
@@ -67,7 +78,7 @@ export async function deleteCategory(id: string) {
 
   const orderCount = await categoryRepo.countOrdersByCategoryId(id);
   if (orderCount > 0) {
-    throw new AppError("Cannot delete category with existing orders", 409);
+    throw new AppError("Kategori tidak dapat dihapus karena sudah ada pesanan.", 409);
   }
 
   return await categoryRepo.deleteCategory(id);

@@ -25,6 +25,7 @@ interface OrderRow {
 interface OrderStats { pending: number, verified: number, rejected: number, expired: number, total: number, verifiedRevenue: number }
 
 const { request } = useApi()
+const fetchAll = useFetchAll()
 const toast = useToast()
 const confirm = useConfirm()
 const pendingOrders = usePendingOrdersCount()
@@ -62,8 +63,8 @@ onMounted(loadStats)
 const eventOptions = ref<{ label: string, value: string }[]>([{ label: 'Semua event', value: 'all' }])
 onMounted(async () => {
   try {
-    const res = await request<{ data: { id: string, title: string }[] }>('/events', { query: { limit: 100 } })
-    eventOptions.value = [{ label: 'Semua event', value: 'all' }, ...res.data.map(e => ({ label: e.title, value: e.id }))]
+    const res = await fetchAll<{ id: string, title: string }>('/events')
+    eventOptions.value = [{ label: 'Semua event', value: 'all' }, ...res.map(e => ({ label: e.title, value: e.id }))]
   } catch {
     // Filter stays at "all events".
   }

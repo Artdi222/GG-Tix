@@ -21,6 +21,7 @@ interface ScanResult {
 }
 
 const { request } = useApi()
+const fetchAll = useFetchAll()
 const { prefs } = useScannerPrefs()
 const EVENT_KEY = 'ggtix_scanner_event'
 
@@ -41,8 +42,8 @@ async function loadEvents() {
   eventsError.value = ''
   try {
     // Ticket sales are often closed on show day, so include closed events.
-    const res = await request<{ data: EventOption[] }>('/events', { query: { limit: 100 } })
-    events.value = [...res.data].sort((a, b) => relevance(a) - relevance(b))
+    const res = await fetchAll<EventOption>('/events')
+    events.value = [...res].sort((a, b) => relevance(a) - relevance(b))
     let remembered: string | null = null
     try {
       remembered = localStorage.getItem(EVENT_KEY)

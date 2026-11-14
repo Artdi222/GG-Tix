@@ -20,7 +20,7 @@ function openForm(v: Venue | null) {
 }
 
 async function remove(v: Venue) {
-  const ok = await confirm({ title: `Hapus ${v.name}?`, description: 'Venue yang masih dipakai event tidak dapat dihapus.', confirmLabel: 'Hapus venue', danger: true })
+  const ok = await confirm({ title: `Hapus ${v.name}?`, description: 'Venue yang masih dipakai event tidak dapat dihapus — arsipkan lewat Edit.', confirmLabel: 'Hapus venue', danger: true })
   if (!ok) return
   busy.value = v.id
   try {
@@ -38,6 +38,7 @@ const columns: TableColumn<Venue>[] = [
   { accessorKey: 'name', header: 'Venue' },
   { accessorKey: 'city', header: 'Kota' },
   { accessorKey: 'sortOrder', header: 'Urutan' },
+  { accessorKey: 'isActive', header: 'Status' },
   { id: 'actions', header: '' }
 ]
 </script>
@@ -109,6 +110,13 @@ const columns: TableColumn<Venue>[] = [
               </div>
             </div>
           </template>
+          <template #isActive-cell="{ row }">
+            <UBadge
+              :label="row.original.isActive ? 'Aktif' : 'Diarsipkan'"
+              :color="row.original.isActive ? 'success' : 'neutral'"
+              variant="subtle"
+            />
+          </template>
           <template #actions-cell="{ row }">
             <div class="flex justify-end gap-1">
               <UButton
@@ -162,7 +170,7 @@ const columns: TableColumn<Venue>[] = [
       <VenueFormModal
         v-model:open="formOpen"
         :venue="editing"
-        @saved="list.refresh()"
+        @saved="() => list.refresh()"
       />
     </template>
   </UDashboardPanel>

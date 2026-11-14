@@ -19,10 +19,25 @@ export interface UpdateVenueDTO {
   city?: string;
   imageUrl?: string | null;
   sortOrder?: number;
+  isActive?: boolean;
 }
 
-export async function getAllVenues(q?: string, page?: number, limit?: number) {
-  return await venueRepo.findAllVenues({ q, page, limit });
+export async function getAllVenues(q?: string, page?: number, limit?: number, active?: boolean) {
+  return await venueRepo.findAllVenues({ q, page, limit, active });
+}
+
+export async function getVenueCities() {
+  return await venueRepo.findDistinctCities();
+}
+
+async function assertNotDuplicate(name: string, city: string, excludeId?: string) {
+  const dup = await venueRepo.findDuplicateVenue(name, city, excludeId);
+  if (dup) {
+    throw new AppError(
+      `Venue "${dup.name}" di ${dup.city} sudah terdaftar${dup.isActive ? "" : " (diarsipkan)"}.`,
+      409
+    );
+  }
 }
 
 export async function getVenueById(id: string) {
@@ -34,6 +49,7 @@ export async function getVenueById(id: string) {
 }
 
 export async function createVenue(data: CreateVenueDTO) {
+  await assertNotDuplicate(data.name, data.city);
   return await venueRepo.createVenue(data);
 }
 
@@ -41,6 +57,10 @@ export async function updateVenue(id: string, data: UpdateVenueDTO) {
   const existing = await venueRepo.findVenueById(id);
   if (!existing) {
     throw new AppError("Venue not found", 404);
+  }
+
+  if (data.name !== undefined || data.city !== undefined) {
+    await assertNotDuplicate(data.name ?? existing.name, data.city ?? existing.city, id);
   }
 
   const updated = await venueRepo.updateVenue(id, data);
@@ -71,7 +91,7 @@ export async function deleteVenue(id: string) {
 
   if (Number(eventCount?.total || 0) > 0) {
     throw new AppError(
-      "Venue tidak dapat dihapus karena masih digunakan oleh event konser.",
+      "Venue tidak dapat dihapus karena masih digunakan oleh event konser. Arsipkan saja agar tidak muncul di pilihan event baru.",
       400
     );
   }

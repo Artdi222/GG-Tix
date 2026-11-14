@@ -1,5 +1,5 @@
 import { likeContains } from "../lib/pagination";
-import { eq, ilike, desc, count, and } from "drizzle-orm";
+import { eq, ilike, desc, count, and, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { artists, events } from "../db/schema";
 
@@ -102,4 +102,12 @@ export async function countEventsByArtistId(id: string) {
     .from(events)
     .where(eq(events.artistId, id));
   return Number(result?.value || 0);
+}
+
+/** Case-insensitive name match, optionally excluding one artist (for edits). */
+export async function findArtistByName(name: string, excludeId?: string) {
+  const conditions: SQL[] = [sql`lower(trim(${artists.name})) = lower(${name.trim()})`];
+  if (excludeId) conditions.push(ne(artists.id, excludeId));
+  const [artist] = await db.select().from(artists).where(and(...conditions)).limit(1);
+  return artist || null;
 }

@@ -26,7 +26,13 @@ export async function getArtistById(id: string) {
   return artist;
 }
 
+async function assertUniqueName(name: string, excludeId?: string) {
+  const dup = await artistRepo.findArtistByName(name, excludeId);
+  if (dup) throw new AppError(`Artis "${dup.name}" sudah terdaftar.`, 409);
+}
+
 export async function createArtist(data: CreateArtistDTO) {
+  await assertUniqueName(data.name);
   return await artistRepo.createArtist(data);
 }
 
@@ -54,7 +60,7 @@ export async function deleteArtist(id: string) {
 
   const linkedEventsCount = await artistRepo.countEventsByArtistId(id);
   if (linkedEventsCount > 0) {
-    throw new AppError("Cannot delete artist with associated events", 400);
+    throw new AppError("Artis tidak dapat dihapus karena masih dipakai event.", 400);
   }
 
   const deleted = await artistRepo.deleteArtist(id);

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { Venue } from '~/components/VenueFormModal.vue'
+import type { Artist } from '~/components/ArtistFormModal.vue'
+
 export interface EventRow {
   id: string
   title: string
@@ -21,7 +24,7 @@ export interface EventRow {
   sold?: number
 }
 
-export interface Option { label: string, value: string }
+export interface Option { label: string, value: string, archived?: boolean }
 
 const props = withDefaults(defineProps<{
   eventData?: EventRow | null
@@ -29,7 +32,7 @@ const props = withDefaults(defineProps<{
   venues: Option[]
 }>(), { eventData: null })
 
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ 'saved': [], 'venue-created': [venue: Venue], 'artist-created': [artist: Artist] }>()
 const open = defineModel<boolean>('open', { default: false })
 
 const { request } = useApi()
@@ -59,6 +62,25 @@ const state = reactive(blank())
 const saving = ref(false)
 const formError = ref('')
 const isEdit = computed(() => !!props.eventData)
+const venueFormOpen = ref(false)
+const artistFormOpen = ref(false)
+
+function onArtistCreated(artist: Artist) {
+  emit('artist-created', artist)
+  state.artistId = artist.id
+}
+
+// Archived venues stay selectable only for the event that already uses them.
+const venueItems = computed(() =>
+  props.venues
+    .filter(v => !v.archived || v.value === props.eventData?.venueId)
+    .map(v => v.archived ? { ...v, label: `${v.label} (diarsipkan)` } : v)
+)
+
+function onVenueCreated(venue: Venue) {
+  emit('venue-created', venue)
+  state.venueId = venue.id
+}
 
 watch(open, (isOpen) => {
   if (!isOpen) return
@@ -158,6 +180,16 @@ async function submit() {
             label="Artis"
             required
           >
+            <template #hint>
+              <UButton
+                label="Artis baru"
+                icon="i-lucide-plus"
+                size="xs"
+                variant="link"
+                class="p-0"
+                @click="artistFormOpen = true"
+              />
+            </template>
             <USelectMenu
               v-model="state.artistId"
               :items="artists"
@@ -180,9 +212,19 @@ async function submit() {
             label="Venue"
             required
           >
+            <template #hint>
+              <UButton
+                label="Venue baru"
+                icon="i-lucide-plus"
+                size="xs"
+                variant="link"
+                class="p-0"
+                @click="venueFormOpen = true"
+              />
+            </template>
             <USelectMenu
               v-model="state.venueId"
-              :items="venues"
+              :items="venueItems"
               value-key="value"
               placeholder="Pilih venue"
               class="w-full"
@@ -306,4 +348,12 @@ async function submit() {
       />
     </template>
   </UModal>
+  <ArtistFormModal
+    v-model:open="artistFormOpen"
+    @saved="onArtistCreated"
+  />
+  <VenueFormModal
+    v-model:open="venueFormOpen"
+    @saved="onVenueCreated"
+  />
 </template>

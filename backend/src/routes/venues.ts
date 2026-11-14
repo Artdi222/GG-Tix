@@ -13,6 +13,7 @@ const venueIdParamSchema = z.object({
 
 const listQuerySchema = z.object({
   q: z.string().optional(),
+  active: z.enum(["true", "false"]).optional().transform((v) => (v === undefined ? undefined : v === "true")),
   page: pageQuery(),
   limit: limitQuery(10),
 });
@@ -38,16 +39,23 @@ const updateVenueSchema = z.object({
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter").optional(),
   imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
+  isActive: z.boolean().optional(),
 });
 
 // GET /api/venues — admin list (admin + staff read)
 venueRoute.get("/", authMiddleware, adminOrHigher, zValidator("query", listQuerySchema), async (c) => {
   const query = c.req.valid("query");
-  const result = await venueService.getAllVenues(query.q, query.page, query.limit);
+  const result = await venueService.getAllVenues(query.q, query.page, query.limit, query.active);
   return c.json({
     data: result.items,
     pagination: result.pagination,
   });
+});
+
+// GET /api/venues/cities — distinct cities for autocomplete (before /:id)
+venueRoute.get("/cities", authMiddleware, adminOrHigher, async (c) => {
+  const data = await venueService.getVenueCities();
+  return c.json({ data });
 });
 
 // GET /api/venues/:id — admin detail

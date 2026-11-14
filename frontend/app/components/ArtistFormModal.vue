@@ -8,7 +8,7 @@ export interface Artist {
 }
 
 const props = withDefaults(defineProps<{ artist?: Artist | null }>(), { artist: null })
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [artist: Artist] }>()
 const open = defineModel<boolean>('open', { default: false })
 
 const { request } = useApi()
@@ -29,11 +29,12 @@ async function submit() {
   saving.value = true
   const body = { name: state.name.trim(), bio: state.bio.trim(), photoUrl: state.photoUrl }
   try {
-    if (props.artist) await request(`/artists/${props.artist.id}`, { method: 'PUT', body })
-    else await request('/artists', { method: 'POST', body })
+    const res = props.artist
+      ? await request<{ data: Artist }>(`/artists/${props.artist.id}`, { method: 'PUT', body })
+      : await request<{ data: Artist }>('/artists', { method: 'POST', body })
     toast.add({ title: props.artist ? 'Artis diperbarui' : 'Artis ditambahkan', color: 'success' })
     open.value = false
-    emit('saved')
+    emit('saved', res.data)
   } catch (err) {
     formError.value = apiErrorMessage(err, 'Artis gagal disimpan.')
   } finally {

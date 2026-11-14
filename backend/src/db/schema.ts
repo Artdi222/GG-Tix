@@ -104,7 +104,9 @@ export const venues = pgTable(
     city: varchar("city", { length: 100 }).notNull().default("Jakarta"),
     imageUrl: text("image_url"),
     sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => ({
     nameIdx: index("venues_name_idx").on(table.name),

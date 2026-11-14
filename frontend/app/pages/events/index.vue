@@ -15,6 +15,7 @@ const list = usePaginatedList<EventRow>('/events', {
   query: () => ({ status: status.value === 'all' ? undefined : status.value })
 })
 
+const fetchAll = useFetchAll()
 const artists = ref<Option[]>([])
 const venues = ref<Option[]>([])
 const optionsError = ref('')
@@ -22,11 +23,11 @@ async function loadOptions() {
   optionsError.value = ''
   try {
     const [a, v] = await Promise.all([
-      request<{ data: { id: string, name: string }[] }>('/artists', { query: { limit: 100 } }),
-      request<{ data: { id: string, name: string, city: string }[] }>('/venues', { query: { limit: 100 } })
+      fetchAll<{ id: string, name: string }>('/artists'),
+      fetchAll<{ id: string, name: string, city: string, isActive: boolean }>('/venues')
     ])
-    artists.value = a.data.map(x => ({ label: x.name, value: x.id }))
-    venues.value = v.data.map(x => ({ label: `${x.name} — ${x.city}`, value: x.id }))
+    artists.value = a.map(x => ({ label: x.name, value: x.id }))
+    venues.value = v.map(x => ({ label: `${x.name} — ${x.city}`, value: x.id, archived: !x.isActive }))
   } catch (err) {
     optionsError.value = apiErrorMessage(err, 'Daftar artis dan venue gagal dimuat; form event tidak bisa dipakai.')
   }
@@ -297,6 +298,8 @@ const filtered = computed(() => !!list.search.value || status.value !== 'all')
         :artists="artists"
         :venues="venues"
         @saved="list.refresh()"
+        @artist-created="a => artists.unshift({ label: a.name, value: a.id })"
+        @venue-created="v => venues.unshift({ label: `${v.name} — ${v.city}`, value: v.id })"
       />
       <CategoryManagerModal
         v-if="categoriesFor"

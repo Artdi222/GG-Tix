@@ -1,26 +1,34 @@
 import { likeContains } from "../lib/pagination";
-import { eq, ilike, desc, count, and } from "drizzle-orm";
+import { eq, ilike, desc, count, and, or, ne, asc, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { venues } from "../db/schema";
 
 export interface VenueQuery {
   q?: string;
+  active?: boolean;
   page?: number;
   limit?: number;
 }
 
 export async function findAllVenues(filters: VenueQuery = {}) {
-  const { q, page = 1, limit = 10 } = filters;
+  const { q, active, page = 1, limit = 10 } = filters;
   const offset = (page - 1) * limit;
 
-  const conditions = q && q.trim() !== "" ? [ilike(venues.name, likeContains(q))] : [];
+  const conditions: SQL[] = [];
+  if (q && q.trim() !== "") {
+    const pattern = likeContains(q);
+    conditions.push(
+      or(ilike(venues.name, pattern), ilike(venues.address, pattern), ilike(venues.city, pattern))!
+    );
+  }
+  if (active !== undefined) conditions.push(eq(venues.isActive, active));
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const items = await db
     .select()
     .from(venues)
     .where(whereClause)
-    .orderBy(venues.sortOrder, desc(venues.createdAt))
+    .orderBy(desc(venues.isActive), venues.sortOrder, desc(venues.createdAt))
     .limit(limit)
     .offset(offset);
 
@@ -46,6 +54,26 @@ export async function findVenueById(id: string) {
     .from(venues)
     .where(eq(venues.id, id))
     .limit(1);
+  return venue || null;
+}
+
+/** Distinct city names already in use, for the admin city autocomplete. */
+export async function findDistinctCities() {
+  const rows = await db
+    .selectDistinct({ city: venues.city })
+    .from(venues)
+    .orderBy(asc(venues.city));
+  return rows.map((r) => r.city);
+}
+
+/** Case-insensitive match on name + city, optionally excluding one venue (for edits). */
+export async function findDuplicateVenue(name: string, city: string, excludeId?: string) {
+  const conditions: SQL[] = [
+    sql`lower(trim(${venues.name})) = lower(${name.trim()})`,
+    sql`lower(trim(${venues.city})) = lower(${city.trim()})`,
+  ];
+  if (excludeId) conditions.push(ne(venues.id, excludeId));
+  const [venue] = await db.select().from(venues).where(and(...conditions)).limit(1);
   return venue || null;
 }
 
@@ -77,15 +105,17 @@ export async function updateVenue(
     city?: string;
     imageUrl?: string | null;
     sortOrder?: number;
+    isActive?: boolean;
   }
 ) {
-  const updateData: Record<string, any> = {};
+  const updateData: Record<string, any> = { updatedAt: new Date() };
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.address !== undefined) updateData.address = data.address.trim();
   if (data.city !== undefined) updateData.city = data.city.trim();
   if (data.imageUrl !== undefined)
     updateData.imageUrl = data.imageUrl ? data.imageUrl.trim() : null;
   if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
   const [venue] = await db
     .update(venues)

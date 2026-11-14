@@ -6,38 +6,64 @@ export interface Venue {
   city: string
   imageUrl: string | null
   sortOrder: number
+  isActive: boolean
 }
 
 const props = withDefaults(defineProps<{ venue?: Venue | null }>(), { venue: null })
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [venue: Venue] }>()
 const open = defineModel<boolean>('open', { default: false })
 
 const { request } = useApi()
 const toast = useToast()
-const state = reactive({ name: '', address: '', city: '', sortOrder: 0 as number | undefined, imageUrl: '' })
+const state = reactive({ name: '', address: '', city: '', sortOrder: 0 as number | undefined, imageUrl: '', isActive: true })
 const saving = ref(false)
 const formError = ref('')
+const cities = ref<string[]>([])
+
+async function loadCities() {
+  try {
+    cities.value = (await request<{ data: string[] }>('/venues/cities')).data
+  } catch {
+    cities.value = [] // autocomplete is a convenience; free text still works
+  }
+}
+
+function addCity(city: string) {
+  const c = city.trim()
+  if (!c) return
+  if (!cities.value.includes(c)) cities.value = [...cities.value, c]
+  state.city = c
+}
 
 watch(open, (isOpen) => {
   if (!isOpen) return
   formError.value = ''
+  loadCities()
   const v = props.venue
   Object.assign(state, v
-    ? { name: v.name, address: v.address, city: v.city, sortOrder: v.sortOrder, imageUrl: v.imageUrl ?? '' }
-    : { name: '', address: '', city: '', sortOrder: 0, imageUrl: '' })
+    ? { name: v.name, address: v.address, city: v.city, sortOrder: v.sortOrder, imageUrl: v.imageUrl ?? '', isActive: v.isActive }
+    : { name: '', address: '', city: '', sortOrder: 0, imageUrl: '', isActive: true })
 })
 
 async function submit() {
   formError.value = !state.name.trim() ? 'Nama venue wajib diisi.' : !state.address.trim() ? 'Alamat wajib diisi.' : !state.city.trim() ? 'Kota wajib diisi.' : ''
   if (formError.value) return
   saving.value = true
-  const body = { name: state.name.trim(), address: state.address.trim(), city: state.city.trim(), sortOrder: state.sortOrder ?? 0, imageUrl: state.imageUrl || null }
+  const body = {
+    name: state.name.trim(),
+    address: state.address.trim(),
+    city: state.city.trim(),
+    sortOrder: state.sortOrder ?? 0,
+    imageUrl: state.imageUrl || null,
+    ...(props.venue ? { isActive: state.isActive } : {})
+  }
   try {
-    if (props.venue) await request(`/venues/${props.venue.id}`, { method: 'PUT', body })
-    else await request('/venues', { method: 'POST', body })
+    const res = props.venue
+      ? await request<{ data: Venue }>(`/venues/${props.venue.id}`, { method: 'PUT', body })
+      : await request<{ data: Venue }>('/venues', { method: 'POST', body })
     toast.add({ title: props.venue ? 'Venue diperbarui' : 'Venue ditambahkan', color: 'success' })
     open.value = false
-    emit('saved')
+    emit('saved', res.data)
   } catch (err) {
     formError.value = apiErrorMessage(err, 'Venue gagal disimpan.')
   } finally {
@@ -86,11 +112,13 @@ async function submit() {
             label="Kota"
             required
           >
-            <UInput
+            <UInputMenu
               v-model="state.city"
-              maxlength="100"
-              placeholder="Jakarta"
+              :items="cities"
+              create-item
+              placeholder="Pilih atau ketik kota"
               class="w-full"
+              @create="addCity"
             />
           </UFormField>
           <UFormField label="Urutan tampil">
@@ -102,12 +130,23 @@ async function submit() {
           </UFormField>
         </div>
         <UFormField
-          label="Denah / foto venue"
+          label="Foto venue"
+          help="Denah kursi dan poster diunggah per event, bukan di sini."
         >
           <ImageField
             v-model="state.imageUrl"
             kind="venue"
             aspect="aspect-[4/3]"
+          />
+        </UFormField>
+        <UFormField
+          v-if="venue"
+          label="Status"
+          help="Venue yang diarsipkan tidak muncul di pilihan event baru, tapi event lamanya tetap aman."
+        >
+          <USwitch
+            v-model="state.isActive"
+            :label="state.isActive ? 'Aktif' : 'Diarsipkan'"
           />
         </UFormField>
         <UAlert
