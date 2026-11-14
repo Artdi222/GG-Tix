@@ -41,13 +41,6 @@ const chance = (p: number) => rand() < p;
 const DAY = 86_400_000;
 const NOW = Date.now();
 
-/** A date `days` from today at the given WIB wall-clock time. */
-function wib(days: number, time = "19:00") {
-  const d = new Date(NOW + days * DAY + 7 * 3_600_000); // shift to WIB calendar day
-  const ymd = d.toISOString().slice(0, 10);
-  return new Date(`${ymd}T${time}:00+07:00`);
-}
-
 const FIRST = ["Andi", "Budi", "Citra", "Dewi", "Eka", "Fajar", "Gita", "Hana", "Indra", "Joko", "Kevin", "Lestari", "Maya", "Nanda", "Oki", "Putri", "Rizky", "Sari", "Tono", "Umar", "Vina", "Wulan", "Yoga", "Zahra", "Dimas", "Ayu", "Bayu", "Nisa", "Reza", "Tiara", "Galih", "Intan", "Farhan", "Salsa", "Arif", "Melati"];
 const LAST = ["Pratama", "Santoso", "Wijaya", "Saputra", "Lestari", "Kusuma", "Hidayat", "Nugroho", "Rahayu", "Siregar", "Halim", "Putra", "Wibowo", "Setiawan", "Maharani", "Gunawan", "Permana", "Anggraini", "Firmansyah", "Utami"];
 const PAYMENT_TYPES = ["qris", "qris", "gopay", "shopeepay", "bca_va", "bni_va", "bri_va", "echannel", "credit_card"];
@@ -77,32 +70,30 @@ async function seed() {
   const verifiers = insertedAdmins.filter((a) => a.role !== "gate_staff");
   console.log(`  ${insertedAdmins.length} admins created (password: admin123)`);
 
-  // 2. Venues
+  // 2. Venues — real venues of official game-music concerts in 2026.
   const insertedVenues = await db
     .insert(venues)
     .values([
-      { name: "Gelora Bung Karno", address: "Jl. Pintu Satu Senayan, Gelora, Tanah Abang, Jakarta Pusat, DKI Jakarta 10270", city: "Jakarta", sortOrder: 0 },
-      { name: "Istora Senayan", address: "Kompleks GBK, Jl. Pintu Satu Senayan, Tanah Abang, Jakarta Pusat, DKI Jakarta 10270", city: "Jakarta", sortOrder: 1 },
-      { name: "ICE BSD City", address: "Jl. BSD Grand Boulevard No.1, Pagedangan, Kabupaten Tangerang, Banten 15339", city: "Tangerang", sortOrder: 2 },
-      { name: "Trans Convention Center", address: "Jl. Gatot Subroto No.289, Cibangkong, Batununggal, Kota Bandung, Jawa Barat 40273", city: "Bandung", sortOrder: 3 },
-      { name: "Surabaya Convention Hall", address: "Jl. Arief Rachman Hakim No.131, Klampis Ngasem, Sukolilo, Kota Surabaya, Jawa Timur 60117", city: "Surabaya", sortOrder: 4 },
-      { name: "Jogja Expo Center", address: "Jl. Raya Janti, Wonocatur, Banguntapan, Bantul, DI Yogyakarta 55198", city: "Yogyakarta", sortOrder: 5 },
-      { name: "Santika Premiere Ballroom", address: "Jl. Pandanaran No.116, Mugassari, Semarang Selatan, Kota Semarang, Jawa Tengah 50249", city: "Semarang", sortOrder: 6 },
-      { name: "Bali Nusa Dua Convention Center", address: "Kawasan Pariwisata Nusa Dua Lot NW/1, Benoa, Kuta Selatan, Badung, Bali 80363", city: "Bali", sortOrder: 7 },
+      { name: "Le Grand Rex", address: "1 Boulevard Poissonnière, 75002 Paris, Prancis", city: "Paris", sortOrder: 0 },
+      { name: "Tokyo International Forum Hall A", address: "3-5-1 Marunouchi, Chiyoda-ku, Tokyo 100-0005, Jepang", city: "Tokyo", sortOrder: 1 },
+      { name: "Mercedes-Benz Arena", address: "1200 Shibo Avenue, Pudong New Area, Shanghai, Tiongkok", city: "Shanghai", sortOrder: 2 },
+      { name: "The Symphony Hall", address: "2-3-3 Oyodominami, Kita-ku, Osaka 531-0076, Jepang", city: "Osaka", sortOrder: 3 },
+      { name: "Zepp DiverCity (Tokyo)", address: "Diver City Tokyo Plaza, 1-1-10 Aomi, Koto-ku, Tokyo 135-0064, Jepang", city: "Tokyo", sortOrder: 4 },
+      { name: "Esplanade Theatre", address: "1 Esplanade Drive, Singapura 038981", city: "Singapura", sortOrder: 5 },
+      { name: "Royal Albert Hall", address: "Kensington Gore, South Kensington, London SW7 2AP, Inggris", city: "London", sortOrder: 6 },
     ])
     .returning();
   console.log(`  ${insertedVenues.length} venues created`);
 
-  // 3. Artists
+  // 3. Artists — performers or presenters named by the official announcements.
   const artistSeed = [
-    ["Rover Ensemble", "Orkestra yang membawakan soundtrack epik Wuthering Waves — string megah, tema pertarungan, dan melodi Solaris."],
-    ["Stellar Astral", "Grup pop kosmik bernuansa Astral Express: synth neon, harmoni selestial, dan energi konser yang meledak."],
-    ["Liyue Philharmonic", "Instrumen tradisional bertemu orkestrasi modern — aransemen Genshin Impact yang legendaris."],
-    ["Rhodes Island Band", "Industrial rock dan elektronik khas Arknights dengan beat menghentak dan vokal operatik."],
-    ["New Eridu DJ Crew", "Kolektif DJ yang memutar beat urban Zenless Zone Zero: bass drop, breakbeat, dan panggung neon."],
-    ["Kivotos Strings", "Kuartet gesek yang menghadirkan musik Blue Archive dengan sentuhan pop ceria."],
-    ["Persona Jazz Unit", "Big band jazz-funk yang membawakan acid jazz ikonik dari seri Persona."],
-    ["Hyrule Symphony", "Orkestra simfoni yang menghidupkan musik petualangan klasik dari dunia fantasi."],
+    ["HoYoFair", "Program fan-creation resmi HoYoverse; konser ini membawakan musik Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, dan Honkai Impact 3rd."],
+    ["Tokyo Philharmonic Orchestra", "Orkestra yang membawakan The Music of SQUARE ENIX di Tokyo: Final Fantasy, Kingdom Hearts, Dragon Quest, dan lainnya."],
+    ["Monster Siren Records", "Label musik resmi Hypergryph untuk Arknights, penyelenggara konser tahunan Ambience Synesthesia."],
+    ["NHK Symphony Orchestra", "Orkestra nasional Jepang; tur Pokémon Classic Concert merayakan 30 tahun Pokémon Red & Green."],
+    ["ATLUS", "Pengembang seri Persona; Persona Live Tour 2026 -Resonance- merayakan 30 tahun Persona."],
+    ["Kuro Games", "Pengembang Wuthering Waves; tur konser To the New World menampilkan soundtrack resmi game."],
+    ["Blizzard Entertainment", "Pengembang World of Warcraft; tur 20 Years of Music merayakan dua dekade musik Azeroth."],
   ] as const;
   const insertedArtists = await db
     .insert(artists)
@@ -110,28 +101,56 @@ async function seed() {
     .returning();
   console.log(`  ${insertedArtists.length} artists created`);
 
-  // 4. Events — offsets relative to today; sell-through drives order volume.
+  // 4. Events — official 2026 concerts, moved one year ahead (same local time) so they are on sale.
+  //    Set the real dates here when needed; `at` is an ISO time with the venue's UTC offset.
   type Tier = { name: string; price: number; quota: number; benefits: string[] };
-  const T = {
-    vvip: (price: number, quota: number): Tier => ({ name: "VVIP", price, quota, benefits: ["Kursi baris 1–5", "Poster bertanda tangan", "Merchandise eksklusif"] }),
-    vip: (price: number, quota: number): Tier => ({ name: "VIP", price, quota, benefits: ["Kursi baris 6–15", "Lanyard & badge", "Jalur masuk prioritas"] }),
-    cat1: (price: number, quota: number): Tier => ({ name: "CAT 1", price, quota, benefits: ["Tribun tengah"] }),
-    reg: (price: number, quota: number): Tier => ({ name: "Reguler", price, quota, benefits: ["Tiket masuk standar"] }),
-    fest: (price: number, quota: number): Tier => ({ name: "Festival", price, quota, benefits: ["Area berdiri depan panggung"] }),
-  };
-  const eventSeed = [
-    { title: "Genshin Impact: Melodies of Teyvat", artist: 2, publisher: "HoYoverse", venue: 0, day: -62, time: "19:00", sell: 0.97, tags: ["GenshinImpact", "Orchestra"], tiers: [T.vvip(2_000_000, 60), T.vip(950_000, 180), T.cat1(550_000, 400), T.reg(300_000, 700)] },
-    { title: "Persona Live: Take Your Time", artist: 6, publisher: "Atlus", venue: 3, day: -34, time: "19:30", sell: 0.88, tags: ["Persona", "Jazz"], tiers: [T.vip(800_000, 120), T.reg(350_000, 450)] },
-    { title: "Arknights: Contingency Stage", artist: 3, publisher: "Hypergryph", venue: 4, day: -12, time: "20:00", sell: 0.79, tags: ["Arknights", "Rock"], tiers: [T.vip(650_000, 120), T.fest(300_000, 500)] },
-    { title: "Blue Archive: Kivotos Festival", artist: 5, publisher: "Nexon Games", venue: 2, day: 2, time: "16:00", sell: 0.84, tags: ["BlueArchive", "Pop"], tiers: [T.vip(750_000, 150), T.cat1(450_000, 300), T.reg(250_000, 600)] },
-    { title: "Wuthering Waves Live 2026", artist: 0, publisher: "Kuro Games", venue: 0, day: 9, time: "19:00", sell: 0.72, tags: ["WutheringWaves", "Orchestra"], tiers: [T.vvip(1_800_000, 50), T.vip(850_000, 200), T.cat1(500_000, 450), T.reg(275_000, 800)] },
-    { title: "Honkai: Star Rail — Astral Concert", artist: 1, publisher: "HoYoverse", venue: 1, day: 20, time: "18:30", sell: 0.58, tags: ["HSR", "SynthPop"], tiers: [T.vip(800_000, 150), T.reg(325_000, 650)] },
-    { title: "Zenless Zone Zero: NEON NIGHT", artist: 4, publisher: "HoYoverse", venue: 5, day: 33, time: "20:00", sell: 0.41, tags: ["ZZZ", "Electronic"], tiers: [T.vip(700_000, 100), T.fest(275_000, 600)] },
-    { title: "Hyrule Symphony: Echoes of Wisdom", artist: 7, publisher: "Nintendo", venue: 6, day: 47, time: "19:00", sell: 0.29, tags: ["Symphony", "Fantasy"], tiers: [T.vip(900_000, 80), T.reg(400_000, 350)] },
-    { title: "Genshin Impact: Natlan Night", artist: 2, publisher: "HoYoverse", venue: 7, day: 61, time: "19:30", sell: 0.22, tags: ["GenshinImpact", "Bali"], tiers: [T.vvip(2_200_000, 40), T.vip(1_000_000, 120), T.reg(400_000, 400)] },
-    { title: "Arknights: Rhodes Island Tour Jogja", artist: 3, publisher: "Hypergryph", venue: 5, day: 78, time: "19:00", sell: 0.12, tags: ["Arknights", "Tour"], tiers: [T.vip(600_000, 80), T.fest(250_000, 400)] },
-    { title: "Wuthering Waves: Resonator's Encore", artist: 0, publisher: "Kuro Games", venue: 7, day: 110, time: "19:30", sell: 0.05, tags: ["WutheringWaves", "Encore"], tiers: [T.vip(850_000, 60), T.reg(300_000, 300)] },
-    { title: "Stellar Astral: Countdown Party", artist: 1, publisher: "HoYoverse", venue: 2, day: 140, time: "21:00", sell: 0, closed: true, tags: ["HSR", "NewYear"], tiers: [T.vip(900_000, 100), T.fest(350_000, 700)] },
+  const tier = (name: string, price: number, quota: number, benefits: string[] = []): Tier => ({ name, price, quota, benefits });
+  const eventSeed: {
+    title: string; artist: number; publisher: string; venue: number; at: string; hours: number;
+    sell: number; closed?: boolean; tags: string[]; description: string; tiers: Tier[];
+  }[] = [
+    {
+      title: "HoYoFair Fan Concert", artist: 0, publisher: "HoYoverse", venue: 0, at: "2027-02-21T20:00:00+01:00", hours: 2.5, sell: 0.62,
+      tags: ["HoYoverse", "Orchestra"],
+      description: "Konser fan resmi HoYoFair dengan musik Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, dan Honkai Impact 3rd. Aslinya digelar 21 Februari 2026 di Le Grand Rex, Paris.",
+      tiers: [tier("Catégorie 1", 1_900_000, 300, ["Kursi orchestra depan"]), tier("Catégorie 2", 1_350_000, 900), tier("Catégorie 3", 900_000, 1_400)],
+    },
+    {
+      title: "The Music of SQUARE ENIX – Magic, Memories, and Melodies", artist: 1, publisher: "Square Enix", venue: 1, at: "2027-04-25T18:00:00+09:00", hours: 2.5, sell: 0.55,
+      tags: ["SquareEnix", "Orchestra"],
+      description: "Tur orkestra resmi Square Enix (Final Fantasy, Kingdom Hearts, Dragon Quest, dan lainnya) bersama Tokyo Philharmonic Orchestra. Aslinya 25–26 April 2026 di Tokyo International Forum Hall A. Harga mengikuti harga resmi (S ¥11.000, A ¥8.800) yang dikonversi.",
+      tiers: [tier("S Seat", 1_200_000, 2_500), tier("A Seat", 960_000, 2_500)],
+    },
+    {
+      title: "Arknights Ambience Synesthesia — Once Seen", artist: 2, publisher: "Hypergryph", venue: 2, at: "2027-05-01T19:30:00+08:00", hours: 3, sell: 0.48,
+      tags: ["Arknights", "Concert"],
+      description: "Konser musik tahunan resmi Arknights (明日方舟「音律联觉——昔时我见」). Aslinya 1–4 Mei 2026, 8 pertunjukan di Mercedes-Benz Arena, Shanghai. Harga mengikuti enam tingkat resmi (¥480–¥1.480) yang dikonversi.",
+      tiers: [tier("S", 3_250_000, 600), tier("A", 2_800_000, 1_200), tier("B", 2_370_000, 2_000), tier("C", 1_930_000, 3_000), tier("D", 1_490_000, 3_500), tier("E", 1_050_000, 4_000)],
+    },
+    {
+      title: "NHK Symphony Orchestra × Pokémon Classic Concert", artist: 3, publisher: "The Pokémon Company", venue: 3, at: "2027-08-23T14:00:00+09:00", hours: 2, sell: 0.34,
+      tags: ["Pokemon", "Orchestra"],
+      description: "Tur konser klasik resmi Pokémon bersama NHK Symphony Orchestra untuk 30 tahun Pokémon Red & Green. Aslinya 23 Agustus 2026 di The Symphony Hall, Osaka.",
+      tiers: [tier("S Seat", 1_100_000, 700), tier("A Seat", 850_000, 1_000)],
+    },
+    {
+      title: "Persona Live Tour 2026 -Resonance-", artist: 4, publisher: "ATLUS", venue: 4, at: "2027-09-23T18:00:00+09:00", hours: 2.5, sell: 0.27,
+      tags: ["Persona", "Live"],
+      description: "Tur konser resmi 30 tahun Persona. Aslinya 23 September 2026 (pukul 13:00 dan 18:00) di Zepp DiverCity, Tokyo.",
+      tiers: [tier("Reserved", 1_150_000, 600), tier("Standing", 950_000, 1_800)],
+    },
+    {
+      title: "Wuthering Waves Concert Tour: To the New World", artist: 5, publisher: "Kuro Games", venue: 5, at: "2027-09-26T20:00:00+08:00", hours: 2.5, sell: 0.18,
+      tags: ["WutheringWaves", "Orchestra"],
+      description: "Tur konser resmi Wuthering Waves. Aslinya 26 September 2026 di Esplanade Theatre, Singapura.",
+      tiers: [tier("Cat 1", 2_100_000, 400), tier("Cat 2", 1_550_000, 700), tier("Cat 3", 1_050_000, 700)],
+    },
+    {
+      title: "World of Warcraft: 20 Years of Music", artist: 6, publisher: "Blizzard Entertainment", venue: 6, at: "2027-10-25T19:30:00+01:00", hours: 2.5, sell: 0.08,
+      tags: ["WorldOfWarcraft", "Orchestra"],
+      description: "Tur konser dunia resmi 20 tahun musik World of Warcraft. Aslinya 25 Oktober 2026 di Royal Albert Hall, London.",
+      tiers: [tier("Stalls", 2_000_000, 1_000), tier("Circle", 1_450_000, 2_000), tier("Gallery", 900_000, 1_500)],
+    },
   ];
 
   const insertedEvents = await db
@@ -141,14 +160,14 @@ async function seed() {
       artistId: insertedArtists[e.artist]!.id,
       publisherName: e.publisher,
       venueId: insertedVenues[e.venue]!.id,
-      dateTime: wib(e.day, e.time),
-      endDateTime: new Date(wib(e.day, e.time).getTime() + 3 * 3_600_000),
-      description: `${e.title} — konser musik game bersama ${artistSeed[e.artist]![0]} di ${insertedVenues[e.venue]!.name}.`,
+      dateTime: new Date(e.at),
+      endDateTime: new Date(new Date(e.at).getTime() + e.hours * 3_600_000),
+      description: e.description,
       tags: e.tags,
       maxTicketsPerOrder: 4,
       sortOrder: i,
       // Past events stop selling; the last one is a draft not yet on sale.
-      status: e.day < 0 || e.closed ? ("closed" as const) : ("open" as const),
+      status: new Date(e.at).getTime() < NOW || e.closed ? ("closed" as const) : ("open" as const),
       createdBy: adminBudi.id,
       createdAt: new Date(NOW - int(95, 120) * DAY),
     })))
@@ -203,8 +222,8 @@ async function seed() {
       { code: "GGTIX2026", name: "Promo Grand Launching GG-Tix", description: "Diskon 20% maksimal Rp 100.000 untuk seluruh konser.", discountType: "percentage" as const, discountValue: "20.00", maxDiscountAmount: "100000.00", minOrderAmount: "150000.00", quotaTotal: 150, quotaRemaining: 150, maxUsagePerCustomer: 1, startDate: new Date(NOW - 90 * DAY), endDate: new Date(NOW + 60 * DAY) },
       { code: "EARLYBIRD", name: "Potongan Early Bird", description: "Potongan flat Rp 50.000 untuk semua kategori.", discountType: "fixed" as const, discountValue: "50000.00", maxDiscountAmount: null, minOrderAmount: "100000.00", quotaTotal: 80, quotaRemaining: 80, maxUsagePerCustomer: 2, startDate: new Date(NOW - 90 * DAY), endDate: new Date(NOW + 30 * DAY) },
       { code: "GAMERPASS", name: "Diskon Komunitas Gamer", description: "Diskon 10% khusus member komunitas.", discountType: "percentage" as const, discountValue: "10.00", maxDiscountAmount: "50000.00", minOrderAmount: "50000.00", quotaTotal: 200, quotaRemaining: 200, maxUsagePerCustomer: 1, startDate: new Date(NOW - 60 * DAY), endDate: new Date(NOW + 90 * DAY) },
-      { code: "WUWALIVE", name: "Spesial Wuthering Waves Live", description: "Potongan Rp 75.000 khusus Wuthering Waves Live 2026.", discountType: "fixed" as const, discountValue: "75000.00", maxDiscountAmount: null, minOrderAmount: "250000.00", quotaTotal: 60, quotaRemaining: 60, maxUsagePerCustomer: 1, eventId: insertedEvents[4]!.id, startDate: new Date(NOW - 45 * DAY), endDate: wib(9, "12:00") },
-      { code: "TEYVAT15", name: "Flash Sale Melodies of Teyvat", description: "Diskon 15% — sudah berakhir.", discountType: "percentage" as const, discountValue: "15.00", maxDiscountAmount: "150000.00", minOrderAmount: "300000.00", quotaTotal: 40, quotaRemaining: 40, maxUsagePerCustomer: 1, eventId: insertedEvents[0]!.id, startDate: new Date(NOW - 88 * DAY), endDate: new Date(NOW - 70 * DAY) },
+      { code: "WUWALIVE", name: "Spesial Wuthering Waves Concert", description: "Potongan Rp 75.000 khusus Wuthering Waves Concert Tour.", discountType: "fixed" as const, discountValue: "75000.00", maxDiscountAmount: null, minOrderAmount: "250000.00", quotaTotal: 60, quotaRemaining: 60, maxUsagePerCustomer: 1, eventId: insertedEvents[5]!.id, startDate: new Date(NOW - 45 * DAY), endDate: new Date(NOW + 60 * DAY) },
+      { code: "TEYVAT15", name: "Flash Sale HoYoFair Fan Concert", description: "Diskon 15% — sudah berakhir.", discountType: "percentage" as const, discountValue: "15.00", maxDiscountAmount: "150000.00", minOrderAmount: "300000.00", quotaTotal: 40, quotaRemaining: 40, maxUsagePerCustomer: 1, eventId: insertedEvents[0]!.id, startDate: new Date(NOW - 88 * DAY), endDate: new Date(NOW - 70 * DAY) },
       { code: "NATAL2026", name: "Promo Akhir Tahun", description: "Dijadwalkan untuk musim liburan.", discountType: "percentage" as const, discountValue: "12.00", maxDiscountAmount: "120000.00", minOrderAmount: "200000.00", quotaTotal: 100, quotaRemaining: 100, maxUsagePerCustomer: 1, startDate: new Date(NOW + 40 * DAY), endDate: new Date(NOW + 75 * DAY) },
       { code: "BETATEST", name: "Uji Coba Internal", description: "Voucher nonaktif untuk QA.", discountType: "fixed" as const, discountValue: "25000.00", maxDiscountAmount: null, minOrderAmount: "0.00", quotaTotal: 10, quotaRemaining: 10, maxUsagePerCustomer: 1, isActive: false, startDate: new Date(NOW - 30 * DAY), endDate: new Date(NOW + 30 * DAY) },
     ].map((v) => ({ ...v, createdBy: adminBudi.id })))
