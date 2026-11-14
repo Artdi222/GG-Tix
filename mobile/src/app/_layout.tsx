@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { useAuthStore } from '../store/auth-store';
+import { useCityStore } from '../store/city-store';
 import { View, ActivityIndicator } from 'react-native';
 import { listenToNotifications } from '../services/notifications';
 import { BRAND_COLORS } from '../constants/config';
@@ -11,6 +12,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     initializeAuth();
+    void useCityStore.getState().hydrate();
   }, [initializeAuth]);
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="auth/login" />
       <Stack.Screen name="auth/register" />
+      <Stack.Screen name="events" />
       <Stack.Screen name="event/[id]" />
       <Stack.Screen name="checkout/[id]" />
       <Stack.Screen name="ticket/[id]" />

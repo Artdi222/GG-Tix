@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../store/auth-store';
 import { BRAND_COLORS } from '../../constants/config';
+import { AppTopBar, PageHeader } from '../../components/layout';
 import { apiFetch } from '../../services/api';
 import { session, type SessionUser } from '../../services/session';
 import { registerForPushNotificationsAsync, disablePushNotifications, isPushEnabled } from '../../services/notifications';
@@ -195,7 +196,9 @@ export default function ProfileScreen() {
 
   if (!token) {
     return (
-      <View style={[styles.container, styles.centerContainer, { paddingTop: Math.max(insets.top, 20) }]}>
+      <View style={styles.container}>
+        <AppTopBar />
+        <View style={[styles.centerContainer, { flex: 1 }]}>
         <View style={styles.guestIconWrap}>
           <Ionicons name="person-outline" size={40} color={BRAND_COLORS.accent} />
         </View>
@@ -213,6 +216,7 @@ export default function ProfileScreen() {
           <Text style={styles.loginBtnText}>Masuk ke Akun</Text>
           <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -221,11 +225,8 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
-        <View>
-          <Text style={styles.headerTitle}>Akun Saya</Text>
-        </View>
-      </View>
+      <AppTopBar />
+      <PageHeader title="Akun Saya" />
 
       <ScrollView
         contentContainerStyle={[

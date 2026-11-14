@@ -52,7 +52,11 @@ export interface EventItem {
 
 interface EventCardProps {
   event: EventItem;
-  variant?: 'portrait' | 'row';
+  variant?: 'portrait' | 'row' | 'poster';
+  /** Poster variant: ranking number shown in the corner. */
+  rank?: number;
+  /** Poster variant: card width (height follows a 2:3 poster). */
+  width?: number;
   style?: ViewStyle;
 }
 
@@ -124,7 +128,7 @@ export function getLowestPrice(event: EventItem): string {
   return formatRupiah(minPrice);
 }
 
-export function EventCard({ event, variant = 'portrait', style }: EventCardProps) {
+export function EventCard({ event, variant = 'portrait', style, rank, width = 168 }: EventCardProps) {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
   const scale = useSharedValue(1);
@@ -147,6 +151,34 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
     router.push(`/event/${event.id}`);
   };
   const label = `${event.title}, ${dateInfo.full}${event.venue?.city ? `, ${event.venue.city}` : ''}, ${isSoldOut ? 'habis' : `mulai ${lowestPrice}`}`;
+
+  if (variant === 'poster') {
+    return (
+      <Animated.View style={[animatedStyle, { width }]}>
+        <Pressable onPressIn={pressIn} onPressOut={pressOut} onPress={open} style={style} accessibilityRole="button" accessibilityLabel={label}>
+          <View style={[styles.poster, { width, height: Math.round(width * 1.5) }]}>
+            <Image source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} onError={() => setImageError(true)} />
+            {rank ? (
+              <View style={styles.rank}>
+                <Text style={styles.rankText}>{rank}</Text>
+              </View>
+            ) : null}
+            {isSoldOut || fewLeft ? (
+              <View style={[styles.cornerFlag, isSoldOut ? styles.flagSold : styles.flagFew]}>
+                <Text style={[styles.flagText, isSoldOut && { color: '#FFFFFF' }]}>{isSoldOut ? 'Habis' : 'Hampir habis'}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.posterTitle} numberOfLines={2}>{event.title}</Text>
+          <View style={styles.infoPill}>
+            <Text style={styles.infoPillText} numberOfLines={1}>{dateInfo.day} {dateInfo.month}</Text>
+            <View style={styles.infoPillSep} />
+            <Text style={[styles.infoPillText, styles.infoPillPrice]} numberOfLines={1}>{isSoldOut ? 'Habis' : lowestPrice}</Text>
+          </View>
+        </Pressable>
+      </Animated.View>
+    );
+  }
 
   if (variant === 'portrait') {
     return (
@@ -199,6 +231,15 @@ export function EventCard({ event, variant = 'portrait', style }: EventCardProps
 }
 
 const styles = StyleSheet.create({
+  poster: { borderRadius: 14, overflow: 'hidden', backgroundColor: '#E4E4E7', marginBottom: 10 },
+  rank: { position: 'absolute', top: 0, left: 0, minWidth: 40, height: 44, paddingHorizontal: 10, borderBottomRightRadius: 14, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' },
+  rankText: { color: '#F5A524', fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  cornerFlag: { position: 'absolute', top: 10, right: 10, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  posterTitle: { fontSize: 15, fontWeight: '800', color: '#18181B', lineHeight: 19, minHeight: 38, textTransform: 'uppercase', letterSpacing: 0.1 },
+  infoPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, borderWidth: 1.5, borderColor: '#18181B', borderRadius: 10, paddingHorizontal: 10, height: 32, maxWidth: '100%' },
+  infoPillText: { fontSize: 13, fontWeight: '700', color: '#18181B' },
+  infoPillPrice: { flexShrink: 1 },
+  infoPillSep: { width: 1, height: 14, backgroundColor: '#D4D4D8', marginHorizontal: 8 },
   portrait: { width: 156 },
   portraitPoster: { width: 156, height: 208, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E4E4E7', marginBottom: 10 },
   dateChip: { position: 'absolute', top: 10, left: 10, backgroundColor: '#FFFFFF', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', minWidth: 40 },

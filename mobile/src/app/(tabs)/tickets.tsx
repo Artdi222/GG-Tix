@@ -17,6 +17,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-na
 import * as Haptics from 'expo-haptics';
 import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { BRAND_COLORS } from '../../constants/config';
+import { AppTopBar, PageHeader, PillTabs } from '../../components/layout';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
 import { getPosterImage } from '../../components/EventCard';
@@ -193,7 +194,9 @@ export default function TicketsScreen() {
 
   if (!token) {
     return (
-      <View style={[styles.container, styles.centerContainer, { paddingTop: Math.max(insets.top, 20) }]}>
+      <View style={styles.container}>
+        <AppTopBar />
+        <View style={[styles.centerContainer, { flex: 1 }]}>
         <View style={styles.guestIconWrap}>
           <Ionicons name="ticket-outline" size={40} color={BRAND_COLORS.accent} />
         </View>
@@ -211,17 +214,15 @@ export default function TicketsScreen() {
           <Text style={styles.loginBtnText}>Masuk ke Akun</Text>
           <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
-        <View>
-          <Text style={styles.headerTitle}>Tiket Saya</Text>
-        </View>
-      </View>
+      <AppTopBar />
+      <PageHeader title="Tiket Saya" />
 
       {isOffline ? (
         <View style={styles.offlineBanner}>
@@ -230,45 +231,14 @@ export default function TicketsScreen() {
         </View>
       ) : null}
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'active' && styles.tabBtnActive]}
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-            }
-            setActiveTab('active');
-          }}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Tiket akan datang"
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'active' && styles.tabBtnTextActive]}>
-            Akan datang{activeTicketsCount ? ` · ${activeTicketsCount}` : ''}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'all' && styles.tabBtnActive]}
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-            }
-            setActiveTab('all');
-          }}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Semua tiket lunas"
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'all' && styles.tabBtnTextActive]}>
-            Semua tiket{data.summary.verified ? ` · ${data.summary.verified}` : ''}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <PillTabs<'active' | 'all'>
+        value={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { value: 'active', label: `Akan datang${activeTicketsCount ? ` · ${activeTicketsCount}` : ''}` },
+          { value: 'all', label: `Semua tiket${data.summary.verified ? ` · ${data.summary.verified}` : ''}` },
+        ]}
+      />
 
       {error ? <TouchableOpacity onPress={data.reload} style={{ padding: 16 }} accessibilityRole="button"><Text style={{ color: '#B91C1C' }}>{error} Ketuk untuk coba lagi.</Text></TouchableOpacity> : null}
       {loading && !refreshing ? (

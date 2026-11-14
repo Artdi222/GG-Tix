@@ -18,6 +18,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-na
 import * as Haptics from 'expo-haptics';
 import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { BRAND_COLORS } from '../../constants/config';
+import { AppTopBar, PageHeader } from '../../components/layout';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -205,7 +206,9 @@ export default function HistoryScreen() {
 
   if (!token) {
     return (
-      <View style={[styles.container, styles.centerContainer, { paddingTop: Math.max(insets.top, 20) }]}>
+      <View style={styles.container}>
+        <AppTopBar />
+        <View style={[styles.centerContainer, { flex: 1 }]}>
         <View style={styles.guestIconWrap}>
           <Ionicons name="receipt-outline" size={40} color={BRAND_COLORS.accent} />
         </View>
@@ -223,17 +226,15 @@ export default function HistoryScreen() {
           <Text style={styles.loginBtnText}>Masuk ke Akun</Text>
           <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
-        <View>
-          <Text style={styles.headerTitle}>Riwayat Pesanan</Text>
-        </View>
-      </View>
+      <AppTopBar />
+      <PageHeader title="Riwayat Pesanan" />
 
       {/* Scrolls sideways instead of squeezing four chips into a 320px screen. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.filterContainer}>
