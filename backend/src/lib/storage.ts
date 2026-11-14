@@ -109,6 +109,23 @@ export function keyFromUrl(url: string | null | undefined): string | null {
   return cleanUrl.slice(idx + marker.length);
 }
 
+/** Read an object from the private bucket with the account token (used by the media proxy). */
+export async function fetchObject(key: string): Promise<Response> {
+  return withAuth(async (a) => {
+    const path = key.split("/").map(encodeURIComponent).join("/");
+    const res = await fetch(`${a.downloadUrl}/file/${B2_BUCKET}/${path}`, {
+      headers: { Authorization: a.authToken },
+    });
+    assertAuthorized(res);
+    return res;
+  });
+}
+
+/** Download host from the last authorization, for building canonical stored URLs. */
+export function cachedDownloadUrl(): string | null {
+  return auth?.downloadUrl ?? null;
+}
+
 export async function uploadObject(
   key: string,
   buffer: Buffer,

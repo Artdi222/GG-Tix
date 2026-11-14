@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { mediaUrlField } from "../lib/media";
 import { pageQuery, limitQuery } from "../lib/pagination";
 import * as eventService from "../services/event.service";
 import { authMiddleware, adminOrHigher } from "../lib/middleware";
@@ -21,11 +22,11 @@ const createEventSchema = z.object({
   description: z.string().optional().nullable(),
   maxTicketsPerOrder: z.number().int().min(1).max(10).nullable().optional(),
   tags: z.array(z.string().max(50)).optional(),
-  seatmapUrl: z.string().url("Invalid seatmap URL format").optional().nullable().or(z.literal("")),
+  seatmapUrl: mediaUrlField("Invalid seatmap URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
   status: z.enum(["open", "closed"]).optional(),
-  imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
-  posterUrl: z.string().url("Invalid poster URL format").optional().nullable().or(z.literal("")),
+  imageUrl: mediaUrlField("Invalid image URL format").optional().nullable().or(z.literal("")),
+  posterUrl: mediaUrlField("Invalid poster URL format").optional().nullable().or(z.literal("")),
 });
 
 const updateEventSchema = createEventSchema.partial();

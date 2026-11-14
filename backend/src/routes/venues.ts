@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { mediaUrlField } from "../lib/media";
 import { pageQuery, limitQuery } from "../lib/pagination";
 import * as venueService from "../services/venue.service";
 import { authMiddleware, adminOrHigher } from "../lib/middleware";
@@ -31,7 +32,7 @@ const createVenueSchema = z.object({
   address: z.string().min(1, "Alamat wajib diisi"),
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter"),
   timezone: timezoneSchema.optional(),
-  imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
+  imageUrl: mediaUrlField("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
 });
 
@@ -44,7 +45,7 @@ const updateVenueSchema = z.object({
   address: z.string().min(1, "Alamat wajib diisi").optional(),
   city: z.string().min(1, "Kota wajib diisi").max(100, "Kota maksimum 100 karakter").optional(),
   timezone: timezoneSchema.optional(),
-  imageUrl: z.string().url("Invalid image URL format").optional().nullable().or(z.literal("")),
+  imageUrl: mediaUrlField("Invalid image URL format").optional().nullable().or(z.literal("")),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
 });

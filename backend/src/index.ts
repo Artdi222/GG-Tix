@@ -14,6 +14,7 @@ import { expireOverduePendingOrders } from "./services/payment.service";
 import { pruneAuditLogs } from "./services/settings.service";
 import { IMAGE_MAX_BYTES } from "./lib/storage";
 import healthRoute from "./routes/health";
+import { mediaRoute, mediaUrlRewrite } from "./lib/media";
 import authRoute from "./routes/auth";
 import eventRoute from "./routes/event";
 import artistsRoute from "./routes/artists";
@@ -92,6 +93,9 @@ app.onError(errorHandler);
 
 // Base API Route Group
 const api = new Hono();
+// Private-bucket images: proxy route + response URL rewrite (see lib/media.ts).
+api.use("*", mediaUrlRewrite);
+api.route("/media", mediaRoute);
 api.route("/health", healthRoute);
 api.route("/auth", authRoute);
 api.route("/events", eventRoute);

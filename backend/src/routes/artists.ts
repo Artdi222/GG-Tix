@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { mediaUrlField } from "../lib/media";
 import { pageQuery, limitQuery } from "../lib/pagination";
 import * as artistService from "../services/artist.service";
 import { authMiddleware, adminOrHigher } from "../lib/middleware";
@@ -21,9 +22,7 @@ const createArtistSchema = z.object({
     .min(1, "Name is required")
     .max(150, "Name max length is 150 characters"),
   bio: z.string().optional(),
-  photoUrl: z
-    .string()
-    .url("Invalid photo URL format")
+  photoUrl: mediaUrlField("Invalid photo URL format")
     .optional()
     .or(z.literal("")),
 });
@@ -35,9 +34,7 @@ const updateArtistSchema = z.object({
     .max(150, "Name max length is 150 characters")
     .optional(),
   bio: z.string().optional(),
-  photoUrl: z
-    .string()
-    .url("Invalid photo URL format")
+  photoUrl: mediaUrlField("Invalid photo URL format")
     .optional()
     .or(z.literal("")),
 });
