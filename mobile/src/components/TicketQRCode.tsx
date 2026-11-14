@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Platform, Dimensions } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Brightness from 'expo-brightness';
@@ -35,6 +35,7 @@ export function TicketQRCode({
   venueName,
   eventDate,
 }: TicketQRCodeProps) {
+  const [openedAt] = useState(() => Date.now());
   const shimmerTranslateX = useSharedValue(-SCREEN_WIDTH);
 
   useEffect(() => {
@@ -96,18 +97,11 @@ export function TicketQRCode({
         <View style={styles.topSection}>
           <Animated.View style={[styles.shimmerBeam, shimmerAnimatedStyle]} pointerEvents="none" />
 
-          <View style={styles.securityWatermarkRow}>
-            <Ionicons name="shield-checkmark" size={13} color={BRAND_COLORS.accent} />
-            <Text style={styles.securityWatermarkText}>
-              E-TIKET RESMI GG-TIX
-            </Text>
-          </View>
-
           <Text style={styles.eventTitle} numberOfLines={2}>
             {eventTitle}
           </Text>
-          {eventDate && <Text style={styles.eventDate}>📅 {formatDate(eventDate)} WIB</Text>}
-          {venueName && <Text style={styles.venueName}>📍 {venueName}</Text>}
+          {eventDate && <Text style={styles.eventDate}>{formatDate(eventDate)} WIB</Text>}
+          {venueName && <Text style={styles.venueName}>{venueName}</Text>}
 
           <View style={styles.badgeRow}>
             <View style={styles.catBadge}>
@@ -148,12 +142,18 @@ export function TicketQRCode({
             </View>
           )}
 
-          <View style={styles.brightnessHintRow}>
-            <Ionicons name="sunny-outline" size={12} color="#71717A" />
-            <Text style={styles.brightnessHintText}>
-              Kecerahan layar otomatis dinaikkan untuk scan QR
-            </Text>
-          </View>
+          {/* A past show's QR still renders (proof of purchase), but should not look ready to scan. */}
+          {!ticket.checkedIn && eventDate && new Date(eventDate).getTime() < openedAt - 12 * 3600000 ? (
+            <View style={styles.brightnessHintRow}>
+              <Ionicons name="time-outline" size={12} color="#71717A" />
+              <Text style={styles.brightnessHintText}>Acara ini sudah berlangsung</Text>
+            </View>
+          ) : (
+            <View style={styles.brightnessHintRow}>
+              <Ionicons name="sunny-outline" size={12} color="#71717A" />
+              <Text style={styles.brightnessHintText}>Kecerahan layar dinaikkan agar QR mudah dipindai</Text>
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     top: -80,
     width: 60,
     height: 300,
-    backgroundColor: 'rgba(124, 58, 237, 0.18)',
+    backgroundColor: 'rgba(245, 165, 36, 0.18)',
     shadowColor: BRAND_COLORS.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
@@ -235,12 +235,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   catBadge: {
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    backgroundColor: 'rgba(245, 165, 36, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.35)',
+    borderColor: 'rgba(245, 165, 36, 0.35)',
   },
   catBadgeText: {
     color: BRAND_COLORS.accent,

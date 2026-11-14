@@ -93,7 +93,7 @@ export default function LoginScreen() {
                 <Ionicons
                   name="mail-outline"
                   size={18}
-                  color={emailFocused ? '#7C3AED' : '#71717A'}
+                  color={emailFocused ? '#B4630A' : '#71717A'}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -116,7 +116,7 @@ export default function LoginScreen() {
                 <Ionicons
                   name="lock-closed-outline"
                   size={18}
-                  color={passwordFocused ? '#7C3AED' : '#71717A'}
+                  color={passwordFocused ? '#B4630A' : '#71717A'}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#B4630A',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   inputWrapperFocused: {
-    borderColor: '#7C3AED',
+    borderColor: '#B4630A',
   },
   inputIcon: {
     marginRight: 8,
@@ -289,8 +289,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingVertical: 14,
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#7C3AED',
+    borderRadius: 26,
+    backgroundColor: '#18181B',
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   linkHighlight: {
-    color: '#7C3AED',
+    color: '#B4630A',
     fontSize: 13,
     fontWeight: '700',
   },

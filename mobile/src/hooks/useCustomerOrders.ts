@@ -10,17 +10,19 @@ export function useCustomerOrders(filter: OrderFilter) {
   const [loadedFor, setLoadedFor] = useState('');
   const [state, setState] = useState({ items: [] as OrderItem[], summary: emptySummary, page: 0, totalPages: 0, offline: false, error: '', loading: true, loadingMore: false });
   const controller = useRef<AbortController | null>(null);
+  const loadedKey = useRef('');
   const load = useCallback(async (page = 1) => {
     controller.current?.abort();
     const abort = new AbortController(); controller.current = abort;
     const revision = session.snapshot().revision;
     const current = () => !abort.signal.aborted && session.snapshot().revision === revision;
     if (!userId) { setState({ items: [], summary: emptySummary, page: 0, totalPages: 0, offline: false, error: '', loading: false, loadingMore: false }); return; }
-    setState(s => (page === 1 ? { ...s, loading: true, error: '' } : { ...s, loadingMore: true, error: '' }));
+    // Refreshing page 1 keeps the current list visible; only a first load shows the skeleton.
+    setState(s => (page === 1 ? { ...s, loading: loadedKey.current !== `${userId}:${filter}` || s.items.length === 0, error: '' } : { ...s, loadingMore: true, error: '' }));
     try {
       const [result, summary] = await Promise.all([fetchOrderPage(page, filter, abort.signal), fetchOrderSummary(abort.signal)]);
       if (!current()) return;
-      setLoadedFor(`${userId}:${filter}`);
+      setLoadedFor(`${userId}:${filter}`); loadedKey.current = `${userId}:${filter}`;
       setState(s => ({ items: page === 1 ? result.items : [...s.items, ...result.items.filter(item => !s.items.some(old => old.id === item.id))], summary, page, totalPages: result.pagination.totalPages, offline: false, error: '', loading: false, loadingMore: false }));
       // Cache a complete page, including metadata; never present a partial cache as all orders.
       await session.cacheWrite(`orders:${filter}:${page}`, { result, summary }, revision).catch(() => {});
@@ -30,7 +32,7 @@ export function useCustomerOrders(filter: OrderFilter) {
         const cached = await session.cacheRead<{ result: Awaited<ReturnType<typeof fetchOrderPage>>; summary: OrderSummary }>(`orders:${filter}:${page}`, revision).catch(() => null);
         if (!current()) return;
         if (cached) {
-          setLoadedFor(`${userId}:${filter}`);
+          setLoadedFor(`${userId}:${filter}`); loadedKey.current = `${userId}:${filter}`;
           setState(s => ({ items: page === 1 ? cached.result.items : [...s.items, ...cached.result.items.filter(item => !s.items.some(old => old.id === item.id))], summary: cached.summary, page, totalPages: cached.result.pagination.totalPages, offline: true, error: '', loading: false, loadingMore: false }));
           return;
         }
@@ -39,7 +41,7 @@ export function useCustomerOrders(filter: OrderFilter) {
     }
   }, [userId, filter]);
   useFocusEffect(useCallback(() => {
-    setState({ items: [], summary: emptySummary, page: 0, totalPages: 0, offline: false, error: '', loading: true, loadingMore: false });
+    // Revalidate on focus without blanking the list, so switching tabs does not flash a skeleton.
     void load();
     return () => controller.current?.abort();
   }, [load]));

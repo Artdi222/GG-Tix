@@ -320,12 +320,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(245, 165, 36, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
   },
   expandButtonText: {
     color: BRAND_COLORS.accent,
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.3)',
+    borderColor: 'rgba(245, 165, 36, 0.3)',
   },
   positionHeaderRow: {
     flexDirection: 'row',

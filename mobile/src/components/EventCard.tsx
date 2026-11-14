@@ -3,12 +3,11 @@ import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
+  Pressable,
   Platform,
   type ViewStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -106,6 +105,12 @@ export function formatEventDate(isoString?: string): { day: string; month: strin
   }
 }
 
+/** True once the show has ended (or started, when no end time is set). */
+export function isEventOver(event: Pick<EventItem, 'dateTime' | 'endDateTime'>, now = Date.now()): boolean {
+  const end = new Date(event.endDateTime || event.dateTime).getTime();
+  return Number.isFinite(end) && end < now;
+}
+
 export function getLowestPrice(event: EventItem): string {
   if (!event.ticketCategories || event.ticketCategories.length === 0) {
     return event.minPrice != null ? formatRupiah(event.minPrice) : 'Cek Tiket';
@@ -122,416 +127,97 @@ export function getLowestPrice(event: EventItem): string {
 export function EventCard({ event, variant = 'portrait', style }: EventCardProps) {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
-
   const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.set(withSpring(MOTION_TOKENS.pressScale.card, MOTION_TOKENS.springSnappy));
-  };
-
-  const handlePressOut = () => {
-    scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
-  };
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const dateInfo = formatEventDate(event.dateTime);
   const lowestPrice = getLowestPrice(event);
   const posterUri = imageError ? FALLBACK_POSTERS[0] : getPosterImage(event);
-
   const isSoldOut =
     (event.capacity !== undefined && event.capacity > 0 && (event.sold ?? 0) >= event.capacity) ||
-    (event.ticketCategories &&
-    event.ticketCategories.length > 0 &&
-    event.ticketCategories.every(
-      (c) => c.quotaRemaining !== undefined && Number(c.quotaRemaining) <= 0
-    ));
+    (!!event.ticketCategories?.length &&
+      event.ticketCategories.every((c) => c.quotaRemaining !== undefined && Number(c.quotaRemaining) <= 0));
+  // Only flag scarcity when it is real: under 15% of capacity left.
+  const fewLeft = !isSoldOut && !!event.capacity && (event.capacity - (event.sold ?? 0)) / event.capacity < 0.15;
 
-  const handlePress = () => {
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        
-      }
-    }
+  const pressIn = () => scale.set(withSpring(MOTION_TOKENS.pressScale.card, MOTION_TOKENS.springSnappy));
+  const pressOut = () => scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
+  const open = () => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     router.push(`/event/${event.id}`);
   };
+  const label = `${event.title}, ${dateInfo.full}${event.venue?.city ? `, ${event.venue.city}` : ''}, ${isSoldOut ? 'habis' : `mulai ${lowestPrice}`}`;
 
   if (variant === 'portrait') {
     return (
       <Animated.View style={animatedStyle}>
-        <TouchableOpacity
-          activeOpacity={1}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={handlePress}
-          style={[styles.portraitContainer, style]}
-          accessibilityRole="button"
-          accessibilityLabel={`Konser ${event.title}`}
-        >
-          <View style={styles.portraitPosterWrapper}>
-            <Image
-              source={{ uri: posterUri }}
-              style={styles.portraitPosterImage}
-              contentFit="cover"
-              transition={200}
-              onError={() => setImageError(true)}
-            />
-
-            <View style={[styles.portraitBadge, isSoldOut ? styles.badgeSold : styles.badgeAvail]}>
-              <Text style={[styles.portraitBadgeText, isSoldOut ? styles.badgeTextSold : styles.badgeTextAvail]}>
-                {isSoldOut ? 'HABIS' : 'TERSEDIA'}
-              </Text>
+        <Pressable onPressIn={pressIn} onPressOut={pressOut} onPress={open} style={[styles.portrait, style]} accessibilityRole="button" accessibilityLabel={label}>
+          <View style={styles.portraitPoster}>
+            <Image source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} onError={() => setImageError(true)} />
+            <View style={styles.dateChip}>
+              <Text style={styles.dateChipDay}>{dateInfo.day}</Text>
+              <Text style={styles.dateChipMonth}>{dateInfo.month}</Text>
             </View>
-
-            <View style={styles.posterDateTag}>
-              <Text style={styles.posterDateText}>{dateInfo.day} {dateInfo.month}</Text>
-            </View>
-          </View>
-
-          <View style={styles.portraitInfo}>
-            <Text style={styles.portraitTitle} numberOfLines={2}>
-              {event.title}
-            </Text>
-
-            {event.artist?.name ? (
-              <Text style={styles.portraitArtist} numberOfLines={1}>
-                {event.artist.name}
-              </Text>
-            ) : null}
-
-            <View style={styles.portraitBottomRow}>
-              <Text style={styles.portraitPrice}>{lowestPrice}</Text>
-              <View style={styles.portraitBuyPill}>
-                <Text style={styles.portraitBuyPillText}>Beli</Text>
+            {isSoldOut || fewLeft ? (
+              <View style={[styles.flag, isSoldOut ? styles.flagSold : styles.flagFew]}>
+                <Text style={styles.flagText}>{isSoldOut ? 'Habis' : 'Hampir habis'}</Text>
               </View>
-            </View>
+            ) : null}
           </View>
-        </TouchableOpacity>
+          <Text style={styles.portraitTitle} numberOfLines={2}>{event.title}</Text>
+          <Text style={styles.meta} numberOfLines={1}>{event.venue?.city || event.artist?.name || ''}</Text>
+          <Text style={[styles.price, isSoldOut && styles.priceSold]} numberOfLines={1}>{isSoldOut ? 'Tiket habis' : lowestPrice}</Text>
+        </Pressable>
       </Animated.View>
     );
   }
 
   return (
     <Animated.View style={animatedStyle}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handlePress}
-        style={[styles.rowContainer, style]}
-        accessibilityRole="button"
-        accessibilityLabel={`Konser ${event.title}`}
-      >
-        <View style={styles.rowPosterWrapper}>
-          <Image
-            source={{ uri: posterUri }}
-            style={styles.rowPosterImage}
-            contentFit="cover"
-            transition={200}
-            onError={() => setImageError(true)}
-          />
-
-          {isSoldOut && (
-            <View style={styles.rowSoldOverlay}>
-              <Text style={styles.rowSoldText}>HABIS</Text>
-            </View>
-          )}
+      <Pressable onPressIn={pressIn} onPressOut={pressOut} onPress={open} style={[styles.row, style]} accessibilityRole="button" accessibilityLabel={label}>
+        <View style={styles.rowPoster}>
+          <Image source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} onError={() => setImageError(true)} />
         </View>
-
-        <View style={styles.rowContent}>
-          <View style={styles.rowHeader}>
-            <View style={styles.rowDatePill}>
-              <Ionicons name="calendar-outline" size={11} color="#7C3AED" />
-              <Text style={styles.rowDateText}>{dateInfo.full}</Text>
-            </View>
-            {event.venue?.city ? (
-              <View style={styles.cityLocationRow}>
-                <Ionicons name="location-outline" size={11} color="#71717A" />
-                <Text style={styles.rowCityText} numberOfLines={1}>{event.venue.city}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <Text style={styles.rowTitle} numberOfLines={2}>
-            {event.title}
+        <View style={styles.rowBody}>
+          <Text style={styles.rowDate} numberOfLines={1}>
+            {dateInfo.weekday}, {dateInfo.day} {dateInfo.month} · {dateInfo.time}
           </Text>
-
-          {event.artist?.name ? (
-            <View style={styles.rowArtistRow}>
-              <Ionicons name="mic-outline" size={12} color="#52525B" />
-              <Text style={styles.rowArtistText} numberOfLines={1}>
-                {event.artist.name}
-              </Text>
-            </View>
-          ) : null}
-
-          {event.venue?.name ? (
-            <Text style={styles.rowVenueText} numberOfLines={1}>
-              {event.venue.name}
+          <Text style={styles.rowTitle} numberOfLines={2}>{event.title}</Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {[event.venue?.name, event.venue?.city].filter(Boolean).join(', ')}
+          </Text>
+          <View style={styles.rowFoot}>
+            <Text style={[styles.price, isSoldOut && styles.priceSold]} numberOfLines={1}>
+              {isSoldOut ? 'Tiket habis' : `Mulai ${lowestPrice}`}
             </Text>
-          ) : null}
-
-          <View style={styles.rowBottom}>
-            <View>
-              <Text style={styles.pricePrefix}>Mulai dari</Text>
-              <Text style={styles.rowPrice} numberOfLines={1}>{lowestPrice}</Text>
-            </View>
-
-            {/* A compact chevron leaves the price room on narrow phones; the whole card is the tap target. */}
-            {isSoldOut ? (
-              <View style={[styles.actionButton, styles.actionButtonSold]}>
-                <Text style={[styles.actionButtonText, styles.actionButtonTextSold]}>Habis</Text>
-              </View>
-            ) : (
-              <View style={styles.actionChevron}>
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-              </View>
-            )}
+            {fewLeft ? <Text style={styles.fewText}>Hampir habis</Text> : null}
           </View>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  portraitContainer: {
-    width: 148,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  portraitPosterWrapper: {
-    width: '100%',
-    height: 196,
-    position: 'relative',
-    backgroundColor: '#FFFFFF',
-  },
-  portraitPosterImage: {
-    width: '100%',
-    height: '100%',
-  },
-  portraitBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeAvail: {
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
-  },
-  badgeSold: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-  },
-  portraitBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  badgeTextAvail: {
-    color: '#FFFFFF',
-  },
-  badgeTextSold: {
-    color: '#FFFFFF',
-  },
-  posterDateTag: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(9, 9, 11, 0.85)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  posterDateText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  portraitInfo: {
-    padding: 10,
-  },
-  portraitTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#18181B',
-    lineHeight: 17,
-    marginBottom: 4,
-  },
-  portraitArtist: {
-    fontSize: 11,
-    color: '#52525B',
-    marginBottom: 8,
-  },
-  portraitBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  portraitPrice: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#7C3AED',
-  },
-  portraitBuyPill: {
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.3)',
-  },
-  portraitBuyPillText: {
-    color: '#7C3AED',
-    fontSize: 10,
-    fontWeight: '800',
-  },
+  portrait: { width: 156 },
+  portraitPoster: { width: 156, height: 208, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E4E4E7', marginBottom: 10 },
+  dateChip: { position: 'absolute', top: 10, left: 10, backgroundColor: '#FFFFFF', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', minWidth: 40 },
+  dateChipDay: { fontSize: 16, fontWeight: '800', color: '#18181B', lineHeight: 18 },
+  dateChipMonth: { fontSize: 10, fontWeight: '700', color: '#B4630A', letterSpacing: 0.5 },
+  flag: { position: 'absolute', bottom: 10, left: 10, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  flagSold: { backgroundColor: 'rgba(24,24,27,0.85)' },
+  flagFew: { backgroundColor: '#F5A524' },
+  flagText: { fontSize: 11, fontWeight: '700', color: '#18181B' },
+  portraitTitle: { fontSize: 15, fontWeight: '700', color: '#18181B', lineHeight: 19, letterSpacing: -0.2 },
+  meta: { fontSize: 13, color: '#71717A', marginTop: 2 },
+  price: { fontSize: 14, fontWeight: '700', color: '#18181B', marginTop: 6 },
+  priceSold: { color: '#A1A1AA' },
 
-  rowContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-    marginBottom: 12,
-  },
-  rowPosterWrapper: {
-    width: 105,
-    height: 145,
-    position: 'relative',
-    backgroundColor: '#FFFFFF',
-  },
-  rowPosterImage: {
-    width: '100%',
-    height: '100%',
-  },
-  rowSoldOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(9, 9, 11, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rowSoldText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  rowContent: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  rowHeader: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: 10,
-    rowGap: 2,
-    marginBottom: 4,
-  },
-  rowDatePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rowDateText: {
-    fontSize: 11,
-    color: '#7C3AED',
-    fontWeight: '700',
-  },
-  cityLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  rowCityText: {
-    fontSize: 11,
-    color: '#71717A',
-    fontWeight: '600',
-  },
-  rowTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#18181B',
-    lineHeight: 18,
-    marginBottom: 2,
-  },
-  rowArtistRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 2,
-  },
-  rowArtistText: {
-    fontSize: 11,
-    color: '#52525B',
-    fontWeight: '500',
-  },
-  rowVenueText: {
-    fontSize: 11,
-    color: '#71717A',
-    marginBottom: 6,
-  },
-  rowBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    gap: 8,
-    marginTop: 4,
-  },
-  actionChevron: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#7C3AED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pricePrefix: {
-    fontSize: 9,
-    color: '#71717A',
-    fontWeight: '500',
-  },
-  rowPrice: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#7C3AED',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#7C3AED',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  actionButtonSold: {
-    backgroundColor: '#E4E4E7',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  actionButtonTextSold: {
-    color: '#71717A',
-  },
+  row: { flexDirection: 'row', gap: 14, paddingVertical: 4 },
+  rowPoster: { width: 88, height: 112, borderRadius: 14, overflow: 'hidden', backgroundColor: '#E4E4E7' },
+  rowBody: { flex: 1, justifyContent: 'center' },
+  rowDate: { fontSize: 12, fontWeight: '700', color: '#B4630A', letterSpacing: 0.2, marginBottom: 4 },
+  rowTitle: { fontSize: 16, fontWeight: '700', color: '#18181B', lineHeight: 20, letterSpacing: -0.2 },
+  rowFoot: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  fewText: { fontSize: 11, fontWeight: '700', color: '#92400E', backgroundColor: 'rgba(245,165,36,0.18)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginTop: 6, overflow: 'hidden' },
 });

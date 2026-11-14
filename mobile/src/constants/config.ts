@@ -18,7 +18,7 @@ export const STORAGE_KEYS = {
   USER: 'ggtix_customer_user',
 } as const;
 
-// Light theme, sharing the admin dashboard's violet brand.
+// Light theme sharing the admin dashboard's ink + gold brand. accent is the AA-safe amber for text/fills on white; gold is for highlights only.
 export const BRAND_COLORS = {
   primary: '#18181B',
   bgDark: '#F6F6F8',
@@ -28,11 +28,11 @@ export const BRAND_COLORS = {
   cardBgElevated: '#F4F4F5',
   cardBgHover: '#EDEDF0',
 
-  accent: '#7C3AED',
-  accentGold: '#7C3AED',
-  accentHover: '#6D28D9',
-  accentGlow: 'rgba(124, 58, 237, 0.10)',
-  accentGlowStrong: 'rgba(124, 58, 237, 0.22)',
+  accent: '#B4630A',
+  accentGold: '#F5A524',
+  accentHover: '#92400E',
+  accentGlow: 'rgba(245, 165, 36, 0.10)',
+  accentGlowStrong: 'rgba(245, 165, 36, 0.22)',
 
   success: '#059669',
   successBg: 'rgba(5, 150, 105, 0.1)',
@@ -43,10 +43,10 @@ export const BRAND_COLORS = {
 
   borderLight: '#E4E4E7',
   borderMedium: '#D4D4D8',
-  borderGold: 'rgba(124, 58, 237, 0.35)',
+  borderGold: 'rgba(245, 165, 36, 0.35)',
 
   seatAvailable: '#059669',
-  seatSelected: '#7C3AED',
+  seatSelected: '#B4630A',
   seatLocked: '#DC2626',
   seatSold: '#D4D4D8',
   zoneVip: '#9333EA',

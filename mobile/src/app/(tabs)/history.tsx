@@ -232,10 +232,6 @@ export default function HistoryScreen() {
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
         <View>
           <Text style={styles.headerTitle}>Riwayat Pesanan</Text>
-          <Text style={styles.headerSub}>Catatan transaksi tiket konser akun Anda</Text>
-        </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{data.summary.totalOrders} Transaksi</Text>
         </View>
       </View>
 
@@ -341,17 +337,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: '#F6F6F8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4E4E7',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
     color: '#18181B',
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
   },
   headerSub: {
     fontSize: 11,
@@ -412,7 +406,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   filterCountDotActive: {
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    backgroundColor: 'rgba(245, 165, 36, 0.15)',
   },
   filterCountText: {
     fontSize: 10,
@@ -577,11 +571,11 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(245, 165, 36, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
     marginBottom: 4,
   },
   promptTitle: {

@@ -21,7 +21,7 @@ import { BRAND_COLORS } from '../../constants/config';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
 import { CategoryCard, TicketCategoryItem } from '../../components/CategoryCard';
-import { getPosterImage } from '../../components/EventCard';
+import { getPosterImage, isEventOver } from '../../components/EventCard';
 import { VenueSeatmapViewer } from '../../components/VenueSeatmapViewer';
 
 export interface EventDetailData {
@@ -164,7 +164,7 @@ export default function EventDetailScreen() {
     try {
       await Share.share({
         title: event.title,
-        message: `Beli tiket konser ${event.title} di GG-Tix sekarang! 🎟️🔥`,
+        message: `${event.title} — tiket tersedia di GG-Tix.`,
       });
     } catch {
       
@@ -172,7 +172,7 @@ export default function EventDetailScreen() {
   };
 
   const handleCheckout = () => {
-    if (event?.maintenanceMode || event?.status !== 'open') return;
+    if (!event || event.maintenanceMode || event.status !== 'open' || isEventOver(event)) return;
     if (!selectedCategory) {
       Alert.alert('Peringatan', 'Silakan pilih kategori tiket terlebih dahulu.');
       return;
@@ -187,15 +187,8 @@ export default function EventDetailScreen() {
     }
 
     if (!token) {
-      if (Platform.OS === 'web') {
-        const toLogin = typeof window !== 'undefined' ? window.confirm('Silakan masuk atau daftar terlebih dahulu untuk membeli tiket.') : true;
-        if (toLogin) router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } });
-        return;
-      }
-      Alert.alert('Perlu Masuk', 'Silakan masuk atau daftar terlebih dahulu untuk membeli tiket.', [
-        { text: 'Batal', style: 'cancel' },
-        { text: 'Masuk', onPress: () => router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } }) },
-      ]);
+      // The login screen explains itself and returns here afterwards; a confirm dialog only adds a tap.
+      router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } });
       return;
     }
 
@@ -258,7 +251,7 @@ export default function EventDetailScreen() {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={BRAND_COLORS.accent} />
-        <Text style={styles.loadingText}>Memuat detail konser & layout panggung...</Text>
+        <Text style={styles.loadingText}>Memuat konser…</Text>
       </View>
     );
   }
@@ -278,7 +271,15 @@ export default function EventDetailScreen() {
   }).format(totalPrice);
 
   const posterUri = getPosterImage(event as any);
-  const salesClosed = event.status !== 'open';
+  const isOver = isEventOver(event);
+  const salesClosed = event.status !== 'open' || isOver;
+  const closedReason = isOver
+    ? 'Acara ini sudah berlangsung'
+    : event.status !== 'open'
+      ? 'Penjualan tiket ditutup'
+      : event.maintenanceMode
+        ? 'Pemesanan sedang dalam pemeliharaan'
+        : null;
   const checkoutBlocked = event.maintenanceMode || salesClosed || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0;
 
   return (
@@ -324,23 +325,18 @@ export default function EventDetailScreen() {
         <View style={styles.mainContent}>
           <View style={styles.topMetaRow}>
             {event.publisherName && (
-              <View style={styles.publisherBadge}>
-                <Ionicons name="shield-checkmark-outline" size={12} color={BRAND_COLORS.accent} />
-                <Text style={styles.publisherText}>
-                  OFFICIAL BY {event.publisherName.toUpperCase()}
-                </Text>
-              </View>
+              <Text style={styles.publisherText} numberOfLines={1}>Oleh {event.publisherName}</Text>
             )}
 
             {salesClosed ? (
               <View style={[styles.statusOpenBadge, { backgroundColor: BRAND_COLORS.dangerBg, borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
                 <View style={[styles.statusDot, { backgroundColor: BRAND_COLORS.danger }]} />
-                <Text style={[styles.statusOpenText, { color: BRAND_COLORS.danger }]}>Penjualan Ditutup</Text>
+                <Text style={[styles.statusOpenText, { color: BRAND_COLORS.danger }]}>{isOver ? 'Sudah berlangsung' : 'Penjualan ditutup'}</Text>
               </View>
             ) : (
               <View style={styles.statusOpenBadge}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusOpenText}>Tiket Tersedia</Text>
+                <Text style={styles.statusOpenText}>Tiket tersedia</Text>
               </View>
             )}
           </View>
@@ -353,7 +349,7 @@ export default function EventDetailScreen() {
                 <Ionicons name="calendar-outline" size={17} color={BRAND_COLORS.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Tanggal & Waktu Acara</Text>
+                <Text style={styles.infoLabel}>Waktu</Text>
                 <Text style={styles.infoValue}>{formatDate(event.dateTime)} WIB</Text>
               </View>
             </View>
@@ -365,7 +361,7 @@ export default function EventDetailScreen() {
                 <Ionicons name="location-outline" size={17} color={BRAND_COLORS.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Lokasi Venue Konser</Text>
+                <Text style={styles.infoLabel}>Lokasi</Text>
                 <Text style={styles.infoValue}>
                   {event.venue ? `${event.venue.name}, ${event.venue.city}` : 'Venue TBA'}
                 </Text>
@@ -378,7 +374,7 @@ export default function EventDetailScreen() {
 
           {event.artist && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Lineup / Performer</Text>
+              <Text style={styles.sectionTitle}>Penampil</Text>
               <View style={styles.artistCard}>
                 <Image
                   source={{
@@ -415,9 +411,9 @@ export default function EventDetailScreen() {
 
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Pilih Kategori Tiket</Text>
+              <Text style={styles.sectionTitle}>Pilih tiket</Text>
               <Text style={styles.categoryCount}>
-                {event.ticketCategories?.length || 0} Pilihan
+                {event.ticketCategories?.length || 0} kategori
               </Text>
             </View>
 
@@ -479,7 +475,7 @@ export default function EventDetailScreen() {
 
           {event.description ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tentang Konser</Text>
+              <Text style={styles.sectionTitle}>Tentang acara</Text>
               <Text style={styles.descriptionText}>{event.description}</Text>
             </View>
           ) : null}
@@ -492,40 +488,39 @@ export default function EventDetailScreen() {
           { paddingBottom: Math.max(insets.bottom, 16) },
         ]}
       >
-        <View style={styles.footerPriceCol}>
-          <Text style={styles.footerPriceLabel} numberOfLines={1}>Total · {quantity} tiket</Text>
-          <Text style={styles.footerPriceValue}>{formattedTotalPrice}</Text>
-          {selectedCategory && (
-            <Text style={styles.footerCategoryBadge} numberOfLines={1}>
-              {selectedCategory.name}
-            </Text>
-          )}
-        </View>
+        {closedReason ? (
+          // Showing a price next to a disabled button read as "you could buy this"; say why instead.
+          <View style={styles.footerClosed}>
+            <Ionicons name={isOver ? 'time-outline' : 'lock-closed-outline'} size={18} color="#52525B" />
+            <Text style={styles.footerClosedText}>{closedReason}</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.footerPriceCol}>
+              <Text style={styles.footerPriceLabel} numberOfLines={1}>
+                {selectedCategory ? `${selectedCategory.name} · ${quantity} tiket` : 'Pilih kategori tiket'}
+              </Text>
+              <Text style={styles.footerPriceValue}>{formattedTotalPrice}</Text>
+            </View>
 
-        <Animated.View style={checkoutAnimatedStyle}>
-          <TouchableOpacity
-            style={[
-              styles.checkoutBtn,
-              checkoutBlocked && styles.checkoutBtnDisabled,
-            ]}
-            disabled={checkoutBlocked}
-            onPressIn={() => {
-              if (!checkoutBlocked) {
-                checkoutScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
-              }
-            }}
-            onPressOut={() => {
-              checkoutScale.set(withSpring(1, MOTION_TOKENS.springSnappy));
-            }}
-            onPress={handleCheckout}
-            activeOpacity={1}
-            accessibilityRole="button"
-            accessibilityLabel={event?.maintenanceMode || salesClosed ? 'Pemesanan ditutup' : 'Beli Tiket Sekarang'}
-          >
-            <Text style={styles.checkoutBtnText}>{event?.maintenanceMode || salesClosed ? 'Pemesanan Ditutup' : 'Lanjut Checkout'}</Text>
-            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-        </Animated.View>
+            <Animated.View style={checkoutAnimatedStyle}>
+              <TouchableOpacity
+                style={[styles.checkoutBtn, checkoutBlocked && styles.checkoutBtnDisabled]}
+                disabled={checkoutBlocked}
+                onPressIn={() => {
+                  if (!checkoutBlocked) checkoutScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
+                }}
+                onPressOut={() => checkoutScale.set(withSpring(1, MOTION_TOKENS.springSnappy))}
+                onPress={handleCheckout}
+                activeOpacity={1}
+                accessibilityRole="button"
+                accessibilityLabel="Beli tiket"
+              >
+                <Text style={styles.checkoutBtnText}>Beli tiket</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -534,7 +529,7 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: '#FFFFFF',
   },
   centerContainer: {
     flex: 1,
@@ -572,7 +567,7 @@ const styles = StyleSheet.create({
   },
   coverWrapper: {
     width: '100%',
-    height: 250,
+    height: 300,
     position: 'relative',
     backgroundColor: '#FFFFFF',
   },
@@ -580,8 +575,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  // Content rises over the cover like a sheet, the usual pattern for event detail apps.
   mainContent: {
-    padding: 16,
+    padding: 20,
+    marginTop: -24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#FFFFFF',
   },
   topMetaRow: {
     flexDirection: 'row',
@@ -601,10 +601,11 @@ const styles = StyleSheet.create({
     borderColor: BRAND_COLORS.borderGold,
   },
   publisherText: {
-    color: BRAND_COLORS.accent,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    flexShrink: 1,
+    color: '#71717A',
+    fontSize: 13,
+    fontWeight: '600',
+    marginRight: 12,
   },
   statusOpenBadge: {
     flexDirection: 'row',
@@ -629,21 +630,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   title: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '800',
     color: '#18181B',
-    lineHeight: 28,
+    lineHeight: 32,
     marginBottom: 16,
     letterSpacing: -0.4,
   },
 
   infoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
+    marginBottom: 28,
   },
   infoRow: {
     flexDirection: 'row',
@@ -653,12 +649,10 @@ const styles = StyleSheet.create({
   infoIconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 10,
-    backgroundColor: '#F4F4F5',
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 165, 36, 0.14)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
   },
   infoLabel: {
     fontSize: 11,
@@ -683,17 +677,18 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    marginBottom: 16,
+    marginBottom: 28,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 0,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    marginBottom: 12,
+    fontWeight: '800',
     color: '#18181B',
     letterSpacing: -0.2,
   },
@@ -703,14 +698,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   artistCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
+    gap: 14,
   },
   artistPhoto: {
     width: 56,
@@ -789,6 +779,8 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
 
+  footerClosed: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 52 },
+  footerClosedText: { fontSize: 15, fontWeight: '700', color: '#3F3F46' },
   stickyFooter: {
     position: 'absolute',
     bottom: 0,
@@ -826,10 +818,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   checkoutBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-    borderRadius: 12,
-    backgroundColor: BRAND_COLORS.accent,
+    paddingHorizontal: 28,
+    paddingVertical: 15,
+    borderRadius: 26,
+    backgroundColor: '#18181B',
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -841,7 +834,7 @@ const styles = StyleSheet.create({
   },
   checkoutBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
+    fontWeight: '800',
+    fontSize: 15,
   },
 });

@@ -72,7 +72,7 @@ export default function RegisterScreen() {
   ];
 
   const iconColor = (field: string) =>
-    focusedField === field ? '#7C3AED' : '#71717A';
+    focusedField === field ? '#B4630A' : '#71717A';
 
   return (
     <KeyboardAvoidingView
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#B4630A',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   inputWrapperFocused: {
-    borderColor: '#7C3AED',
+    borderColor: '#B4630A',
   },
   inputIcon: {
     marginRight: 8,
@@ -329,8 +329,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingVertical: 14,
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#7C3AED',
+    borderRadius: 26,
+    backgroundColor: '#18181B',
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   linkHighlight: {
-    color: '#7C3AED',
+    color: '#B4630A',
     fontSize: 13,
     fontWeight: '700',
   },

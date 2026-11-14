@@ -183,7 +183,7 @@ function TicketCard({ item, onPress }: TicketCardProps) {
 export default function TicketsScreen() {
   const token = useAuthStore((state) => state.token);
   const [activeTab, setActiveTab] = useState<'active' | 'all'>('active');
-  const data = useCustomerOrders(activeTab === 'active' ? 'active' : 'all');
+  const data = useCustomerOrders(activeTab === 'active' ? 'active' : 'verified');
   const { items: filteredOrders, loading, offline: isOffline, error } = data;
   const refreshing = loading && filteredOrders.length > 0;
   const onRefresh = data.reload;
@@ -220,11 +220,6 @@ export default function TicketsScreen() {
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
         <View>
           <Text style={styles.headerTitle}>Tiket Saya</Text>
-          <Text style={styles.headerSub}>E-Tiket resmi & akses barcode gate</Text>
-        </View>
-        <View style={styles.activeCountBadge}>
-          <View style={styles.activeCountDot} />
-          <Text style={styles.activeCountText}>{activeTicketsCount} Tiket Aktif</Text>
         </View>
       </View>
 
@@ -248,10 +243,10 @@ export default function TicketsScreen() {
           }}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Filter Tiket Aktif"
+          accessibilityLabel="Tiket akan datang"
         >
           <Text style={[styles.tabBtnText, activeTab === 'active' && styles.tabBtnTextActive]}>
-            Tiket Aktif ({activeTicketsCount})
+            Akan datang{activeTicketsCount ? ` · ${activeTicketsCount}` : ''}
           </Text>
         </TouchableOpacity>
 
@@ -267,10 +262,10 @@ export default function TicketsScreen() {
           }}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Filter Semua Riwayat"
+          accessibilityLabel="Semua tiket lunas"
         >
           <Text style={[styles.tabBtnText, activeTab === 'all' && styles.tabBtnTextActive]}>
-            Semua Riwayat ({data.summary.totalOrders})
+            Semua tiket{data.summary.verified ? ` · ${data.summary.verified}` : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -279,7 +274,7 @@ export default function TicketsScreen() {
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={BRAND_COLORS.accent} />
-          <Text style={styles.loadingText}>Memuat tiket digital...</Text>
+          <Text style={styles.loadingText}>Memuat tiket…</Text>
         </View>
       ) : (
         <FlatList
@@ -304,7 +299,7 @@ export default function TicketsScreen() {
               <View style={styles.offlineNoticeBox}>
                 <Ionicons name="shield-checkmark" size={15} color={BRAND_COLORS.success} />
                 <Text style={styles.offlineNoticeText}>
-                  QR Code e-tiket tersimpan aman di perangkat dan siap di-scan tanpa perlu koneksi internet saat di venue.
+                  Buka tiketmu sekali saat online, QR-nya tetap bisa dibuka tanpa internet di venue.
                 </Text>
               </View>
             ) : null
@@ -321,12 +316,12 @@ export default function TicketsScreen() {
                 <Ionicons name="ticket-outline" size={36} color="#71717A" />
               </View>
               <Text style={styles.emptyTitle}>
-                {activeTab === 'active' ? 'Belum Ada Tiket Aktif' : 'Belum Ada Riwayat Transaksi'}
+                {activeTab === 'active' ? 'Belum ada tiket untuk acara mendatang' : 'Belum ada tiket'}
               </Text>
               <Text style={styles.emptyText}>
                 {activeTab === 'active'
-                  ? 'Tiket konser yang telah berhasil dibayar akan otomatis terbit di sini lengkap dengan barcode QR gate check-in.'
-                  : 'Seluruh riwayat pesanan tiket konser Anda akan tercatat di halaman ini.'}
+                  ? 'Tiket yang sudah dibayar muncul di sini lengkap dengan QR untuk masuk venue.'
+                  : 'Tiket lunas, termasuk dari acara yang sudah lewat, tersimpan di sini.'}
               </Text>
               <TouchableOpacity
                 style={styles.exploreBtn}
@@ -355,17 +350,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: '#F6F6F8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4E4E7',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
     color: '#18181B',
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
   },
   headerSub: {
     fontSize: 11,
@@ -398,10 +391,11 @@ const styles = StyleSheet.create({
 
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-    backgroundColor: '#F6F6F8',
+    marginHorizontal: 20,
+    marginVertical: 8,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: '#E4E4E7',
   },
   tabBtn: {
     flex: 1,
@@ -409,22 +403,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
   },
   tabBtnActive: {
-    backgroundColor: '#F4F4F5',
-    borderColor: BRAND_COLORS.accent,
+    backgroundColor: '#FFFFFF',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
   },
   tabBtnText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#71717A',
+    color: '#52525B',
     fontVariant: ['tabular-nums'],
   },
   tabBtnTextActive: {
-    color: BRAND_COLORS.accent,
+    color: '#18181B',
     fontWeight: '700',
   },
 
@@ -664,11 +655,11 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(245, 165, 36, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
     marginBottom: 4,
   },
   promptTitle: {
@@ -716,9 +707,10 @@ const styles = StyleSheet.create({
     borderColor: '#E4E4E7',
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#18181B',
+    textAlign: 'center',
   },
   emptyText: {
     color: '#71717A',
@@ -746,9 +738,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: 'rgba(245, 165, 36, 0.1)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(124, 58, 237, 0.25)',
+    borderBottomColor: 'rgba(245, 165, 36, 0.25)',
     paddingHorizontal: 16,
     paddingVertical: 7,
   },

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
   Modal,
+  Pressable,
   TextInput,
   KeyboardAvoidingView,
   ActivityIndicator,
@@ -32,6 +33,7 @@ export default function ProfileScreen() {
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [infoSheet, setInfoSheet] = useState<{ title: string; message: string } | null>(null);
 
   // Change password modal state
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
@@ -188,7 +190,7 @@ export default function ProfileScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
     }
-    if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`); else Alert.alert(title, message);
+    setInfoSheet({ title, message });
   };
 
   if (!token) {
@@ -222,11 +224,6 @@ export default function ProfileScreen() {
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + (Platform.OS === 'android' ? 6 : 2) }]}>
         <View>
           <Text style={styles.headerTitle}>Akun Saya</Text>
-          <Text style={styles.headerSub}>Profil, keamanan & preferensi aplikasi</Text>
-        </View>
-        <View style={styles.securityBadge}>
-          <Ionicons name="shield-checkmark" size={11} color={BRAND_COLORS.success} />
-          <Text style={styles.securityBadgeText}>ENCRYPTED</Text>
         </View>
       </View>
 
@@ -244,15 +241,11 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.profileInfoCol}>
               <Text style={styles.userName} numberOfLines={1}>
-                {user?.name || 'Customer GG-Tix'}
+                {user?.name}
               </Text>
               <Text style={styles.userEmail} numberOfLines={1}>
-                {user?.email || 'customer@ggtix.com'}
+                {user?.email}
               </Text>
-              <View style={styles.memberPill}>
-                <Ionicons name="star" size={11} color={BRAND_COLORS.accent} />
-                <Text style={styles.memberPillText}>MEMBER RESMI GG-TIX</Text>
-              </View>
             </View>
           </View>
 
@@ -265,7 +258,7 @@ export default function ProfileScreen() {
               activeOpacity={0.75}
             >
               <Text style={styles.summaryValue}>{stats.activeTickets}</Text>
-              <Text style={styles.summaryLabel}>Tiket Aktif</Text>
+              <Text style={styles.summaryLabel}>Tiket mendatang</Text>
             </TouchableOpacity>
 
             <View style={styles.summaryDivider} />
@@ -276,19 +269,13 @@ export default function ProfileScreen() {
               activeOpacity={0.75}
             >
               <Text style={styles.summaryValue}>{stats.totalOrders}</Text>
-              <Text style={styles.summaryLabel}>Riwayat Order</Text>
+              <Text style={styles.summaryLabel}>Pesanan</Text>
             </TouchableOpacity>
 
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: BRAND_COLORS.success }]}>Aktif</Text>
-              <Text style={styles.summaryLabel}>Status Akun</Text>
-            </View>
           </View>
         </View>
 
-        {notice ? <Text style={{ color: '#7C3AED', padding: 16 }}>{notice}</Text> : null}
+        {notice ? <Text style={{ color: '#B4630A', padding: 16 }}>{notice}</Text> : null}
         <View style={styles.menuCard}>
           <TouchableOpacity style={styles.menuItem} onPress={() => { setName(user?.name || ''); setEmail(user?.email || ''); setProfileError(''); setEditProfile(true); }} accessibilityRole="button">
             <Ionicons name="person-outline" size={20} color={BRAND_COLORS.accent} /><View style={styles.menuTextCol}><Text style={styles.menuTitle}>Edit Profil</Text><Text style={styles.menuDesc}>Perbarui nama dan email akun</Text></View>
@@ -320,28 +307,6 @@ export default function ProfileScreen() {
               <View style={styles.menuTextCol}>
                 <Text style={styles.menuTitle}>Ubah Kata Sandi</Text>
                 <Text style={styles.menuDesc}>Perbarui kata sandi akun secara berkala</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#71717A" />
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() =>
-                handleMenuPress(
-                  'Privasi & Keamanan',
-                  'Seluruh data transaksi dan barcode e-tiket dilindungi enkripsi standar industri dan tersimpan aman di perangkat Anda.'
-                )
-              }
-              activeOpacity={0.75}
-            >
-              <View style={styles.menuIconBox}>
-                <Ionicons name="lock-closed-outline" size={18} color={BRAND_COLORS.accent} />
-              </View>
-              <View style={styles.menuTextCol}>
-                <Text style={styles.menuTitle}>Privasi & Keamanan Data</Text>
-                <Text style={styles.menuDesc}>Enkripsi data dan proteksi e-tiket resmi</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color="#71717A" />
             </TouchableOpacity>
@@ -544,6 +509,17 @@ export default function ProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <Modal visible={!!infoSheet} transparent animationType="slide" onRequestClose={() => setInfoSheet(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setInfoSheet(null)} accessibilityLabel="Tutup" />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetGrabber} />
+          <Text style={styles.sheetTitle}>{infoSheet?.title}</Text>
+          <Text style={styles.sheetBody}>{infoSheet?.message}</Text>
+          <Pressable style={styles.sheetBtn} onPress={() => setInfoSheet(null)} accessibilityRole="button">
+            <Text style={styles.sheetBtnText}>Mengerti</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -557,17 +533,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: '#F6F6F8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4E4E7',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
     color: '#18181B',
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
   },
   headerSub: {
     fontSize: 11,
@@ -643,13 +617,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(245, 165, 36, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
   },
   memberPillText: {
     color: BRAND_COLORS.accent,
@@ -663,6 +637,13 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
 
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 8 },
+  sheetGrabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: '#D4D4D8', marginBottom: 16 },
+  sheetTitle: { fontSize: 20, fontWeight: '800', color: '#18181B', marginBottom: 8, letterSpacing: -0.3 },
+  sheetBody: { fontSize: 15, lineHeight: 22, color: '#52525B' },
+  sheetBtn: { marginTop: 24, height: 52, borderRadius: 26, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' },
+  sheetBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   summaryBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -781,11 +762,11 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(245, 165, 36, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
     marginBottom: 4,
   },
   promptTitle: {
@@ -842,7 +823,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    backgroundColor: 'rgba(245, 165, 36, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },

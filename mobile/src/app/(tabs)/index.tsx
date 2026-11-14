@@ -1,144 +1,77 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  View,
   TextInput,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
-  StatusBar,
-  Platform,
-  Modal,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { apiEnvelope } from '../../services/api';
 import { collectPages } from '../../services/pagination';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { BRAND_COLORS } from '../../constants/config';
-import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
-import { EventCard, EventItem } from '../../components/EventCard';
+import { EventCard, EventItem, isEventOver } from '../../components/EventCard';
 import { HeroBannerCarousel } from '../../components/HeroBannerCarousel';
 import { HomeSkeletonLoader } from '../../components/SkeletonLoader';
 
-interface CityItem {
-  name: string;
-  label: string;
-  iconName: React.ComponentProps<typeof Ionicons>['name'];
-}
+const ALL_CITIES = 'Semua Kota';
+const ALL_TAGS = 'all';
+const CITY_KEY = '@ggtix_home_city';
 
-const CITY_LIST: CityItem[] = [
-  { name: 'Semua Kota', label: 'Semua', iconName: 'globe-outline' },
-  { name: 'Jakarta', label: 'Jakarta', iconName: 'business-outline' },
-  { name: 'Bandung', label: 'Bandung', iconName: 'cafe-outline' },
-  { name: 'Surabaya', label: 'Surabaya', iconName: 'water-outline' },
-  { name: 'Bali', label: 'Bali', iconName: 'sunny-outline' },
-  { name: 'Yogyakarta', label: 'Jogja', iconName: 'color-palette-outline' },
-  { name: 'Medan', label: 'Medan', iconName: 'trail-sign-outline' },
-];
+const tap = () => {
+  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+};
 
-const GENRE_CHIPS = [
-  { id: 'all', label: 'Semua', icon: 'apps-outline' },
-  { id: 'gaming', label: 'Gaming OST', icon: 'game-controller-outline' },
-  { id: 'anime', label: 'Anime & J-Pop', icon: 'sparkles-outline' },
-  { id: 'rock', label: 'Rock & Metal', icon: 'musical-notes-outline' },
-  { id: 'festival', label: 'Festival', icon: 'bonfire-outline' },
-  { id: 'kpop', label: 'K-Pop', icon: 'star-outline' },
-];
+const cityOf = (e: EventItem) => e.venue?.city?.trim() || '';
 
-interface CityCardItemProps {
-  item: CityItem & { count: number };
-  isSelected: boolean;
-  onSelect: () => void;
-}
-
-function CityCardItem({ item, isSelected, onSelect }: CityCardItemProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.set(withSpring(0.95, MOTION_TOKENS.springSnappy));
-  };
-
-  const handlePressOut = () => {
-    scale.set(withSpring(1, MOTION_TOKENS.springSnappy));
-  };
-
-  const handlePress = () => {
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-
-      }
-    }
-    onSelect();
-  };
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <TouchableOpacity
-        style={[styles.cityCard, isSelected && styles.cityCardActive]}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handlePress}
-        activeOpacity={1}
-        accessibilityRole="button"
-        accessibilityLabel={`Filter kota ${item.label}, ${item.count} konser`}
-      >
-        <View style={[styles.cityCardIconWrap, isSelected && styles.cityCardIconWrapActive]}>
-          <Ionicons
-            name={item.iconName}
-            size={18}
-            color={isSelected ? BRAND_COLORS.accent : '#52525B'}
-          />
-        </View>
-        <Text style={[styles.cityCardName, isSelected && styles.cityCardNameActive]} numberOfLines={1}>
-          {item.label}
-        </Text>
-        <Text style={[styles.cityCardCount, isSelected && styles.cityCardCountActive]}>
-          {item.count} Event
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
+function greeting() {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Jakarta' }).format(new Date()));
+  if (h < 11) return 'Selamat pagi';
+  if (h < 15) return 'Selamat siang';
+  if (h < 19) return 'Selamat sore';
+  return 'Selamat malam';
 }
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((s) => s.user);
 
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCity, setSelectedCity] = useState<string>('Jakarta');
-  const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [cityModalVisible, setCityModalVisible] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [city, setCity] = useState(ALL_CITIES);
+  const [tag, setTag] = useState(ALL_TAGS);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [now] = useState(() => Date.now());
 
-  // One loader for first load, pull-to-refresh and retry; a newer load or unmount aborts the older one.
-  const loadController = useRef<AbortController | null>(null);
-  const loadEvents = useCallback(async () => {
-    loadController.current?.abort();
+  const controllerRef = useRef<AbortController | null>(null);
+  const load = useCallback(async () => {
+    controllerRef.current?.abort();
     const controller = new AbortController();
-    loadController.current = controller;
+    controllerRef.current = controller;
     try {
-      const items = await collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`, { signal: controller.signal }));
-      if (!controller.signal.aborted) {
-        setEvents(items);
-        setErrorMessage(null);
-      }
+      const items = await collectPages<EventItem>((page) =>
+        apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`, { signal: controller.signal })
+      );
+      if (controller.signal.aborted) return;
+      // Sales can stay "open" after the show; past events are not something to buy.
+      setEvents(items.filter((e) => !isEventOver(e)).sort((a, b) => +new Date(a.dateTime) - +new Date(b.dateTime)));
+      setError(null);
     } catch (err: any) {
-      if (!controller.signal.aborted) setErrorMessage(err.message || 'Gagal memuat daftar konser');
+      if (!controller.signal.aborted) setError(err?.message || 'Gagal memuat daftar konser.');
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);
@@ -148,810 +81,295 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    loadController.current = controller;
-    collectPages<EventItem>(page => apiEnvelope<EventItem[]>(`/events?status=open&page=${page}&limit=100`, { signal: controller.signal }))
-      .then((items) => { if (!controller.signal.aborted) setEvents(items); })
-      .catch((err: any) => { if (!controller.signal.aborted) setErrorMessage(err.message || 'Gagal memuat daftar konser'); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => loadController.current?.abort();
-  }, []);
+    // Fetch-on-mount: state is only set after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+    AsyncStorage.getItem(CITY_KEY).then((saved) => { if (saved) setCity(saved); }).catch(() => {});
+    return () => controllerRef.current?.abort();
+  }, [load]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadEvents();
-  }, [loadEvents]);
+  const chooseCity = (name: string) => {
+    tap();
+    setCity(name);
+    setCityOpen(false);
+    AsyncStorage.setItem(CITY_KEY, name).catch(() => {});
+  };
 
-  const filteredEvents = useMemo(() => {
-    let result = events;
-
-    if (selectedGenre !== 'all') {
-      result = result.filter((evt) => {
-        const text = `${evt.title} ${evt.tags?.join(' ') || ''} ${evt.description || ''}`.toLowerCase();
-        if (selectedGenre === 'gaming') return text.includes('game') || text.includes('genshin') || text.includes('esports') || text.includes('ost');
-        if (selectedGenre === 'anime') return text.includes('anime') || text.includes('j-pop') || text.includes('japan') || text.includes('vocaloid');
-        if (selectedGenre === 'rock') return text.includes('rock') || text.includes('metal') || text.includes('band');
-        if (selectedGenre === 'festival') return text.includes('fest') || text.includes('symphony');
-        if (selectedGenre === 'kpop') return text.includes('k-pop') || text.includes('kpop') || text.includes('korea');
-        return true;
-      });
+  // Cities and tags come from the data, so a new venue city shows up without an app update.
+  const cities = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of events) {
+      const c = cityOf(e);
+      if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
     }
-
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      result = result.filter((evt) => {
-        return (
-          evt.title.toLowerCase().includes(q) ||
-          (evt.artist?.name && evt.artist.name.toLowerCase().includes(q)) ||
-          (evt.venue?.name && evt.venue.name.toLowerCase().includes(q)) ||
-          (evt.venue?.city && evt.venue.city.toLowerCase().includes(q)) ||
-          (evt.publisherName && evt.publisherName.toLowerCase().includes(q))
-        );
-      });
-    }
-
-    return result;
-  }, [events, searchQuery, selectedGenre]);
-
-  const heroBanners = useMemo(() => {
-    return events.slice(0, 4);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [events]);
 
-  const hypeEvents = useMemo(() => {
-    return events.slice(0, 6);
-  }, [events]);
+  // A remembered city that no longer has events falls back to everything instead of an empty home.
+  const activeCity = city === ALL_CITIES || cities.some(([c]) => c === city) ? city : ALL_CITIES;
 
-  const cityCards = useMemo(() => {
-    return CITY_LIST.map((c) => {
-      if (c.name === 'Semua Kota') {
-        return { ...c, count: events.length };
-      }
-      const count = events.filter((evt) =>
-        evt.venue?.city?.toLowerCase().includes(c.name.toLowerCase())
-      ).length;
-      return { ...c, count };
-    });
-  }, [events]);
+  const inCity = useMemo(
+    () => (activeCity === ALL_CITIES ? events : events.filter((e) => cityOf(e) === activeCity)),
+    [events, activeCity]
+  );
 
-  const localEvents = useMemo(() => {
-    if (selectedCity === 'Semua Kota') return filteredEvents;
-    return filteredEvents.filter((evt) => {
-      const city = evt.venue?.city?.toLowerCase() || '';
-      return city.includes(selectedCity.toLowerCase());
-    });
-  }, [filteredEvents, selectedCity]);
+  const tags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of inCity) for (const t of e.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
+  }, [inCity]);
+  const activeTag = tag === ALL_TAGS || tags.includes(tag) ? tag : ALL_TAGS;
 
-  const isSearching = searchQuery.trim().length > 0;
+  const visible = useMemo(
+    () => (activeTag === ALL_TAGS ? inCity : inCity.filter((e) => e.tags?.includes(activeTag))),
+    [inCity, activeTag]
+  );
+
+  const q = query.trim().toLowerCase();
+  const results = useMemo(() => {
+    if (!q) return [];
+    return events.filter((e) =>
+      [e.title, e.artist?.name, e.venue?.name, e.venue?.city, e.publisherName]
+        .some((v) => v?.toLowerCase().includes(q))
+    );
+  }, [events, q]);
+
+  const featured = visible.slice(0, 4);
+  const thisWeek = visible.filter((e) => +new Date(e.dateTime) - now < 7 * 86400000);
+  const firstName = user?.name?.split(' ')[0];
 
   return (
-    <View style={styles.screenContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
 
-      <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 12) + 6 }]}>
-        <View style={styles.headerLeft}>
-          <View style={styles.brandBadge}>
-            <Text style={styles.brandText}>GG</Text>
-            <View style={styles.brandDot} />
-          </View>
-          <View>
-            <Text style={styles.greetingSubText}>Eksklusif Konser</Text>
-            <TouchableOpacity
-              style={styles.locationSelectorBtn}
-              onPress={() => setCityModalVisible(true)}
-              activeOpacity={0.8}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting}>{greeting()}{firstName ? `, ${firstName}` : ''}</Text>
+            <Pressable
+              onPress={() => { tap(); setCityOpen(true); }}
+              style={styles.cityPill}
+              hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`Pilih kota konser, saat ini ${selectedCity}`}
+              accessibilityLabel={`Pilih kota, saat ini ${activeCity}`}
             >
-              <Ionicons name="location" size={13} color={BRAND_COLORS.accent} />
-              <Text style={styles.locationSelectorText} numberOfLines={1}>{selectedCity}</Text>
-              <Ionicons name="chevron-down" size={11} color="#52525B" />
-            </TouchableOpacity>
+              <Ionicons name="location" size={16} color={BRAND_COLORS.accent} />
+              <Text style={styles.cityPillText} numberOfLines={1}>{activeCity}</Text>
+              <Ionicons name="chevron-down" size={16} color="#18181B" />
+            </Pressable>
           </View>
-        </View>
-
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => {}}
-            activeOpacity={0.8}
+          <Pressable
+            onPress={() => router.push(user ? '/(tabs)/profile' : '/auth/login')}
+            style={styles.avatar}
             accessibilityRole="button"
-            accessibilityLabel="Notifikasi"
-          >
-            <Ionicons name="notifications-outline" size={18} color="#18181B" />
-            <View style={styles.notificationDot} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.push('/(tabs)/profile')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={user ? `Profil ${user.name}` : 'Buka Halaman Masuk'}
+            accessibilityLabel={user ? `Profil ${user.name}` : 'Masuk'}
           >
             {user ? (
-              <View style={styles.userAvatar}>
-                <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
-              </View>
+              <Text style={styles.avatarText}>{user.name.slice(0, 1).toUpperCase()}</Text>
             ) : (
-              <Ionicons name="person-outline" size={18} color="#52525B" />
+              <Ionicons name="person-outline" size={18} color="#18181B" />
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
-      </View>
 
-      <View style={styles.searchFilterWrapper}>
-        <View style={styles.searchBarContainer}>
-          <Ionicons name="search-outline" size={18} color="#71717A" style={styles.searchIcon} />
+        <View style={styles.search}>
+          <Ionicons name="search" size={18} color="#71717A" />
           <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Cari konser, artis, atau venue"
+            placeholderTextColor="#A1A1AA"
             style={styles.searchInput}
-            placeholder="Cari konser impian, artis, atau venue..."
-            placeholderTextColor="#71717A"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
             returnKeyType="search"
-            accessibilityLabel="Input pencarian konser"
+            accessibilityLabel="Cari konser"
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              style={styles.clearSearchBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Hapus teks pencarian"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close-circle" size={16} color="#71717A" />
-            </TouchableOpacity>
-          )}
+          {query ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Hapus pencarian">
+              <Ionicons name="close-circle" size={18} color="#A1A1AA" />
+            </Pressable>
+          ) : null}
         </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.genreScroll}
-        >
-          {GENRE_CHIPS.map((genre) => {
-            const isActive = selectedGenre === genre.id;
-            return (
-              <TouchableOpacity
-                key={genre.id}
-                style={[styles.genreChip, isActive && styles.genreChipActive]}
-                onPress={() => {
-                  if (Platform.OS !== 'web') {
-                    try {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    } catch {}
-                  }
-                  setSelectedGenre(genre.id);
-                }}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter genre ${genre.label}`}
-              >
-                <Ionicons
-                  name={genre.icon as any}
-                  size={14}
-                  color={isActive ? '#FFFFFF' : '#52525B'}
-                />
-                <Text style={[styles.genreChipText, isActive && styles.genreChipTextActive]}>
-                  {genre.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
       <ScrollView
-        style={styles.mainScroll}
-        contentContainerStyle={styles.mainScrollContent}
+        contentContainerStyle={{ paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={BRAND_COLORS.accent}
-            colors={[BRAND_COLORS.accent]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={BRAND_COLORS.accent} colors={[BRAND_COLORS.accent]} />
         }
       >
-        {loading && !refreshing ? (
+        {loading ? (
           <HomeSkeletonLoader />
-        ) : errorMessage ? (
-          <View style={styles.errorContainer}>
-            <View style={styles.errorIconBox}>
-              <Ionicons name="alert-circle" size={28} color={BRAND_COLORS.danger} />
-            </View>
-            <Text style={styles.errorTitle}>Koneksi Bermasalah</Text>
-            <Text style={styles.errorSubtitle}>{errorMessage}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadEvents}
-              accessibilityRole="button"
-              accessibilityLabel="Coba muat ulang daftar konser"
-            >
-              <Ionicons name="refresh" size={14} color="#18181B" />
-              <Text style={styles.retryButtonText}>Muat Ulang</Text>
-            </TouchableOpacity>
-          </View>
-        ) : isSearching ? (
-          <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Hasil Pencarian</Text>
-              <Text style={styles.sectionBadgeCount}>{filteredEvents.length} Ditemukan</Text>
-            </View>
-
-            {filteredEvents.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Ionicons name="search" size={32} color="#A1A1AA" />
-                <Text style={styles.emptyTitle}>Konser Tidak Ditemukan</Text>
-                <Text style={styles.emptySubtitle}>Tidak ada jadwal yang cocok dengan kata kunci &quot;{searchQuery}&quot;</Text>
-              </View>
+        ) : error && !events.length ? (
+          <State
+            icon="cloud-offline-outline"
+            title="Tidak bisa terhubung"
+            body={error}
+            action="Coba lagi"
+            onAction={() => { setLoading(true); load(); }}
+          />
+        ) : q ? (
+          <View style={styles.section}>
+            <Text style={styles.resultCount}>{results.length} hasil untuk “{query.trim()}”</Text>
+            {results.length ? (
+              results.map((e) => <EventCard key={e.id} event={e} variant="row" />)
             ) : (
-              filteredEvents.map((evt) => (
-                <EventCard key={`search-${evt.id}`} event={evt} variant="row" />
-              ))
+              <State icon="search-outline" title="Tidak ada yang cocok" body="Coba nama artis, venue, atau kota lain." />
             )}
           </View>
         ) : (
-          <View>
-            {heroBanners.length > 0 && (
-              <View style={styles.heroSection}>
-                <HeroBannerCarousel
-                  items={heroBanners}
-                  onPressItem={(item) => router.push(`/event/${item.id}`)}
-                />
-              </View>
-            )}
-
-            {hypeEvents.length > 0 && (
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionTitleRow}>
-                    <View style={styles.accentIndicator} />
-                    <Text style={styles.sectionTitle}>Sedang Hype & Tren</Text>
-                  </View>
-                  <Text style={styles.sectionActionText}>Paling dicari fans</Text>
-                </View>
-
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalCardList}
-                >
-                  {hypeEvents.map((evt) => (
-                    <EventCard key={`hype-${evt.id}`} event={evt} variant="portrait" />
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            <View style={styles.sectionBlock}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionTitleRow, { flex: 1, minWidth: 0, marginRight: 12 }]}>
-                  <View style={styles.accentIndicator} />
-                  <Text style={[styles.sectionTitle, { flexShrink: 1 }]} numberOfLines={1}>Jelajahi per Kota</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setCityModalVisible(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Lihat semua pilihan kota"
-                >
-                  <Text style={styles.sectionActionLink}>Lihat semua</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cityScrollContent}
-                style={styles.cityScrollWrapper}
-              >
-                {cityCards.map((c) => (
-                  <CityCardItem
-                    key={`city-${c.name}`}
-                    item={c}
-                    isSelected={selectedCity === c.name}
-                    onSelect={() => setSelectedCity(c.name)}
-                  />
-                ))}
+          <>
+            {tags.length > 1 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {[ALL_TAGS, ...tags].map((t) => {
+                  const on = t === activeTag;
+                  return (
+                    <Pressable
+                      key={t}
+                      onPress={() => { tap(); setTag(t); }}
+                      style={[styles.chip, on && styles.chipOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{t === ALL_TAGS ? 'Semua' : t}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
+            ) : null}
 
-              <View style={styles.cityFeedSubHeader}>
-                <Text style={styles.cityFeedTitle}>Konser di {selectedCity}</Text>
-                <Text style={styles.cityFeedCount}>{localEvents.length} Event Aktif</Text>
-              </View>
-
-              {localEvents.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="location-outline" size={32} color="#A1A1AA" />
-                  <Text style={styles.emptyTitle}>Belum Ada Konser di {selectedCity}</Text>
-                  <Text style={styles.emptySubtitle}>Pilih kota lainnya atau cek jadwal di seluruh Indonesia.</Text>
+            {visible.length === 0 ? (
+              <State
+                icon="calendar-clear-outline"
+                title={`Belum ada konser di ${activeCity}`}
+                body="Jadwal baru akan muncul di sini. Sementara itu, lihat kota lain."
+                action="Lihat semua kota"
+                onAction={() => chooseCity(ALL_CITIES)}
+              />
+            ) : (
+              <>
+                <View style={styles.heroWrap}>
+                  <HeroBannerCarousel items={featured} onPressItem={(item) => router.push(`/event/${item.id}`)} />
                 </View>
-              ) : (
-                localEvents.map((evt) => (
-                  <EventCard key={`local-${evt.id}`} event={evt} variant="row" />
-                ))
-              )}
-            </View>
-          </View>
+
+                {thisWeek.length > 0 ? (
+                  <View style={styles.section}>
+                    <SectionTitle title="Minggu ini" />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+                      {thisWeek.map((e) => <EventCard key={e.id} event={e} variant="portrait" />)}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
+                <View style={styles.section}>
+                  <SectionTitle title={activeCity === ALL_CITIES ? 'Semua konser' : `Konser di ${activeCity}`} meta={`${visible.length} acara`} />
+                  {visible.map((e) => <EventCard key={e.id} event={e} variant="row" />)}
+                </View>
+              </>
+            )}
+          </>
         )}
-
-        <View style={styles.bottomSpacer} />
       </ScrollView>
-      <Modal
-        visible={cityModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCityModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setCityModalVisible(false)}
-        >
-          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 24) + 12 }]}>
-            <View style={styles.modalHandleBar} />
-            <Text style={styles.modalTitle}>Pilih Kota Konser</Text>
-            <Text style={styles.modalSubtitle}>Temukan kemeriahan event musik di kotamu</Text>
 
-            <View style={styles.modalGrid}>
-              {CITY_LIST.map((city) => {
-                const isSelected = selectedCity === city.name;
-                return (
-                  <TouchableOpacity
-                    key={`modal-city-${city.name}`}
-                    style={[styles.modalCityCard, isSelected && styles.modalCityCardActive]}
-                    onPress={() => {
-                      if (Platform.OS !== 'web') {
-                        try {
-                          Haptics.selectionAsync();
-                        } catch {}
-                      }
-                      setSelectedCity(city.name);
-                      setCityModalVisible(false);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Pilih kota ${city.name}`}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={city.iconName}
-                      size={18}
-                      color={isSelected ? BRAND_COLORS.accent : '#52525B'}
-                    />
-                    <Text style={[styles.modalCityText, isSelected && styles.modalCityTextActive]}>
-                      {city.name}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={18} color={BRAND_COLORS.accent} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </TouchableOpacity>
+      <Modal visible={cityOpen} transparent animationType="slide" onRequestClose={() => setCityOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setCityOpen(false)} accessibilityLabel="Tutup pilihan kota" />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={styles.grabber} />
+          <Text style={styles.sheetTitle}>Pilih kota</Text>
+          <ScrollView style={{ maxHeight: 420 }}>
+            {[[ALL_CITIES, events.length] as [string, number], ...cities].map(([name, count]) => {
+              const on = name === activeCity;
+              return (
+                <Pressable
+                  key={name}
+                  onPress={() => chooseCity(name)}
+                  style={({ pressed }) => [styles.cityRow, pressed && { backgroundColor: '#F4F4F5' }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                >
+                  <Ionicons name={name === ALL_CITIES ? 'globe-outline' : 'location-outline'} size={20} color={on ? BRAND_COLORS.accent : '#52525B'} />
+                  <Text style={[styles.cityRowText, on && { color: BRAND_COLORS.accent }]}>{name}</Text>
+                  <Text style={styles.cityRowCount}>{count}</Text>
+                  {on ? <Ionicons name="checkmark" size={20} color={BRAND_COLORS.accent} /> : <View style={{ width: 20 }} />}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
       </Modal>
     </View>
   );
 }
 
+function SectionTitle({ title, meta }: { title: string; meta?: string }) {
+  return (
+    <View style={styles.sectionHead}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {meta ? <Text style={styles.sectionMeta}>{meta}</Text> : null}
+    </View>
+  );
+}
+
+function State({ icon, title, body, action, onAction }: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  body: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.state}>
+      <View style={styles.stateIcon}><Ionicons name={icon} size={26} color="#52525B" /></View>
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateBody}>{body}</Text>
+      {action && onAction ? (
+        <Pressable onPress={onAction} style={styles.stateBtn} accessibilityRole="button">
+          <Text style={styles.stateBtnText}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screenContainer: {
-    flex: 1,
-    backgroundColor: '#EFEFF2',
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#EFEFF2',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4E4E7',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  brandBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 2,
-  },
-  brandText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#18181B',
-    letterSpacing: 0.5,
-  },
-  brandDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: BRAND_COLORS.accent,
-  },
-  greetingSubText: {
-    fontSize: 10,
-    color: '#71717A',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  locationSelectorBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  locationSelectorText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#18181B',
-    maxWidth: 130,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 9,
-    right: 9,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: BRAND_COLORS.accent,
-  },
-  userAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: BRAND_COLORS.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userAvatarText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: { paddingHorizontal: 20, paddingBottom: 12, backgroundColor: '#FFFFFF' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  greeting: { fontSize: 13, color: '#71717A', fontWeight: '500' },
+  cityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, alignSelf: 'flex-start', minHeight: 32 },
+  cityPillText: { fontSize: 20, fontWeight: '800', color: '#18181B', letterSpacing: -0.4, maxWidth: 220 },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F4F4F5', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 16, fontWeight: '800', color: '#18181B' },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, borderRadius: 14, paddingHorizontal: 14, backgroundColor: '#F4F4F5' },
+  searchInput: { flex: 1, fontSize: 15, color: '#18181B', paddingVertical: 0 },
 
-  searchFilterWrapper: {
-    backgroundColor: '#EFEFF2',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4E4E7',
-  },
-  searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    borderWidth: 1,
-    borderColor: '#EBEBEF',
-    marginBottom: 10,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#18181B',
-    paddingVertical: 0,
-  },
-  clearSearchBtn: {
-    padding: 4,
-  },
-  genreScroll: {
-    gap: 8,
-    paddingVertical: 2,
-  },
-  genreChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EBEBEF',
-  },
-  genreChipActive: {
-    backgroundColor: BRAND_COLORS.accent,
-    borderColor: BRAND_COLORS.accent,
-  },
-  genreChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#52525B',
-  },
-  genreChipTextActive: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
+  chips: { paddingHorizontal: 20, gap: 8, paddingVertical: 4 },
+  chip: { height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#F4F4F5', justifyContent: 'center' },
+  chipOn: { backgroundColor: '#18181B' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#3F3F46' },
+  chipTextOn: { color: '#FFFFFF' },
 
-  mainScroll: {
-    flex: 1,
-  },
-  mainScrollContent: {
-    paddingBottom: 40,
-  },
-  heroSection: {
-    marginTop: 4,
-    marginBottom: 8,
-  },
+  heroWrap: { marginTop: 16 },
+  section: { paddingHorizontal: 20, marginTop: 28, gap: 12 },
+  sectionHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#18181B', letterSpacing: -0.3 },
+  sectionMeta: { fontSize: 13, color: '#71717A', fontWeight: '500' },
+  rail: { gap: 12, paddingRight: 20 },
+  resultCount: { fontSize: 13, color: '#71717A', fontWeight: '500' },
 
-  sectionBlock: {
-    marginTop: 20,
-    paddingHorizontal: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  accentIndicator: {
-    width: 3,
-    height: 16,
-    borderRadius: 1.5,
-    backgroundColor: BRAND_COLORS.accent,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#18181B',
-    letterSpacing: -0.2,
-  },
-  sectionActionText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#71717A',
-  },
-  sectionActionLink: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BRAND_COLORS.accent,
-  },
-  sectionBadgeCount: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BRAND_COLORS.accent,
-  },
-  horizontalCardList: {
-    gap: 12,
-    paddingBottom: 4,
-  },
+  state: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 56, gap: 8 },
+  stateIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#F4F4F5', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  stateTitle: { fontSize: 17, fontWeight: '700', color: '#18181B', textAlign: 'center' },
+  stateBody: { fontSize: 14, color: '#71717A', textAlign: 'center', lineHeight: 20 },
+  stateBtn: { marginTop: 12, height: 44, paddingHorizontal: 20, borderRadius: 22, backgroundColor: '#18181B', justifyContent: 'center' },
+  stateBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 
-  cityScrollWrapper: {
-    marginBottom: 16,
-  },
-  cityScrollContent: {
-    gap: 10,
-  },
-  cityCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    width: 100,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EBEBEF',
-    gap: 6,
-  },
-  cityCardActive: {
-    backgroundColor: BRAND_COLORS.accentGlow,
-    borderColor: BRAND_COLORS.accent,
-  },
-  cityCardIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#F4F4F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cityCardIconWrapActive: {
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-  },
-  cityCardName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#52525B',
-  },
-  cityCardNameActive: {
-    color: '#18181B',
-  },
-  cityCardCount: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#71717A',
-  },
-  cityCardCountActive: {
-    color: BRAND_COLORS.accent,
-  },
-
-  cityFeedSubHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  cityFeedTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  cityFeedCount: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#71717A',
-  },
-
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EBEBEF',
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: '#71717A',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-
-  errorContainer: {
-    margin: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.25)',
-    gap: 10,
-  },
-  errorIconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#18181B',
-  },
-  errorSubtitle: {
-    fontSize: 12,
-    color: '#52525B',
-    textAlign: 'center',
-    marginBottom: 6,
-    lineHeight: 16,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#E4E4E7',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  retryButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-
-  bottomSpacer: {
-    height: 30,
-  },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#EBEBEF',
-  },
-  modalHandleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D4D4D8',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#18181B',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    color: '#71717A',
-    marginBottom: 20,
-  },
-  modalGrid: {
-    gap: 10,
-    marginBottom: 12,
-  },
-  modalCityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#F6F6F8',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EBEBEF',
-  },
-  modalCityCardActive: {
-    backgroundColor: BRAND_COLORS.accentGlow,
-    borderColor: BRAND_COLORS.accent,
-  },
-  modalCityText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#52525B',
-  },
-  modalCityTextActive: {
-    color: '#18181B',
-  },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingHorizontal: 12 },
+  grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: '#D4D4D8', marginBottom: 12 },
+  sheetTitle: { fontSize: 17, fontWeight: '800', color: '#18181B', paddingHorizontal: 8, marginBottom: 8 },
+  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 8, borderRadius: 12 },
+  cityRowText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#18181B' },
+  cityRowCount: { fontSize: 13, color: '#A1A1AA', fontWeight: '600' },
 });

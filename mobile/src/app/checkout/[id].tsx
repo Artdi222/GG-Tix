@@ -74,10 +74,13 @@ export default function CheckoutScreen() {
   // Promo code & voucher discount state
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
-  const [appliedPromo, setAppliedPromo] = useState<{
+  const [promoState, setAppliedPromo] = useState<{
     valid: boolean; code: string; name: string;
     subtotalPrice: string; discountAmount: string; totalPrice: string;
+    quantity: number;
   } | null>(null);
+  // A promo is priced for one quantity; if the clamp changes it after the event loads, it no longer applies.
+  const appliedPromo = promoState?.quantity === quantity ? promoState : null;
   const [promoError, setPromoError] = useState('');
 
   const discountAmount = Number(appliedPromo?.discountAmount || 0);
@@ -143,6 +146,7 @@ export default function CheckoutScreen() {
   };
 
   const handleApplyPromo = async () => {
+    if (!canPay) return;
     const code = promoCodeInput.trim().toUpperCase();
     if (!code) {
       setPromoError('Masukkan kode promo terlebih dahulu');
@@ -171,7 +175,7 @@ export default function CheckoutScreen() {
 
       const promoData = res.data || res;
       if (promoData.valid) {
-        setAppliedPromo(promoData);
+        setAppliedPromo({ ...promoData, quantity });
         setPromoCodeInput('');
       } else {
         setPromoError(promoData.message || 'Kode promo tidak dapat digunakan');
@@ -252,10 +256,7 @@ export default function CheckoutScreen() {
           <Ionicons name="arrow-back" size={20} color="#18181B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Konfirmasi Pembayaran</Text>
-        <View style={styles.sslBadge}>
-          <Ionicons name="lock-closed" size={11} color={BRAND_COLORS.success} />
-          <Text style={styles.sslBadgeText}>256-BIT SSL</Text>
-        </View>
+        <View style={styles.headerSpacer} />
       </View>
 
       {loadError || blockedReason ? (
@@ -387,8 +388,8 @@ export default function CheckoutScreen() {
                   autoCorrect={false}
                 />
                 <TouchableOpacity
-                  style={[styles.promoApplyBtn, isApplyingPromo && { opacity: 0.6 }]}
-                  disabled={isApplyingPromo || !promoCodeInput.trim()}
+                  style={[styles.promoApplyBtn, (isApplyingPromo || !canPay) && { opacity: 0.6 }]}
+                  disabled={isApplyingPromo || !canPay || !promoCodeInput.trim()}
                   onPress={handleApplyPromo}
                   activeOpacity={0.8}
                   accessibilityRole="button"
@@ -587,6 +588,7 @@ const styles = StyleSheet.create({
     color: '#18181B',
     letterSpacing: -0.2,
   },
+  headerSpacer: { width: 44 },
   sslBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -643,12 +645,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    backgroundColor: 'rgba(245, 165, 36, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.3)',
+    borderColor: 'rgba(245, 165, 36, 0.3)',
     marginBottom: 6,
   },
   tierDot: {
@@ -929,7 +931,7 @@ const styles = StyleSheet.create({
   },
   channelChipActive: {
     borderColor: BRAND_COLORS.accent,
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: 'rgba(245, 165, 36, 0.1)',
   },
   channelChipText: {
     color: '#3F3F46',

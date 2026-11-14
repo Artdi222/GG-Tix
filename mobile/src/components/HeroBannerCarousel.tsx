@@ -81,22 +81,26 @@ function HeroSlideItem({ item, index, scrollX, onPress }: SlideItemProps) {
 
       <View style={styles.heroContentOverlay}>
         <View style={styles.heroBadgeRow}>
+          {/* Real facts only: the old "POPULER" tag was on every slide regardless of data. */}
           <View style={styles.heroUrgentBadge}>
-            <Ionicons name="sparkles" size={11} color="#FFFFFF" />
-            <Text style={styles.heroUrgentText}>POPULER</Text>
+            <Ionicons name="calendar" size={11} color="#18181B" />
+            <Text style={styles.heroUrgentText}>
+              {formatEventDate(item.dateTime).day} {formatEventDate(item.dateTime).month}
+            </Text>
           </View>
-          {item.venue?.city && (
+          {item.venue?.city ? (
             <View style={styles.heroCityBadge}>
-              <Text style={styles.heroCityText}>📍 {item.venue.city}</Text>
+              <Ionicons name="location" size={11} color="#FFFFFF" />
+              <Text style={styles.heroCityText}>{item.venue.city}</Text>
             </View>
-          )}
+          ) : null}
         </View>
 
         <Text style={styles.heroTitle} numberOfLines={2}>
           {item.title}
         </Text>
         <Text style={styles.heroMeta} numberOfLines={1}>
-          {[formatEventDate(item.dateTime).full, item.artist?.name].filter(Boolean).join(' · ')}
+          {[item.artist?.name, item.venue?.name].filter(Boolean).join(' · ')}
         </Text>
       </View>
     </TouchableOpacity>
@@ -298,28 +302,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: BRAND_COLORS.accent,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 4,
+    backgroundColor: '#F5A524',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   heroUrgentText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.2,
+    color: '#18181B',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   heroCityBadge: {
-    backgroundColor: 'rgba(9, 9, 11, 0.75)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   heroCityText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   heroTitle: {

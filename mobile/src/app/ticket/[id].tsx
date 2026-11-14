@@ -130,11 +130,8 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
           >
             <Ionicons name="arrow-back" size={20} color="#18181B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>E-Ticket Digital</Text>
-          <View style={styles.sslBadge}>
-            <Ionicons name="shield-checkmark" size={11} color={BRAND_COLORS.success} />
-            <Text style={styles.sslBadgeText}>RESMI</Text>
-          </View>
+          <Text style={styles.headerTitle}>Tiket</Text>
+          <View style={{ width: 44 }} />
         </View>
 
         {isOffline ? (
@@ -191,17 +188,6 @@ function TicketContent({ id, userId }: { id: string; userId: string }) {
           <Text style={styles.errorText}>Data tiket tidak valid.</Text>
         )}
 
-        <View style={styles.tipBox}>
-          <View style={styles.tipIconWrap}>
-            <Ionicons name="sunny" size={18} color={BRAND_COLORS.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.tipTitle}>Kecerahan Otomatis Aktif</Text>
-            <Text style={styles.tipText}>
-              Kecerahan layar otomatis dimaksimalkan demi kelancaran scan barcode saat memasuki gate konser.
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </View>
   );
@@ -332,11 +318,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(245, 165, 36, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
   },
   tipTitle: {
     fontSize: 13,
@@ -353,10 +339,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: 'rgba(245, 165, 36, 0.1)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    borderColor: 'rgba(245, 165, 36, 0.25)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 12,
