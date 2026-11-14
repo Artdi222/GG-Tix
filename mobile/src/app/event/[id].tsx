@@ -1,28 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StatusBar,
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
-  Platform,
-  Share,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiFetch } from '../../services/api';
-import { BRAND_COLORS } from '../../constants/config';
-import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
-import { CategoryCard, TicketCategoryItem } from '../../components/CategoryCard';
-import { getPosterImage, isEventOver } from '../../components/EventCard';
-import { VenueSeatmapViewer } from '../../components/VenueSeatmapViewer';
+import { formatRupiah, getPosterImage, isEventOver } from '../../components/EventCard';
+import type { TicketCategoryItem } from '../../components/CategoryCard';
+import { LinearGradient } from '../../components/LinearGradient';
 
 export interface EventDetailData {
   id: string;
@@ -37,242 +36,103 @@ export interface EventDetailData {
   maintenanceMode?: boolean;
   tags?: string[];
   status: 'open' | 'closed';
-  artist?: {
-    id: string;
-    name: string;
-    bio?: string | null;
-    photoUrl?: string | null;
-  } | null;
-  venue?: {
-    id: string;
-    name: string;
-    city: string;
-    address: string;
-  } | null;
+  artist?: { id: string; name: string; bio?: string | null; photoUrl?: string | null } | null;
+  venue?: { id: string; name: string; city: string; address: string } | null;
   ticketCategories?: TicketCategoryItem[];
+}
+
+const INK = '#18181B';
+const MUTED = '#71717A';
+const ACCENT = '#B4630A';
+
+const tap = (style: 'light' | 'select' = 'select') => {
+  if (Platform.OS === 'web') return;
+  (style === 'light' ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) : Haptics.selectionAsync()).catch(() => {});
+};
+
+const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) =>
+  new Date(iso).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', ...opts });
+
+function durationLabel(start: string, end?: string | null) {
+  if (!end) return null;
+  const mins = Math.round((+new Date(end) - +new Date(start)) / 60000);
+  if (!(mins > 0)) return null;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}j${m ? ` ${m}m` : ''}` : `${m}m`;
 }
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const token = useAuthStore((s) => s.token);
+
   const [event, setEvent] = useState<EventDetailData | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
-  const [selectedCategory, setSelectedCategory] = useState<TicketCategoryItem | null>(null);
-  const [quantity, setQuantity] = useState(1);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const token = useAuthStore((state) => state.token);
-
-  const minusScale = useSharedValue(1);
-  const plusScale = useSharedValue(1);
-  const checkoutScale = useSharedValue(1);
-
-  const minusAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: minusScale.value }],
-  }));
-
-  const plusAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: plusScale.value }],
-  }));
-
-  const checkoutAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: checkoutScale.value }],
-  }));
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [seatmapOpen, setSeatmapOpen] = useState(false);
+  const [seatmapFull, setSeatmapFull] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    if (id) {
-      apiFetch<any>(`/events/${id}`)
-        .then((data) => {
-          if (!isMounted) return;
-          const eventData = data?.data || data;
-          setEvent(eventData);
-
-          if (eventData.ticketCategories && eventData.ticketCategories.length > 0) {
-            const available = eventData.ticketCategories.find(
-              (c: TicketCategoryItem) => Number(c.quotaRemaining) > 0
-            );
-            if (available) {
-              setSelectedCategory(available);
-            }
-          }
-        })
-        .catch((error: any) => {
-          if (!isMounted) return;
-          // 404 has nothing to retry; the empty error falls through to the "not found" copy without a retry button.
-          setLoadError(error?.status === 404 ? '' : error.message || 'Gagal memuat detail konser.');
-        })
-        .finally(() => {
-          if (!isMounted) return;
-          setLoading(false);
-        });
-    }
-
-    return () => {
-      isMounted = false;
-    };
+    if (!id) return;
+    let alive = true;
+    apiFetch<any>(`/events/${id}`)
+      .then((res) => {
+        if (!alive) return;
+        const data: EventDetailData = res?.data || res;
+        setEvent(data);
+        // Open the first category that still has seats, like a showtime list opens the first cinema.
+        const first = [...(data.ticketCategories ?? [])]
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || Number(a.price) - Number(b.price))
+          .find((c) => Number(c.quotaRemaining) > 0);
+        setOpenId(first?.id ?? null);
+      })
+      .catch((err: any) => {
+        if (alive) setLoadError(err?.status === 404 ? '' : err?.message || 'Gagal memuat detail konser.');
+      })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
   }, [id, reloadKey]);
 
-  const maxAllowed = Math.min(
-    event?.maxTicketsPerOrder || 4,
-    selectedCategory ? Number(selectedCategory.quotaRemaining) : 4
+  const categories = useMemo(
+    () => [...(event?.ticketCategories ?? [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || Number(a.price) - Number(b.price)),
+    [event]
   );
 
-  const handleMinus = () => {
-    if (quantity <= 1) return;
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        
-      }
-    }
-    minusScale.set(withSpring(MOTION_TOKENS.pressScale.iconButton, MOTION_TOKENS.springBrisk, () => {
-      minusScale.set(withSpring(1, MOTION_TOKENS.springBrisk));
-    }));
-    setQuantity((q) => Math.max(1, q - 1));
-  };
-
-  const handlePlus = () => {
-    if (quantity >= maxAllowed) {
-      if (Platform.OS !== 'web') {
-        try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        } catch {
-          
-        }
-      }
-      return;
-    }
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        
-      }
-    }
-    plusScale.set(withSpring(MOTION_TOKENS.pressScale.iconButton, MOTION_TOKENS.springBrisk, () => {
-      plusScale.set(withSpring(1, MOTION_TOKENS.springBrisk));
-    }));
-    setQuantity((q) => Math.min(maxAllowed, q + 1));
-  };
-
-  const handleShare = async () => {
-    if (!event) return;
-    try {
-      await Share.share({
-        title: event.title,
-        message: `${event.title} — tiket tersedia di GG-Tix.`,
-      });
-    } catch {
-      
-    }
-  };
-
-  const handleCheckout = () => {
-    if (!event || event.maintenanceMode || event.status !== 'open' || isEventOver(event)) return;
-    if (!selectedCategory) {
-      Alert.alert('Peringatan', 'Silakan pilih kategori tiket terlebih dahulu.');
-      return;
-    }
-
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch {
-        
-      }
-    }
-
-    if (!token) {
-      // The login screen explains itself and returns here afterwards; a confirm dialog only adds a tap.
-      router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } });
-      return;
-    }
-
-    router.push({
-      pathname: '/checkout/[id]',
-      params: {
-        id: id as string,
-        categoryId: selectedCategory.id,
-        qty: quantity.toString(),
-        price: selectedCategory.price.toString(),
-        categoryName: selectedCategory.name,
-      },
-    });
-  };
-
-  const formatDate = (isoString: string) => {
-    try {
-      return new Date(isoString).toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Jakarta',
-      });
-    } catch {
-      return isoString;
-    }
-  };
-
-  if (!loading && !event) {
+  if (loading) {
     return (
-      <View style={[styles.centerContainer, { paddingHorizontal: 32 }]}>
-        <Ionicons name="cloud-offline-outline" size={40} color={BRAND_COLORS.textDim} />
-        <Text style={[styles.loadingText, { textAlign: 'center' }]}>{loadError || 'Konser tidak ditemukan atau sudah dihapus.'}</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={ACCENT} />
+      </View>
+    );
+  }
+
+  if (!event) {
+    return (
+      <View style={[styles.center, { paddingHorizontal: 32 }]}>
+        <Ionicons name="cloud-offline-outline" size={40} color={MUTED} />
+        <Text style={styles.centerText}>{loadError || 'Konser tidak ditemukan atau sudah dihapus.'}</Text>
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
-          <TouchableOpacity
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-            style={{ paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: BRAND_COLORS.borderMedium }}
-            accessibilityRole="button"
-          >
-            <Text style={{ color: BRAND_COLORS.textLight, fontWeight: '700' }}>Kembali</Text>
-          </TouchableOpacity>
+          <Pressable style={styles.ghostBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityRole="button">
+            <Text style={styles.ghostBtnText}>Kembali</Text>
+          </Pressable>
           {loadError ? (
-            <TouchableOpacity
-              onPress={() => { setLoadError(''); setLoading(true); setReloadKey((k) => k + 1); }}
-              style={{ paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: BRAND_COLORS.accent }}
-              accessibilityRole="button"
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Coba Lagi</Text>
-            </TouchableOpacity>
+            <Pressable style={styles.inkBtnSmall} onPress={() => { setLoadError(''); setLoading(true); setReloadKey((k) => k + 1); }} accessibilityRole="button">
+              <Text style={styles.inkBtnText}>Coba lagi</Text>
+            </Pressable>
           ) : null}
         </View>
       </View>
     );
   }
 
-  if (loading || !event) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={BRAND_COLORS.accent} />
-        <Text style={styles.loadingText}>Memuat konser…</Text>
-      </View>
-    );
-  }
-
-  const selectedPriceNum = selectedCategory
-    ? typeof selectedCategory.price === 'string'
-      ? parseFloat(selectedCategory.price)
-      : selectedCategory.price
-    : 0;
-
-  const totalPrice = selectedPriceNum * quantity;
-
-  const formattedTotalPrice = new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(totalPrice);
-
-  const posterUri = getPosterImage(event as any);
+  const poster = getPosterImage(event as any);
   const isOver = isEventOver(event);
-  const salesClosed = event.status !== 'open' || isOver;
   const closedReason = isOver
     ? 'Acara ini sudah berlangsung'
     : event.status !== 'open'
@@ -280,561 +140,335 @@ export default function EventDetailScreen() {
       : event.maintenanceMode
         ? 'Pemesanan sedang dalam pemeliharaan'
         : null;
-  const checkoutBlocked = event.maintenanceMode || salesClosed || !selectedCategory || Number(selectedCategory.quotaRemaining) <= 0;
+  const selected = categories.find((c) => c.id === openId && Number(c.quotaRemaining) > 0) ?? null;
+  const maxQty = selected ? Math.max(1, Math.min(event.maxTicketsPerOrder || 4, Number(selected.quotaRemaining))) : 1;
+  const qty = Math.min(quantity, maxQty);
+  const total = selected ? Number(selected.price) * qty : 0;
+  const duration = durationLabel(event.dateTime, event.endDateTime);
+
+  const toggleCategory = (cat: TicketCategoryItem) => {
+    tap();
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpenId((cur) => (cur === cat.id ? null : cat.id));
+    setQuantity(1);
+  };
+
+  const checkout = () => {
+    if (closedReason || !selected) return;
+    tap('light');
+    if (!token) {
+      router.push({ pathname: '/auth/login', params: { redirect: `/event/${id}` } });
+      return;
+    }
+    router.push({
+      pathname: '/checkout/[id]',
+      params: { id: String(id), categoryId: selected.id, qty: String(qty), price: String(selected.price), categoryName: selected.name },
+    });
+  };
+
+  const share = () => {
+    Share.share({ title: event.title, message: `${event.title} — tiket tersedia di GG-Tix.` }).catch(() => {});
+  };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.topStickyHeader, { top: Math.max(insets.top, 16) }]}>
-        <TouchableOpacity
-          style={styles.circleIconBtn}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Kembali"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
+      <StatusBar barStyle="light-content" />
 
-        <TouchableOpacity
-          style={styles.circleIconBtn}
-          onPress={handleShare}
-          accessibilityRole="button"
-          accessibilityLabel="Bagikan event"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="share-social-outline" size={19} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, 16) + 84 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.coverWrapper}>
-          <Image
-            source={{ uri: posterUri }}
-            style={styles.coverImage}
-            contentFit="cover"
-            transition={200}
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 110 }} showsVerticalScrollIndicator={false}>
+        {/* Backdrop: the poster blurred behind a sharp thumbnail, title and quick facts. */}
+        <View style={styles.hero}>
+          <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={24} />
+          <LinearGradient
+            // Dark only behind the top buttons; the title sits on near-white so any poster stays readable.
+            colors={['rgba(9,9,11,0.55)', 'rgba(255,255,255,0.88)', 'rgba(255,255,255,1)']}
+            locations={[0, 0.42, 0.7]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
           />
+          <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+            <Pressable style={styles.roundBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityRole="button" accessibilityLabel="Kembali" hitSlop={6}>
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </Pressable>
+            <Pressable style={styles.roundBtn} onPress={share} accessibilityRole="button" accessibilityLabel="Bagikan" hitSlop={6}>
+              <Ionicons name="share-outline" size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View style={styles.heroBody}>
+            <Image source={{ uri: poster }} style={styles.poster} contentFit="cover" transition={200} />
+            <View style={styles.heroText}>
+              <Text style={styles.title} numberOfLines={3}>{event.title}</Text>
+              <View style={styles.chips}>
+                {event.tags?.[0] ? <Chip label={event.tags[0]} /> : null}
+                {event.venue?.city ? <Chip label={event.venue.city} /> : null}
+                {duration ? <Chip label={duration} /> : null}
+              </View>
+              <View style={[styles.status, closedReason ? styles.statusClosed : styles.statusOpen]}>
+                <View style={[styles.statusDot, { backgroundColor: closedReason ? '#DC2626' : '#059669' }]} />
+                <Text style={[styles.statusText, { color: closedReason ? '#B91C1C' : '#047857' }]}>
+                  {isOver ? 'Sudah berlangsung' : closedReason ? 'Penjualan ditutup' : 'Tiket tersedia'}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.mainContent}>
-          <View style={styles.topMetaRow}>
-            {event.publisherName && (
-              <Text style={styles.publisherText} numberOfLines={1}>Oleh {event.publisherName}</Text>
-            )}
-
-            {salesClosed ? (
-              <View style={[styles.statusOpenBadge, { backgroundColor: BRAND_COLORS.dangerBg, borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-                <View style={[styles.statusDot, { backgroundColor: BRAND_COLORS.danger }]} />
-                <Text style={[styles.statusOpenText, { color: BRAND_COLORS.danger }]}>{isOver ? 'Sudah berlangsung' : 'Penjualan ditutup'}</Text>
-              </View>
-            ) : (
-              <View style={styles.statusOpenBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusOpenText}>Tiket tersedia</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.title}>{event.title}</Text>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoIconWrap}>
-                <Ionicons name="calendar-outline" size={17} color={BRAND_COLORS.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Waktu</Text>
-                <Text style={styles.infoValue}>{formatDate(event.dateTime)} WIB</Text>
-              </View>
+        {/* Plain label / value pairs, no boxes. */}
+        <View style={styles.facts}>
+          <Fact label="Tanggal" value={`${fmt(event.dateTime, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`} />
+          <Fact
+            label="Waktu"
+            value={`${fmt(event.dateTime, { hour: '2-digit', minute: '2-digit' })}${event.endDateTime ? ` – ${fmt(event.endDateTime, { hour: '2-digit', minute: '2-digit' })}` : ''} WIB`}
+          />
+          {event.venue ? <Fact label="Venue" value={event.venue.name} sub={event.venue.address} /> : null}
+          {event.artist ? <Fact label="Penampil" value={event.artist.name} sub={event.artist.bio || undefined} /> : null}
+          {event.publisherName ? <Fact label="Promotor" value={event.publisherName} /> : null}
+          {event.description ? (
+            <View>
+              <Text style={styles.factLabel}>Tentang acara</Text>
+              <Text style={styles.factBody} numberOfLines={aboutOpen ? undefined : 3}>{event.description}</Text>
+              {event.description.length > 140 ? (
+                <Pressable onPress={() => setAboutOpen((v) => !v)} hitSlop={8} accessibilityRole="button">
+                  <Text style={styles.readMore}>{aboutOpen ? 'Tutup' : 'Selengkapnya'}</Text>
+                </Pressable>
+              ) : null}
             </View>
+          ) : null}
+        </View>
 
-            <View style={styles.infoDivider} />
+        <View style={styles.divider} />
 
-            <View style={styles.infoRow}>
-              <View style={styles.infoIconWrap}>
-                <Ionicons name="location-outline" size={17} color={BRAND_COLORS.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Lokasi</Text>
-                <Text style={styles.infoValue}>
-                  {event.venue ? `${event.venue.name}, ${event.venue.city}` : 'Venue TBA'}
-                </Text>
-                {event.venue?.address ? (
-                  <Text style={styles.infoSub}>{event.venue.address}</Text>
-                ) : null}
-              </View>
-            </View>
-          </View>
+        {/* Ticket categories as an accordion: price and remaining seats at a glance, quantity inside. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Pilih tiket</Text>
+          {categories.length === 0 ? (
+            <Text style={styles.emptyText}>Kategori tiket belum tersedia.</Text>
+          ) : (
+            categories.map((cat) => {
+              const remaining = Number(cat.quotaRemaining);
+              const soldOut = remaining <= 0;
+              const open = openId === cat.id && !soldOut && !closedReason;
+              const low = !soldOut && remaining / Math.max(1, cat.quotaTotal) < 0.15;
+              return (
+                <View key={cat.id} style={[styles.cat, open && styles.catOpen]}>
+                  <Pressable
+                    style={styles.catHead}
+                    onPress={() => !soldOut && !closedReason && toggleCategory(cat)}
+                    disabled={soldOut || !!closedReason}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: open, disabled: soldOut || !!closedReason }}
+                    accessibilityLabel={`${cat.name}, ${formatRupiah(cat.price)}, ${soldOut ? 'habis' : `sisa ${remaining} kursi`}`}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.catName, soldOut && styles.dim]}>{cat.name}</Text>
+                      <Text style={[styles.catPrice, soldOut && styles.dim]}>{formatRupiah(cat.price)}</Text>
+                    </View>
+                    <View style={[styles.seatBox, soldOut && styles.seatBoxSold]}>
+                      <Text style={[styles.seatBig, { color: soldOut ? '#A1A1AA' : low ? '#B45309' : '#059669' }]}>
+                        {soldOut ? 'Habis' : remaining}
+                      </Text>
+                      {!soldOut ? <Text style={styles.seatSmall}>/ {cat.quotaTotal} kursi</Text> : null}
+                    </View>
+                    {!soldOut && !closedReason ? (
+                      <Ionicons name={open ? 'remove' : 'add'} size={22} color={INK} style={{ marginLeft: 12 }} />
+                    ) : null}
+                  </Pressable>
 
-          {event.artist && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Penampil</Text>
-              <View style={styles.artistCard}>
-                <Image
-                  source={{
-                    uri:
-                      event.artist.photoUrl ||
-                      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80',
-                  }}
-                  style={styles.artistPhoto}
-                  contentFit="cover"
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.artistName}>{event.artist.name}</Text>
-                  {event.artist.bio ? (
-                    <Text style={styles.artistBio} numberOfLines={3}>
-                      {event.artist.bio}
-                    </Text>
+                  {open ? (
+                    <View style={styles.catBody}>
+                      {cat.benefits?.length ? (
+                        <View style={{ gap: 6, marginBottom: 14 }}>
+                          {cat.benefits.map((b) => (
+                            <View key={b} style={styles.benefit}>
+                              <Ionicons name="checkmark" size={16} color={ACCENT} />
+                              <Text style={styles.benefitText}>{b}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                      <View style={styles.qtyRow}>
+                        <View>
+                          <Text style={styles.qtyLabel}>Jumlah</Text>
+                          <Text style={styles.qtyHint}>Maks. {maxQty} per pesanan</Text>
+                        </View>
+                        <View style={styles.stepper}>
+                          <Pressable
+                            style={[styles.stepBtn, qty <= 1 && styles.stepBtnOff]}
+                            onPress={() => { tap(); setQuantity(Math.max(1, qty - 1)); }}
+                            disabled={qty <= 1}
+                            accessibilityRole="button"
+                            accessibilityLabel="Kurangi"
+                          >
+                            <Ionicons name="remove" size={18} color={INK} />
+                          </Pressable>
+                          <Text style={styles.qty}>{qty}</Text>
+                          <Pressable
+                            style={[styles.stepBtn, qty >= maxQty && styles.stepBtnOff]}
+                            onPress={() => { tap(); setQuantity(Math.min(maxQty, qty + 1)); }}
+                            disabled={qty >= maxQty}
+                            accessibilityRole="button"
+                            accessibilityLabel="Tambah"
+                          >
+                            <Ionicons name="add" size={18} color={INK} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
                   ) : null}
                 </View>
-              </View>
-            </View>
+              );
+            })
           )}
 
-          <VenueSeatmapViewer
-            seatmapUrl={event.seatmapUrl}
-            eventTitle={event.title}
-            venueName={event.venue ? `${event.venue.name}, ${event.venue.city}` : undefined}
-            ticketCategories={event.ticketCategories || []}
-            selectedCategory={selectedCategory}
-            onSelectCategory={(cat) => {
-              setSelectedCategory(cat);
-              setQuantity(1);
-            }}
-          />
-
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Pilih tiket</Text>
-              <Text style={styles.categoryCount}>
-                {event.ticketCategories?.length || 0} kategori
-              </Text>
-            </View>
-
-            {event.ticketCategories && event.ticketCategories.length > 0 ? (
-              event.ticketCategories.map((cat) => (
-                <CategoryCard
-                  key={cat.id}
-                  category={cat}
-                  isSelected={selectedCategory?.id === cat.id}
-                  onSelect={(c) => {
-                    setSelectedCategory(c);
-                    setQuantity(1);
-                  }}
-                />
-              ))
-            ) : (
-              <Text style={styles.emptyCategories}>Kategori tiket belum tersedia.</Text>
-            )}
-          </View>
-
-          {selectedCategory && Number(selectedCategory.quotaRemaining) > 0 && (
-            <View style={styles.stepperSection}>
-              <View>
-                <Text style={styles.stepperLabel}>Jumlah Tiket</Text>
-                <Text style={styles.stepperSub}>Maksimal {maxAllowed} tiket per transaksi</Text>
-              </View>
-
-              <View style={styles.stepperRow}>
-                <Animated.View style={minusAnimatedStyle}>
-                  <TouchableOpacity
-                    style={[styles.stepBtn, quantity <= 1 && styles.stepBtnDisabled]}
-                    disabled={quantity <= 1}
-                    onPress={handleMinus}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Kurangi jumlah tiket"
-                  >
-                    <Ionicons name="remove" size={20} color="#18181B" />
-                  </TouchableOpacity>
-                </Animated.View>
-
-                <Text style={styles.qtyText}>{quantity}</Text>
-
-                <Animated.View style={plusAnimatedStyle}>
-                  <TouchableOpacity
-                    style={[styles.stepBtn, quantity >= maxAllowed && styles.stepBtnDisabled]}
-                    disabled={quantity >= maxAllowed}
-                    onPress={handlePlus}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Tambah jumlah tiket"
-                  >
-                    <Ionicons name="add" size={20} color="#18181B" />
-                  </TouchableOpacity>
-                </Animated.View>
-              </View>
-            </View>
-          )}
-
-          {event.description ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tentang acara</Text>
-              <Text style={styles.descriptionText}>{event.description}</Text>
+          {/* Only shown when the organiser uploaded a real seatmap. */}
+          {event.seatmapUrl ? (
+            <View style={styles.cat}>
+              <Pressable
+                style={styles.catHead}
+                onPress={() => { tap(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setSeatmapOpen((v) => !v); }}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: seatmapOpen }}
+              >
+                <Ionicons name="map-outline" size={20} color={INK} style={{ marginRight: 12 }} />
+                <Text style={[styles.catName, { flex: 1 }]}>Denah venue</Text>
+                <Ionicons name={seatmapOpen ? 'remove' : 'add'} size={22} color={INK} />
+              </Pressable>
+              {seatmapOpen ? (
+                <Pressable onPress={() => setSeatmapFull(true)} style={styles.catBody} accessibilityRole="button" accessibilityLabel="Perbesar denah">
+                  <Image source={{ uri: event.seatmapUrl }} style={styles.seatmap} contentFit="contain" />
+                  <Text style={styles.qtyHint}>Ketuk untuk memperbesar</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
         </View>
       </ScrollView>
 
-      <View
-        style={[
-          styles.stickyFooter,
-          { paddingBottom: Math.max(insets.bottom, 16) },
-        ]}
-      >
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {closedReason ? (
-          // Showing a price next to a disabled button read as "you could buy this"; say why instead.
           <View style={styles.footerClosed}>
             <Ionicons name={isOver ? 'time-outline' : 'lock-closed-outline'} size={18} color="#52525B" />
             <Text style={styles.footerClosedText}>{closedReason}</Text>
           </View>
         ) : (
           <>
-            <View style={styles.footerPriceCol}>
-              <Text style={styles.footerPriceLabel} numberOfLines={1}>
-                {selectedCategory ? `${selectedCategory.name} · ${quantity} tiket` : 'Pilih kategori tiket'}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.footerLabel} numberOfLines={1}>
+                {selected ? `${selected.name} · ${qty} tiket` : 'Pilih kategori tiket'}
               </Text>
-              <Text style={styles.footerPriceValue}>{formattedTotalPrice}</Text>
+              <Text style={styles.footerTotal}>{selected ? formatRupiah(total) : '—'}</Text>
             </View>
-
-            <Animated.View style={checkoutAnimatedStyle}>
-              <TouchableOpacity
-                style={[styles.checkoutBtn, checkoutBlocked && styles.checkoutBtnDisabled]}
-                disabled={checkoutBlocked}
-                onPressIn={() => {
-                  if (!checkoutBlocked) checkoutScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
-                }}
-                onPressOut={() => checkoutScale.set(withSpring(1, MOTION_TOKENS.springSnappy))}
-                onPress={handleCheckout}
-                activeOpacity={1}
-                accessibilityRole="button"
-                accessibilityLabel="Beli tiket"
-              >
-                <Text style={styles.checkoutBtnText}>Beli tiket</Text>
-              </TouchableOpacity>
-            </Animated.View>
+            <Pressable
+              style={({ pressed }) => [styles.buyBtn, !selected && styles.buyBtnOff, pressed && selected && { opacity: 0.85 }]}
+              onPress={checkout}
+              disabled={!selected}
+              accessibilityRole="button"
+              accessibilityLabel="Beli tiket"
+            >
+              <Text style={styles.buyText}>Beli tiket</Text>
+            </Pressable>
           </>
         )}
       </View>
+
+      <Modal visible={seatmapFull} transparent animationType="fade" onRequestClose={() => setSeatmapFull(false)}>
+        <View style={styles.fullBg}>
+          {event.seatmapUrl ? <Image source={{ uri: event.seatmapUrl }} style={StyleSheet.absoluteFill} contentFit="contain" /> : null}
+          <Pressable style={[styles.roundBtn, { position: 'absolute', top: insets.top + 12, right: 16 }]} onPress={() => setSeatmapFull(false)} accessibilityRole="button" accessibilityLabel="Tutup">
+            <Ionicons name="close" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function Chip({ label }: { label: string }) {
+  return (
+    <View style={styles.chip}>
+      <Text style={styles.chipText} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
+function Fact({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <View>
+      <Text style={styles.factLabel}>{label}</Text>
+      <Text style={styles.factValue}>{value}</Text>
+      {sub ? <Text style={styles.factSub} numberOfLines={2}>{sub}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F6F6F8',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#71717A',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  topStickyHeader: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  circleIconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(9, 9, 11, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
-  coverWrapper: {
-    width: '100%',
-    height: 300,
-    position: 'relative',
-    backgroundColor: '#FFFFFF',
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  // Content rises over the cover like a sheet, the usual pattern for event detail apps.
-  mainContent: {
-    padding: 20,
-    marginTop: -24,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    backgroundColor: '#FFFFFF',
-  },
-  topMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  publisherBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: BRAND_COLORS.accentGlow,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.borderGold,
-  },
-  publisherText: {
-    flexShrink: 1,
-    color: '#71717A',
-    fontSize: 13,
-    fontWeight: '600',
-    marginRight: 12,
-  },
-  statusOpenBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: BRAND_COLORS.success,
-  },
-  statusOpenText: {
-    color: BRAND_COLORS.success,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#18181B',
-    lineHeight: 32,
-    marginBottom: 16,
-    letterSpacing: -0.4,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  centerText: { marginTop: 12, fontSize: 15, color: '#52525B', textAlign: 'center' },
+  ghostBtn: { height: 44, paddingHorizontal: 18, borderRadius: 22, borderWidth: 1, borderColor: '#D4D4D8', justifyContent: 'center' },
+  ghostBtnText: { color: INK, fontWeight: '700' },
+  inkBtnSmall: { height: 44, paddingHorizontal: 18, borderRadius: 22, backgroundColor: INK, justifyContent: 'center' },
+  inkBtnText: { color: '#FFFFFF', fontWeight: '700' },
 
-  infoCard: {
-    marginBottom: 28,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  infoIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: 'rgba(245, 165, 36, 0.14)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoLabel: {
-    fontSize: 11,
-    color: '#71717A',
-    marginBottom: 2,
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  infoSub: {
-    fontSize: 11,
-    color: '#52525B',
-    marginTop: 2,
-  },
-  infoDivider: {
-    height: 1,
-    backgroundColor: '#E4E4E7',
-    marginVertical: 12,
-  },
+  hero: { paddingBottom: 20, overflow: 'hidden', backgroundColor: '#27272A' },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 20 },
+  roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  heroBody: { flexDirection: 'row', gap: 16, paddingHorizontal: 20, alignItems: 'flex-end' },
+  poster: { width: 112, height: 160, borderRadius: 12, backgroundColor: '#3F3F46' },
+  heroText: { flex: 1, gap: 10, paddingBottom: 2 },
+  title: { fontSize: 22, lineHeight: 27, fontWeight: '800', color: INK, letterSpacing: -0.4 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { borderWidth: 1.5, borderColor: INK, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3, maxWidth: 140 },
+  chipText: { fontSize: 12, fontWeight: '700', color: INK },
+  status: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  statusOpen: { backgroundColor: 'rgba(5,150,105,0.12)' },
+  statusClosed: { backgroundColor: 'rgba(220,38,38,0.10)' },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 12, fontWeight: '700' },
 
-  section: {
-    marginBottom: 28,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 0,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 12,
-    fontWeight: '800',
-    color: '#18181B',
-    letterSpacing: -0.2,
-  },
-  categoryCount: {
-    color: '#71717A',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  artistCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  artistPhoto: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: BRAND_COLORS.accent,
-  },
-  artistName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#18181B',
-    marginBottom: 2,
-  },
-  artistBio: {
-    fontSize: 11,
-    color: '#52525B',
-    lineHeight: 16,
-  },
-  descriptionText: {
-    fontSize: 13,
-    color: '#3F3F46',
-    lineHeight: 20,
-    marginTop: 8,
-  },
-  emptyCategories: {
-    color: '#71717A',
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
+  facts: { paddingHorizontal: 20, paddingTop: 8, gap: 16 },
+  factLabel: { fontSize: 15, fontWeight: '800', color: INK, marginBottom: 2 },
+  factValue: { fontSize: 15, color: '#3F3F46', lineHeight: 21 },
+  factSub: { fontSize: 13, color: MUTED, lineHeight: 18, marginTop: 2 },
+  factBody: { fontSize: 15, color: '#3F3F46', lineHeight: 22 },
+  readMore: { marginTop: 4, fontSize: 14, fontWeight: '700', color: ACCENT },
 
-  stepperSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  stepperLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  stepperSub: {
-    fontSize: 11,
-    color: '#71717A',
-    marginTop: 2,
-  },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  stepBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#E4E4E7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepBtnDisabled: {
-    opacity: 0.35,
-  },
-  qtyText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#18181B',
-    minWidth: 24,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
+  divider: { height: 8, backgroundColor: '#F4F4F5', marginTop: 24 },
+  section: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: INK, paddingHorizontal: 4, marginBottom: 4 },
+  emptyText: { fontSize: 14, color: MUTED, paddingHorizontal: 4 },
 
+  cat: { borderWidth: 1, borderColor: '#E4E4E7', borderRadius: 14, backgroundColor: '#FFFFFF' },
+  catOpen: { borderColor: INK },
+  catHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 72, paddingVertical: 12 },
+  catName: { fontSize: 16, fontWeight: '800', color: INK },
+  catPrice: { fontSize: 14, fontWeight: '600', color: '#52525B', marginTop: 2 },
+  dim: { color: '#A1A1AA' },
+  seatBox: { borderWidth: 1, borderColor: '#E4E4E7', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 76 },
+  seatBoxSold: { backgroundColor: '#F4F4F5', borderColor: '#F4F4F5' },
+  seatBig: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  seatSmall: { fontSize: 11, color: MUTED, fontVariant: ['tabular-nums'] },
+  catBody: { borderTopWidth: 1, borderTopColor: '#F4F4F5', padding: 16 },
+  benefit: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  benefitText: { flex: 1, fontSize: 14, color: '#3F3F46', lineHeight: 20 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  qtyLabel: { fontSize: 15, fontWeight: '700', color: INK },
+  qtyHint: { fontSize: 12, color: MUTED, marginTop: 2 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F4F4F5', borderRadius: 22, padding: 4 },
+  stepBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  stepBtnOff: { opacity: 0.35 },
+  qty: { minWidth: 32, textAlign: 'center', fontSize: 16, fontWeight: '800', color: INK, fontVariant: ['tabular-nums'] },
+  seatmap: { width: '100%', height: 220, borderRadius: 10, backgroundColor: '#F4F4F5', marginBottom: 6 },
+
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingTop: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E4E4E7' },
+  footerLabel: { fontSize: 12, color: MUTED, fontWeight: '600' },
+  footerTotal: { fontSize: 20, fontWeight: '800', color: INK, fontVariant: ['tabular-nums'], marginTop: 1 },
   footerClosed: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 52 },
   footerClosedText: { fontSize: 15, fontWeight: '700', color: '#3F3F46' },
-  stickyFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E4E4E7',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  footerPriceCol: {
-    flex: 1,
-    marginRight: 12,
-  },
-  footerPriceLabel: {
-    fontSize: 10,
-    color: '#71717A',
-    fontWeight: '600',
-  },
-  footerPriceValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: BRAND_COLORS.accent,
-    marginTop: 2,
-    letterSpacing: -0.3,
-    fontVariant: ['tabular-nums'],
-  },
-  footerCategoryBadge: {
-    fontSize: 11,
-    color: '#52525B',
-    marginTop: 2,
-  },
-  checkoutBtn: {
-    paddingHorizontal: 28,
-    paddingVertical: 15,
-    borderRadius: 26,
-    backgroundColor: '#18181B',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 44,
-  },
-  checkoutBtnDisabled: {
-    backgroundColor: '#D4D4D8',
-    opacity: 0.6,
-  },
-  checkoutBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 15,
-  },
+  buyBtn: { height: 52, paddingHorizontal: 32, borderRadius: 26, backgroundColor: INK, alignItems: 'center', justifyContent: 'center' },
+  buyBtnOff: { backgroundColor: '#D4D4D8' },
+  buyText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+
+  fullBg: { flex: 1, backgroundColor: '#000000' },
 });
+
