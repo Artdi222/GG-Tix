@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   switcherTabActive: {
-    backgroundColor: BRAND_COLORS.accent,
+    backgroundColor: '#18181B',
     borderColor: BRAND_COLORS.accent,
   },
   switcherTabText: {

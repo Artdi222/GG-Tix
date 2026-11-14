@@ -170,11 +170,14 @@ export function EventCard({ event, variant = 'portrait', style, rank, width = 16
             ) : null}
           </View>
           <Text style={styles.posterTitle} numberOfLines={2}>{event.title}</Text>
-          <View style={styles.infoPill}>
-            <Text style={styles.infoPillText} numberOfLines={1}>{dateInfo.day} {dateInfo.month}</Text>
-            <View style={styles.infoPillSep} />
-            <Text style={[styles.infoPillText, styles.infoPillPrice]} numberOfLines={1}>{isSoldOut ? 'Habis' : lowestPrice}</Text>
-          </View>
+          {/* Plain lines read better than a boxed "date | price" pill that truncates on narrow cards. */}
+          <Text style={styles.posterMeta} numberOfLines={1}>
+            {dateInfo.weekday.charAt(0) + dateInfo.weekday.slice(1).toLowerCase()}, {dateInfo.day} {dateInfo.month.charAt(0) + dateInfo.month.slice(1).toLowerCase()}
+            {event.venue?.city ? ` · ${event.venue.city}` : ''}
+          </Text>
+          <Text style={[styles.posterPrice, isSoldOut && styles.priceSold]} numberOfLines={1}>
+            {isSoldOut ? 'Tiket habis' : `Mulai ${lowestPrice}`}
+          </Text>
         </Pressable>
       </Animated.View>
     );
@@ -235,11 +238,9 @@ const styles = StyleSheet.create({
   rank: { position: 'absolute', top: 0, left: 0, minWidth: 40, height: 44, paddingHorizontal: 10, borderBottomRightRadius: 14, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' },
   rankText: { color: '#F5A524', fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
   cornerFlag: { position: 'absolute', top: 10, right: 10, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  posterTitle: { fontSize: 15, fontWeight: '800', color: '#18181B', lineHeight: 19, minHeight: 38, textTransform: 'uppercase', letterSpacing: 0.1 },
-  infoPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, borderWidth: 1.5, borderColor: '#18181B', borderRadius: 10, paddingHorizontal: 10, height: 32, maxWidth: '100%' },
-  infoPillText: { fontSize: 13, fontWeight: '700', color: '#18181B' },
-  infoPillPrice: { flexShrink: 1 },
-  infoPillSep: { width: 1, height: 14, backgroundColor: '#D4D4D8', marginHorizontal: 8 },
+  posterTitle: { fontSize: 15, fontWeight: '800', color: '#18181B', lineHeight: 19, minHeight: 38 },
+  posterMeta: { fontSize: 13, color: '#71717A', marginTop: 4 },
+  posterPrice: { fontSize: 15, fontWeight: '800', color: '#18181B', marginTop: 2 },
   portrait: { width: 156 },
   portraitPoster: { width: 156, height: 208, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E4E4E7', marginBottom: 10 },
   dateChip: { position: 'absolute', top: 10, left: 10, backgroundColor: '#FFFFFF', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', minWidth: 40 },

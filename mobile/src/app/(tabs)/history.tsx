@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   qrActionBtn: {
-    backgroundColor: BRAND_COLORS.accent,
+    backgroundColor: '#18181B',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   loginBtn: {
-    backgroundColor: BRAND_COLORS.accent,
+    backgroundColor: '#18181B',
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 12,
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   exploreBtn: {
-    backgroundColor: BRAND_COLORS.accent,
+    backgroundColor: '#18181B',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 10,

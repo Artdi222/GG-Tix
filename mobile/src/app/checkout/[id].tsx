@@ -3,7 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   ScrollView,
   Alert,
@@ -19,10 +19,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { apiFetch } from '../../services/api';
-import { BRAND_COLORS } from '../../constants/config';
 import { MOTION_TOKENS } from '../../constants/motion';
 import { useAuthStore } from '../../store/auth-store';
 import { getPosterImage } from '../../components/EventCard';
+import { PageHeader } from '../../components/layout';
 
 export default function CheckoutScreen() {
   const { id, categoryId, qty, price, categoryName } = useLocalSearchParams<{
@@ -245,766 +245,172 @@ export default function CheckoutScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Kembali ke detail konser"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color="#18181B" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Konfirmasi Pembayaran</Text>
-        <View style={styles.headerSpacer} />
+      <View style={{ paddingTop: insets.top, backgroundColor: '#FFFFFF' }}>
+        <PageHeader title="Checkout" back />
       </View>
 
       {loadError || blockedReason ? (
-        <View style={styles.blockedBanner}>
-          <Ionicons name="alert-circle" size={16} color={BRAND_COLORS.danger} />
+        <View style={styles.blocked}>
+          <Ionicons name="alert-circle" size={18} color="#B91C1C" />
           <Text style={styles.blockedText}>{loadError || blockedReason}</Text>
           {loadError ? (
-            <TouchableOpacity onPress={() => { setLoadError(''); setReloadKey((k) => k + 1); }} accessibilityRole="button">
+            <Pressable onPress={() => { setLoadError(''); setReloadKey((k) => k + 1); }} accessibilityRole="button" hitSlop={8}>
               <Text style={styles.blockedAction}>Coba lagi</Text>
-            </TouchableOpacity>
+            </Pressable>
           ) : null}
         </View>
       ) : null}
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, 16) + 84 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.ticketStubCard}>
-          <View style={styles.eventRow}>
-            {posterUri ? (
-              <Image source={{ uri: posterUri }} style={styles.eventThumb} contentFit="cover" />
-            ) : (
-              <View style={styles.eventThumbPlaceholder}>
-                <Ionicons name="musical-notes" size={24} color={BRAND_COLORS.accent} />
-              </View>
-            )}
-            <View style={styles.eventInfoCol}>
-              <View style={styles.tierBadge}>
-                <View style={styles.tierDot} />
-                <Text style={styles.tierBadgeText}>{categoryName || 'General Admission'}</Text>
-              </View>
-              <Text style={styles.eventTitle} numberOfLines={2}>
-                {eventData?.title || (loadError ? 'Detail konser gagal dimuat' : 'Memuat detail konser…')}
-              </Text>
-              {eventData?.dateTime ? (
-                <View style={styles.eventMetaRow}>
-                  <Ionicons name="calendar-outline" size={12} color={BRAND_COLORS.accent} />
-                  <Text style={styles.eventMetaText}>{formatDate(eventData.dateTime)} WIB</Text>
-                </View>
-              ) : null}
-              {eventData?.venue ? (
-                <View style={styles.eventMetaRow}>
-                  <Ionicons name="location-outline" size={12} color="#71717A" />
-                  <Text style={styles.eventMetaText} numberOfLines={1}>
-                    {eventData.venue.name}, {eventData.venue.city}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 110 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.eventRow}>
+          {posterUri ? <Image source={{ uri: posterUri }} style={styles.thumb} contentFit="cover" /> : <View style={styles.thumb} />}
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.eventTitle} numberOfLines={2}>
+              {eventData?.title || (loadError ? 'Detail konser gagal dimuat' : 'Memuat…')}
+            </Text>
+            {eventData?.dateTime ? <Text style={styles.meta}>{formatDate(eventData.dateTime)} WIB</Text> : null}
+            {eventData?.venue ? <Text style={styles.meta} numberOfLines={1}>{eventData.venue.name}, {eventData.venue.city}</Text> : null}
           </View>
         </View>
 
-        <View style={styles.sectionCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.headerIconWrap}>
-              <Ionicons name="mail-outline" size={15} color={BRAND_COLORS.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardHeaderTitle}>Tujuan Pengiriman E-Tiket</Text>
-              <Text style={styles.cardHeaderSub}>QR Code tiket akan otomatis dikirim ke akun ini</Text>
-            </View>
-          </View>
+        <View style={styles.band} />
 
-          <View style={styles.userInfoBox}>
-            <View style={styles.userAvatar}>
-              <Text style={styles.userAvatarText}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.userName}>{user?.name || 'Customer'}</Text>
-              <Text style={styles.userEmail}>{user?.email || 'email@customer.com'}</Text>
-            </View>
-            <View style={styles.verifiedChip}>
-              <Ionicons name="checkmark-circle" size={12} color={BRAND_COLORS.success} />
-              <Text style={styles.verifiedChipText}>Aktif</Text>
-            </View>
-          </View>
-        </View>
+        <Section title="Tiket">
+          <Row label={categoryName || category?.name || 'Kategori'} value={`${quantity} × ${formattedUnitPrice}`} />
+        </Section>
 
-        {/* PROMO VOUCHER CARD */}
-        <View style={styles.sectionCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.headerIconWrap}>
-              <Ionicons name="ticket-outline" size={15} color={BRAND_COLORS.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardHeaderTitle}>Promo & Voucher Diskon</Text>
-              <Text style={styles.cardHeaderSub}>Gunakan kupon potongan harga resmi</Text>
-            </View>
-          </View>
+        <Section title="E-tiket dikirim ke">
+          <Text style={styles.strong}>{user?.name}</Text>
+          <Text style={styles.meta}>{user?.email}</Text>
+        </Section>
 
+        <Section title="Kode promo">
           {appliedPromo ? (
-            <View style={styles.promoAppliedBox}>
+            <View style={styles.promoApplied}>
+              <Ionicons name="checkmark-circle" size={20} color="#059669" />
               <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="checkmark-circle" size={15} color={BRAND_COLORS.success} />
-                  <Text style={styles.promoAppliedCode}>{appliedPromo.code}</Text>
-                  <View style={styles.promoAppliedBadge}>
-                    <Text style={styles.promoAppliedBadgeText}>HEMAT {formattedDiscount}</Text>
-                  </View>
-                </View>
-                <Text style={styles.promoAppliedName}>{appliedPromo.name}</Text>
+                <Text style={styles.strong}>{appliedPromo.code}</Text>
+                <Text style={styles.meta}>{appliedPromo.name} · hemat {formattedDiscount}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.promoRemoveBtn}
-                onPress={handleRemovePromo}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Hapus voucher promo"
-              >
-                <Ionicons name="close" size={16} color="#52525B" />
-              </TouchableOpacity>
+              <Pressable onPress={handleRemovePromo} hitSlop={10} accessibilityRole="button" accessibilityLabel="Hapus kode promo">
+                <Text style={styles.link}>Hapus</Text>
+              </Pressable>
             </View>
           ) : (
-            <View>
-              <View style={styles.promoInputRow}>
+            <>
+              <View style={styles.promoRow}>
                 <TextInput
                   style={styles.promoInput}
-                  placeholder="Kode promo"
-                  placeholderTextColor="#71717A"
+                  placeholder="Masukkan kode"
+                  placeholderTextColor="#A1A1AA"
                   value={promoCodeInput}
                   onChangeText={(val) => setPromoCodeInput(val.toUpperCase())}
                   autoCapitalize="characters"
                   autoCorrect={false}
+                  accessibilityLabel="Kode promo"
                 />
-                <TouchableOpacity
-                  style={[styles.promoApplyBtn, (isApplyingPromo || !canPay) && { opacity: 0.6 }]}
+                <Pressable
+                  style={[styles.promoBtn, (isApplyingPromo || !canPay || !promoCodeInput.trim()) && { opacity: 0.4 }]}
                   disabled={isApplyingPromo || !canPay || !promoCodeInput.trim()}
                   onPress={handleApplyPromo}
-                  activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel="Terapkan kode promo"
                 >
-                  {isApplyingPromo ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.promoApplyBtnText}>Terapkan</Text>
-                  )}
-                </TouchableOpacity>
+                  {isApplyingPromo ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.promoBtnText}>Pakai</Text>}
+                </Pressable>
               </View>
-              {promoError ? (
-                <Text style={styles.promoErrorText}>{promoError}</Text>
-              ) : null}
-            </View>
+              {promoError ? <Text style={styles.error}>{promoError}</Text> : null}
+            </>
           )}
-        </View>
+        </Section>
 
-        <View style={styles.sectionCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.headerIconWrap}>
-              <Ionicons name="receipt-outline" size={15} color={BRAND_COLORS.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardHeaderTitle}>Rincian Pembayaran</Text>
-              <Text style={styles.cardHeaderSub}>Harga resmi tanpa biaya tersembunyi</Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>
-              Kategori {categoryName || 'Tiket'} ({quantity}x)
-            </Text>
-            <Text style={styles.priceValue}>{formattedTotalPrice}</Text>
-          </View>
-
-          {appliedPromo ? (
-            <View style={styles.priceRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.priceLabel, { color: BRAND_COLORS.success }]}>
-                  Diskon Voucher ({appliedPromo.code})
-                </Text>
-              </View>
-              <Text style={[styles.priceValue, { color: BRAND_COLORS.success }]}>
-                - {formattedDiscount}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Harga Satuan</Text>
-            <Text style={styles.priceValueMuted}>{formattedUnitPrice}</Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.priceLabel}>Biaya Layanan & Admin</Text>
-              <View style={styles.freeBadge}>
-                <Text style={styles.freeBadgeText}>PROMO</Text>
-              </View>
-            </View>
-            <Text style={styles.priceFreeText}>Rp 0 (Gratis)</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.totalRow}>
-            <View>
-              <Text style={styles.totalLabel}>Total Tagihan</Text>
-              <Text style={styles.totalSub}>Termasuk pajak & biaya sistem</Text>
-            </View>
-            <Text style={styles.totalAmount}>{formattedFinalPrice}</Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={[styles.headerIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-              <Ionicons name="shield-checkmark" size={15} color={BRAND_COLORS.success} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardHeaderTitle}>Midtrans Secure Gateway</Text>
-              <Text style={styles.cardHeaderSub}>Pilih metode pembayaran di halaman Midtrans</Text>
-            </View>
-          </View>
-
-          <Text style={styles.cardHeaderSub}>Virtual account, QRIS, GoPay, dan ShopeePay tersedia sesuai pilihan di Midtrans.</Text>
-        </View>
-
-        <View style={styles.policyCard}>
-          <Ionicons name="shield-outline" size={15} color="#71717A" style={{ marginTop: 2 }} />
-          <Text style={styles.policyText}>
-            Tiket resmi langsung diterbitkan ke tab <Text style={{ color: BRAND_COLORS.accent, fontWeight: '700' }}>Tiket Saya</Text> setelah pembayaran diverifikasi oleh sistem.
+        <Section title="Rincian pembayaran">
+          <Row label={`Subtotal (${quantity} tiket)`} value={formattedTotalPrice} />
+          {appliedPromo ? <Row label={`Diskon ${appliedPromo.code}`} value={`− ${formattedDiscount}`} tone="good" /> : null}
+          <View style={styles.hr} />
+          <Row label="Total" value={formattedFinalPrice} bold />
+          <Text style={[styles.meta, { marginTop: 12 }]}>
+            Pembayaran diproses lewat Midtrans: virtual account, QRIS, GoPay, atau ShopeePay. Tiket muncul di Tiket Saya setelah pembayaran terverifikasi.
           </Text>
-        </View>
+        </Section>
       </ScrollView>
 
-      <View
-        style={[
-          styles.stickyFooter,
-          { paddingBottom: Math.max(insets.bottom, 16) },
-        ]}
-      >
-        <View style={styles.footerPriceCol}>
-          <Text style={styles.footerPriceLabel}>Total Pembayaran</Text>
-          <Text style={styles.footerPriceValue}>{formattedFinalPrice}</Text>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.footerLabel}>Total pembayaran</Text>
+          <Text style={styles.footerTotal}>{formattedFinalPrice}</Text>
         </View>
-
         <Animated.View style={payButtonAnimatedStyle}>
-          <TouchableOpacity
-            style={[styles.payButton, (loading || !canPay) && styles.payButtonDisabled]}
+          <Pressable
+            style={[styles.payBtn, (loading || !canPay) && styles.payBtnOff]}
             disabled={loading || !canPay}
-            onPressIn={() => {
-              if (!loading && canPay) {
-                payButtonScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy));
-              }
-            }}
-            onPressOut={() => {
-              payButtonScale.set(withSpring(1, MOTION_TOKENS.springSnappy));
-            }}
+            onPressIn={() => { if (!loading && canPay) payButtonScale.set(withSpring(MOTION_TOKENS.pressScale.button, MOTION_TOKENS.springSnappy)); }}
+            onPressOut={() => payButtonScale.set(withSpring(1, MOTION_TOKENS.springSnappy))}
             onPress={handlePay}
-            activeOpacity={1}
             accessibilityRole="button"
-            accessibilityLabel="Bayar sekarang dengan Midtrans"
+            accessibilityLabel="Bayar sekarang"
           >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <>
-                <Text style={styles.payButtonText}>Bayar Sekarang</Text>
-                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-              </>
-            )}
-          </TouchableOpacity>
+            {loading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.payText}>Bayar</Text>}
+          </Pressable>
         </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Row({ label, value, bold, tone }: { label: string; value: string; bold?: boolean; tone?: 'good' }) {
+  const color = tone === 'good' ? '#047857' : undefined;
+  return (
+    <View style={styles.row}>
+      <Text style={[bold ? styles.totalLabel : styles.rowLabel, color && { color }]} numberOfLines={1}>{label}</Text>
+      <Text style={[bold ? styles.totalValue : styles.rowValue, color && { color }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  blockedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: BRAND_COLORS.dangerBg,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  blockedText: {
-    flex: 1,
-    color: '#B91C1C',
-    fontSize: 12.5,
-    fontWeight: '600',
-  },
-  blockedAction: {
-    color: BRAND_COLORS.accent,
-    fontSize: 12.5,
-    fontWeight: '800',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F6F6F8',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#F6F6F8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EBEBEF',
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#18181B',
-    letterSpacing: -0.2,
-  },
-  headerSpacer: { width: 44 },
-  sslBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-  },
-  sslBadgeText: {
-    color: BRAND_COLORS.success,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  scrollContent: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  blocked: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 12, backgroundColor: 'rgba(220,38,38,0.08)' },
+  blockedText: { flex: 1, fontSize: 14, color: '#991B1B', fontWeight: '600' },
+  blockedAction: { fontSize: 14, color: '#991B1B', fontWeight: '800' },
 
-  ticketStubCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  eventRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  eventThumb: {
-    width: 76,
-    height: 104,
-    borderRadius: 10,
-    backgroundColor: '#F4F4F5',
-  },
-  eventThumbPlaceholder: {
-    width: 76,
-    height: 104,
-    borderRadius: 10,
-    backgroundColor: '#F4F4F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  eventInfoCol: {
-    flex: 1,
-  },
-  tierBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(245, 165, 36, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 165, 36, 0.3)',
-    marginBottom: 6,
-  },
-  tierDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: BRAND_COLORS.accent,
-  },
-  tierBadgeText: {
-    color: BRAND_COLORS.accent,
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#18181B',
-    lineHeight: 20,
-    marginBottom: 6,
-    letterSpacing: -0.2,
-  },
-  eventMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
-  },
-  eventMetaText: {
-    fontSize: 12,
-    color: '#52525B',
-    fontWeight: '500',
-  },
+  eventRow: { flexDirection: 'row', gap: 14, paddingHorizontal: 16, paddingVertical: 8 },
+  thumb: { width: 72, height: 108, borderRadius: 10, backgroundColor: '#E4E4E7' },
+  eventTitle: { fontSize: 18, fontWeight: '800', color: '#18181B', lineHeight: 23 },
+  meta: { fontSize: 14, color: '#71717A', lineHeight: 20 },
+  band: { height: 8, backgroundColor: '#F4F4F5', marginTop: 16 },
 
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  headerIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F4F4F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  cardHeaderTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  cardHeaderSub: {
-    fontSize: 11,
-    color: '#71717A',
-    marginTop: 1,
-  },
+  section: { paddingHorizontal: 16, paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#F4F4F5' },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#18181B', marginBottom: 10 },
+  strong: { fontSize: 15, fontWeight: '700', color: '#18181B' },
+  link: { fontSize: 14, fontWeight: '700', color: '#B4630A' },
 
-  userInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  userAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E4E4E7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userAvatarText: {
-    color: BRAND_COLORS.accent,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  userName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  userEmail: {
-    fontSize: 11,
-    color: '#52525B',
-    marginTop: 1,
-  },
-  verifiedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  verifiedChipText: {
-    color: BRAND_COLORS.success,
-    fontSize: 10,
-    fontWeight: '700',
-  },
+  promoRow: { flexDirection: 'row', gap: 10 },
+  promoInput: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#E4E4E7', paddingHorizontal: 14, fontSize: 15, color: '#18181B', fontWeight: '700', letterSpacing: 1 },
+  promoBtn: { height: 48, paddingHorizontal: 20, borderRadius: 12, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' },
+  promoBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
+  promoApplied: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: 'rgba(5,150,105,0.08)' },
+  error: { marginTop: 8, fontSize: 13, color: '#B91C1C' },
 
-  promoInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  promoInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-    paddingHorizontal: 12,
-    color: '#18181B',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  promoApplyBtn: {
-    height: 44,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: BRAND_COLORS.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  promoApplyBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  promoErrorText: {
-    color: BRAND_COLORS.danger,
-    fontSize: 11,
-    marginTop: 6,
-    marginLeft: 2,
-  },
-  promoAppliedBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-  },
-  promoAppliedCode: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: BRAND_COLORS.success,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  promoAppliedBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  promoAppliedBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: BRAND_COLORS.success,
-  },
-  promoAppliedName: {
-    fontSize: 11,
-    color: '#52525B',
-    marginTop: 3,
-  },
-  promoRemoveBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E4E4E7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  rowLabel: { flex: 1, fontSize: 15, color: '#52525B' },
+  rowValue: { fontSize: 15, fontWeight: '600', color: '#18181B', fontVariant: ['tabular-nums'] },
+  totalLabel: { flex: 1, fontSize: 16, fontWeight: '800', color: '#18181B' },
+  totalValue: { fontSize: 18, fontWeight: '800', color: '#18181B', fontVariant: ['tabular-nums'] },
+  hr: { height: 1, backgroundColor: '#E4E4E7', marginVertical: 8 },
 
-  divider: {
-    height: 1,
-    backgroundColor: '#E4E4E7',
-    marginVertical: 10,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  priceLabel: {
-    fontSize: 12,
-    color: '#52525B',
-    fontWeight: '500',
-  },
-  priceValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#18181B',
-    fontVariant: ['tabular-nums'],
-  },
-  priceValueMuted: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#71717A',
-    fontVariant: ['tabular-nums'],
-  },
-  freeBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 3,
-  },
-  freeBadgeText: {
-    color: BRAND_COLORS.success,
-    fontSize: 8,
-    fontWeight: '800',
-  },
-  priceFreeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BRAND_COLORS.success,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  totalLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#18181B',
-  },
-  totalSub: {
-    fontSize: 10,
-    color: '#71717A',
-    marginTop: 1,
-  },
-  totalAmount: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: BRAND_COLORS.accent,
-    letterSpacing: -0.3,
-    fontVariant: ['tabular-nums'],
-  },
-
-  channelGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  channelChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E4E4E7',
-  },
-  channelChipActive: {
-    borderColor: BRAND_COLORS.accent,
-    backgroundColor: 'rgba(245, 165, 36, 0.1)',
-  },
-  channelChipText: {
-    color: '#3F3F46',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  channelChipTextActive: {
-    color: BRAND_COLORS.accent,
-    fontWeight: '700',
-  },
-
-  policyCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-  policyText: {
-    flex: 1,
-    fontSize: 11,
-    color: '#71717A',
-    lineHeight: 16,
-  },
-
-  stickyFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E4E4E7',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  footerPriceCol: {
-    flex: 1,
-    marginRight: 12,
-  },
-  footerPriceLabel: {
-    fontSize: 10,
-    color: '#71717A',
-    fontWeight: '600',
-  },
-  footerPriceValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: BRAND_COLORS.accent,
-    marginTop: 2,
-    letterSpacing: -0.3,
-    fontVariant: ['tabular-nums'],
-  },
-  payButton: {
-    backgroundColor: BRAND_COLORS.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 44,
-  },
-  payButtonDisabled: {
-    backgroundColor: '#D4D4D8',
-    opacity: 0.6,
-  },
-  payButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingTop: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E4E4E7' },
+  footerLabel: { fontSize: 12, color: '#71717A', fontWeight: '600' },
+  footerTotal: { fontSize: 20, fontWeight: '800', color: '#18181B', fontVariant: ['tabular-nums'] },
+  payBtn: { height: 52, minWidth: 140, paddingHorizontal: 32, borderRadius: 26, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' },
+  payBtnOff: { backgroundColor: '#D4D4D8' },
+  payText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 });
