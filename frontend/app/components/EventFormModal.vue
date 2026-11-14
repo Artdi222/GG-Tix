@@ -311,34 +311,57 @@ async function submit() {
           </UFormField>
         </div>
 
-        <div class="grid sm:grid-cols-2 gap-4">
-          <UFormField
-            label="Banner (16:9)"
-            help="Carousel beranda dan latar detail event"
-          >
-            <ImageField
-              v-model="state.imageUrl"
-              kind="banner"
-            />
-          </UFormField>
-          <UFormField
-            label="Poster (2:3)"
-            help="Kartu event dan thumbnail tiket"
-          >
-            <ImageField
-              v-model="state.posterUrl"
-              kind="poster"
-              aspect="aspect-[2/3]"
-            />
-          </UFormField>
-          <UFormField
-            label="Seatmap"
-          >
-            <ImageField
-              v-model="state.seatmapUrl"
-              kind="venue"
-            />
-          </UFormField>
+        <!-- One row, equal preview height: width follows each image's ratio so nothing towers over the form. -->
+        <div>
+          <p class="text-sm font-medium text-default">
+            Gambar
+          </p>
+          <p class="text-xs text-muted mb-3">
+            PNG, JPG, atau WebP, maks. 10 MB. Gambar dipotong otomatis ke rasionya.
+          </p>
+          <div class="flex flex-wrap items-start gap-5">
+            <div>
+              <p class="text-xs font-medium text-default">
+                Banner 16:9
+              </p>
+              <p class="text-xs text-muted mb-1.5">
+                Carousel &amp; latar detail
+              </p>
+              <ImageField
+                v-model="state.imageUrl"
+                kind="banner"
+                height="h-36"
+              />
+            </div>
+            <div>
+              <p class="text-xs font-medium text-default">
+                Poster 2:3
+              </p>
+              <p class="text-xs text-muted mb-1.5">
+                Kartu &amp; tiket
+              </p>
+              <ImageField
+                v-model="state.posterUrl"
+                kind="poster"
+                aspect="aspect-[2/3]"
+                height="h-36"
+              />
+            </div>
+            <div>
+              <p class="text-xs font-medium text-default">
+                Seatmap 9:16
+              </p>
+              <p class="text-xs text-muted mb-1.5">
+                Denah venue
+              </p>
+              <ImageField
+                v-model="state.seatmapUrl"
+                kind="venue"
+                aspect="aspect-[9/16]"
+                height="h-36"
+              />
+            </div>
+          </div>
         </div>
 
         <UAlert
